@@ -1,0 +1,35 @@
+/* Reset everything */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Make root take full space */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+/* Main container */
+.container {
+  min-height: 100vh;
+  width: 100%; /* 👈 use 100%, NOT 100vw */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  background: linear-gradient(135deg, #2563eb, #1e3a8a);
+}
+
+/* Button */
+.btn {
+  background-color: white;
+  color: #2563eb;
+  padding: 12px 24px;
+  font-size: 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
