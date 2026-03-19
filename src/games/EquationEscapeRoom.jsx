@@ -1,906 +1,813 @@
-// src/games/EquationEscapeRoom.jsx
 import React, { useState, useEffect } from 'react';
-import { IoMdLock, IoMdUnlock, IoMdArrowForward, IoMdRefresh } from 'react-icons/io';
-import { FaCalculator, FaChartLine, FaBrain, FaTrophy, FaStar } from 'react-icons/fa';
-import { GiSecretBook, GiPuzzle, GiFinishLine } from 'react-icons/gi';
-import { MdAccessTime, MdLeaderboard } from 'react-icons/md';
 
-function EquationEscapeRoom() {
-  // Remove the gameStarted state from here - it's controlled by Game.jsx
-  const [currentLevel, setCurrentLevel] = useState(1);
-  const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState('');
-  const [unlockedLevels, setUnlockedLevels] = useState([1]);
-  const [gameComplete, setGameComplete] = useState(false);
-  const [timeElapsed, setTimeElapsed] = useState(0);
+const EquationEscapeRoom = () => {
+  const [gameState, setGameState] = useState('start');
+  const [timeLeft, setTimeLeft] = useState(600);
+  const [currentPuzzle, setCurrentPuzzle] = useState(1);
+  const [puzzle1Answer, setPuzzle1Answer] = useState('');
+  const [puzzle2Answer, setPuzzle2Answer] = useState('');
+  const [puzzle3Answer, setPuzzle3Answer] = useState('');
+  const [finalEquation, setFinalEquation] = useState('');
   const [showHint, setShowHint] = useState(false);
-  const [attempts, setAttempts] = useState(0);
-  
-  // State for level inputs
-  const [level1Answers, setLevel1Answers] = useState({ slope: '', intercept: '' });
-  const [level2Answers, setLevel2Answers] = useState({ equation: '', intercept: '' });
-  const [level3Answers, setLevel3Answers] = useState({ slope: '', intercept: '', equation: '' });
-  const [finalAnswers, setFinalAnswers] = useState({
-    slope: '',
-    intercept: '',
-    equation: '',
-    xIntercept: '',
-    yIntercept: ''
-  });
+  const [errorFound, setErrorFound] = useState(false);
+  const [selectedKey, setSelectedKey] = useState(null);
+  const [message, setMessage] = useState('');
+  const [puzzle4Input, setPuzzle4Input] = useState('');
+  const [graphValue, setGraphValue] = useState(0);
 
-  // Level data
-  const levels = {
-    1: {
-      title: "The Point Portal",
-      description: "Two points hold the key to the first lock. Find their relationship!",
-      icon: <GiSecretBook size={32} />,
-      color: "#3b82f6",
-      bgColor: "#dbeafe",
-      points: { p1: { x: 2, y: 4 }, p2: { x: 5, y: 10 } },
-      hint: "Slope = (y₂ - y₁) / (x₂ - x₁). Then use y = mx + b to find intercept.",
-      timeLimit: 300 // 5 minutes
-    },
-    2: {
-      title: "Slope-Intercept Chamber",
-      description: "A slope and a point guide the way. Write the equation to proceed!",
-      icon: <FaChartLine size={32} />,
-      color: "#8b5cf6",
-      bgColor: "#ede9fe",
-      slope: 3,
-      point: { x: 1, y: 5 },
-      hint: "Plug the point into y = mx + b to find b, then write the full equation.",
-      timeLimit: 300
-    },
-    3: {
-      title: "Real-World Riddle",
-      description: "Decode this real-life situation to find the mathematical pattern!",
-      icon: <FaBrain size={32} />,
-      color: "#10b981",
-      bgColor: "#d1fae5",
-      problem: {
-        text: "A cell phone plan costs $30 per month plus $0.10 per text message. " +
-               "Find the slope, y-intercept, and equation of the cost function.",
-        monthlyFee: 30,
-        perTextCost: 0.10
-      },
-      hint: "The monthly fee is your y-intercept. The cost per text is your slope.",
-      timeLimit: 400
-    },
-    4: {
-      title: "Final Boss: The Equation Fortress",
-      description: "All concepts combined! Find every piece of the puzzle to escape!",
-      icon: <GiFinishLine size={32} />,
-      color: "#ef4444",
-      bgColor: "#fee2e2",
-      points: { p1: { x: -2, y: 1 }, p2: { x: 4, y: 7 } },
-      hint: "Find slope first, then intercept. Use these to write equation and find both intercepts.",
-      timeLimit: 600
-    }
-  };
-
-  // Timer effect - remove gameStarted dependency
+  // Timer effect
   useEffect(() => {
-    if (!gameComplete && timeElapsed < levels[currentLevel].timeLimit) {
-      const timer = setTimeout(() => setTimeElapsed(timeElapsed + 1), 1000);
-      return () => clearTimeout(timer);
-    } else if (timeElapsed >= levels[currentLevel].timeLimit) {
-      setFeedback('⏰ Time\'s up! Try again!');
+    let timer;
+    if (gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            setGameState('failed');
+            setMessage('⏰ TIME\'S UP! You failed to escape!');
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     }
-  }, [timeElapsed, gameComplete, currentLevel]);
+    return () => clearInterval(timer);
+  }, [gameState, timeLeft]);
 
-  // Helper functions
-  const calculateSlope = (p1, p2) => (p2.y - p1.y) / (p2.x - p1.x);
-  const calculateIntercept = (point, slope) => point.y - (slope * point.x);
+  const formatTime = () => {
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
 
-  // Level 1 check
-  const checkLevel1 = () => {
-    setAttempts(attempts + 1);
-    const correctSlope = calculateSlope(levels[1].points.p1, levels[1].points.p2);
-    const correctIntercept = calculateIntercept(levels[1].points.p1, correctSlope);
-    
-    const userSlope = parseFloat(level1Answers.slope);
-    const userIntercept = parseFloat(level1Answers.intercept);
-    
-    if (Math.abs(userSlope - correctSlope) < 0.01 && 
-        Math.abs(userIntercept - correctIntercept) < 0.01) {
-      setFeedback('✅ Portal unlocked! +10 points!');
-      setScore(score + 10);
-      setUnlockedLevels([...unlockedLevels, 2]);
-      setTimeout(() => {
-        setCurrentLevel(2);
-        setTimeElapsed(0);
-        setShowHint(false);
-        setFeedback('');
-      }, 2000);
+  const startGame = () => {
+    setGameState('puzzle1');
+    setTimeLeft(600);
+    setCurrentPuzzle(1);
+    setMessage('');
+  };
+
+  const checkPuzzle1 = () => {
+    if (puzzle1Answer === 'x=4') {
+      setGameState('puzzle2');
+      setCurrentPuzzle(2);
+      setMessage('🔓 First lock opened! Moving to next puzzle...');
+      setPuzzle1Answer('');
     } else {
-      setFeedback('❌ Lock remains closed. Check your calculations!');
+      setMessage('❌ Wrong answer! The equation should be x + 3 = 7 → x = 4');
     }
   };
 
-  // Level 2 check
-  const checkLevel2 = () => {
-    setAttempts(attempts + 1);
-    const correctIntercept = calculateIntercept(levels[2].point, levels[2].slope);
-    const correctEquation = `y = ${levels[2].slope}x + ${correctIntercept}`;
-    
-    const userEquation = level2Answers.equation.replace(/\s+/g, '').toLowerCase();
-    const normalizedCorrect = correctEquation.replace(/\s+/g, '').toLowerCase();
-    
-    if (userEquation === normalizedCorrect && 
-        parseFloat(level2Answers.intercept) === correctIntercept) {
-      setFeedback('✅ Chamber unlocked! +15 points!');
-      setScore(score + 15);
-      setUnlockedLevels([...unlockedLevels, 3]);
-      setTimeout(() => {
-        setCurrentLevel(3);
-        setTimeElapsed(0);
-        setShowHint(false);
-        setFeedback('');
-      }, 2000);
+  const checkPuzzle2 = () => {
+    if (puzzle2Answer === '3') {
+      setGameState('puzzle3');
+      setCurrentPuzzle(3);
+      setMessage('🔓 Second lock opened! Almost there...');
+      setPuzzle2Answer('');
     } else {
-      setFeedback('❌ The equation doesn\'t match. Try again!');
+      setMessage('❌ Look at where the line crosses the y-axis!');
     }
   };
 
-  // Level 3 check
-  const checkLevel3 = () => {
-    setAttempts(attempts + 1);
-    const correctSlope = levels[3].problem.perTextCost;
-    const correctIntercept = levels[3].problem.monthlyFee;
-    const correctEquation = `y = ${correctSlope}x + ${correctIntercept}`;
-    
-    const userSlope = parseFloat(level3Answers.slope);
-    const userIntercept = parseFloat(level3Answers.intercept);
-    const userEquation = level3Answers.equation.replace(/\s+/g, '').toLowerCase();
-    const normalizedCorrect = correctEquation.replace(/\s+/g, '').toLowerCase();
-    
-    if (Math.abs(userSlope - correctSlope) < 0.01 && 
-        Math.abs(userIntercept - correctIntercept) < 0.01 &&
-        userEquation === normalizedCorrect) {
-      setFeedback('✅ Riddle solved! +20 points!');
-      setScore(score + 20);
-      setUnlockedLevels([...unlockedLevels, 4]);
-      setTimeout(() => {
-        setCurrentLevel(4);
-        setTimeElapsed(0);
-        setShowHint(false);
-        setFeedback('');
-      }, 2000);
+  const checkPuzzle3 = () => {
+    if (puzzle3Answer === '12') {
+      setGameState('puzzle4');
+      setCurrentPuzzle(4);
+      setMessage('🔓 Third lock clicked! Keep going...');
+      setPuzzle3Answer('');
     } else {
-      setFeedback('❌ Think about what slope and intercept mean in this context.');
+      setMessage('❌ Solve 3x + 5 = 41 carefully!');
     }
   };
 
-  // Final boss check
-  const checkFinalBoss = () => {
-    setAttempts(attempts + 1);
-    const correctSlope = calculateSlope(levels[4].points.p1, levels[4].points.p2);
-    const correctIntercept = calculateIntercept(levels[4].points.p1, correctSlope);
-    const correctEquation = `y = ${correctSlope.toFixed(1)}x + ${correctIntercept.toFixed(1)}`;
-    const correctXIntercept = -correctIntercept / correctSlope;
-    const correctYIntercept = correctIntercept;
-    
-    const userSlope = parseFloat(finalAnswers.slope);
-    const userIntercept = parseFloat(finalAnswers.intercept);
-    const userEquation = finalAnswers.equation.replace(/\s+/g, '').toLowerCase();
-    const normalizedCorrect = correctEquation.replace(/\s+/g, '').toLowerCase();
-    const userXIntercept = parseFloat(finalAnswers.xIntercept);
-    const userYIntercept = parseFloat(finalAnswers.yIntercept);
-    
-    if (Math.abs(userSlope - correctSlope) < 0.1 &&
-        Math.abs(userIntercept - correctIntercept) < 0.1 &&
-        userEquation === normalizedCorrect &&
-        Math.abs(userXIntercept - correctXIntercept) < 0.1 &&
-        Math.abs(userYIntercept - correctYIntercept) < 0.1) {
-      setFeedback('🎉 CONGRATULATIONS! You\'ve escaped! +50 points! 🎉');
-      setScore(score + 50);
-      setGameComplete(true);
+  const checkPuzzle4 = () => {
+    if (puzzle4Input === '2+2=5' || puzzle4Input.toLowerCase().includes('clue 1')) {
+      setErrorFound(true);
+      setGameState('puzzle5');
+      setCurrentPuzzle(5);
+      setMessage('🔓 You spotted the error! Moving on...');
+      setPuzzle4Input('');
     } else {
-      setFeedback('❌ The final lock holds strong. Check all components carefully.');
+      setMessage('❌ That\'s not the error! Look at the clues again.');
+    }
+  };
+
+  const checkPuzzle5 = () => {
+    if (selectedKey === 'key3') {
+      setGameState('final');
+      setCurrentPuzzle(6);
+      setMessage('🔑 Correct key! Now create the final equation...');
+    } else {
+      setMessage('❌ Wrong key! Remember, x² = 16 has two solutions!');
+    }
+  };
+
+  const checkFinal = () => {
+    if (finalEquation.toLowerCase() === 'e=mc^2' || finalEquation.toLowerCase() === 'e=mc2') {
+      setGameState('escaped');
+      setMessage('🎉 CONGRATULATIONS! You\'ve escaped the Equation Escape Room! 🎉');
+    } else {
+      setMessage('❌ That\'s not Einstein\'s famous equation!');
     }
   };
 
   const resetGame = () => {
-    setCurrentLevel(1);
-    setScore(0);
-    setFeedback('');
-    setUnlockedLevels([1]);
-    setGameComplete(false);
-    setTimeElapsed(0);
-    setAttempts(0);
+    setGameState('start');
+    setTimeLeft(600);
+    setCurrentPuzzle(1);
+    setPuzzle1Answer('');
+    setPuzzle2Answer('');
+    setPuzzle3Answer('');
+    setPuzzle4Input('');
+    setFinalEquation('');
     setShowHint(false);
-    setLevel1Answers({ slope: '', intercept: '' });
-    setLevel2Answers({ equation: '', intercept: '' });
-    setLevel3Answers({ slope: '', intercept: '', equation: '' });
-    setFinalAnswers({ slope: '', intercept: '', equation: '', xIntercept: '', yIntercept: '' });
+    setErrorFound(false);
+    setSelectedKey(null);
+    setMessage('');
+    setGraphValue(0);
   };
 
-  const formatTime = (seconds) => {
-    const mins = Math.floor((levels[currentLevel].timeLimit - seconds) / 60);
-    const secs = (levels[currentLevel].timeLimit - seconds) % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  // Interactive graph for puzzle 2
+  const updateGraph = (value) => {
+    setGraphValue(value);
+    // Update the displayed y-value based on the equation y = 2x + 3
+    const yValue = 2 * value + 3;
+    setPuzzle2Answer(yValue.toString());
   };
 
-  // Always render the game content since Game.jsx controls when to show this component
   return (
     <div style={styles.container}>
       {/* Game Header */}
       <div style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.title}>
-            <GiPuzzle style={styles.titleIcon} />
-            Equation Escape Room
-          </h1>
-          <div style={styles.stats}>
-            <div style={styles.stat}>
-              <FaTrophy color="#f59e0b" />
-              <span style={styles.statText}>{score} pts</span>
-            </div>
-            <div style={styles.stat}>
-              <MdAccessTime color="#3b82f6" />
-              <span style={styles.statText}>{formatTime(timeElapsed)}</span>
-            </div>
-            <div style={styles.stat}>
-              <FaStar color="#fbbf24" />
-              <span style={styles.statText}>Level {currentLevel}/4</span>
-            </div>
-            <div style={styles.stat}>
-              <span style={styles.attempts}>{attempts} attempts</span>
-            </div>
+        <h1 style={styles.title}>🧮 EQUATION ESCAPE ROOM 🧮</h1>
+        {gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && (
+          <div style={styles.timer}>
+            ⏱️ Time: {formatTime()}
           </div>
-        </div>
+        )}
+        {message && <div style={styles.message}>{message}</div>}
       </div>
 
-      {/* Level Navigation */}
-      <div style={styles.levelNav}>
-        {[1, 2, 3, 4].map(level => (
-          <button
-            key={level}
-            style={{
-              ...styles.levelBtn,
-              backgroundColor: unlockedLevels.includes(level) 
-                ? (currentLevel === level ? levels[level].color : '#fff')
-                : '#e5e7eb',
-              color: unlockedLevels.includes(level)
-                ? (currentLevel === level ? '#fff' : '#374151')
-                : '#9ca3af',
-              border: currentLevel === level ? `2px solid ${levels[level].color}` : 'none',
-              cursor: unlockedLevels.includes(level) ? 'pointer' : 'not-allowed',
-            }}
-            onClick={() => unlockedLevels.includes(level) && setCurrentLevel(level)}
-            disabled={!unlockedLevels.includes(level)}
-          >
-            {unlockedLevels.includes(level) ? (
-              <IoMdUnlock style={styles.levelIcon} />
-            ) : (
-              <IoMdLock style={styles.levelIcon} />
-            )}
-            Level {level}
-          </button>
-        ))}
-      </div>
-
-      {/* Main Game Area */}
-      {!gameComplete ? (
-        <div style={styles.gameArea}>
-          {/* Level Info */}
-          <div style={styles.levelInfo}>
-            <div style={{
-              ...styles.levelIconLarge,
-              backgroundColor: levels[currentLevel].bgColor,
-              color: levels[currentLevel].color
-            }}>
-              {levels[currentLevel].icon}
-            </div>
-            <div style={styles.levelText}>
-              <h2 style={styles.levelTitle}>{levels[currentLevel].title}</h2>
-              <p style={styles.levelDescription}>{levels[currentLevel].description}</p>
-            </div>
-          </div>
-
-          {/* Hint Toggle */}
-          <button 
-            style={styles.hintBtn}
-            onClick={() => setShowHint(!showHint)}
-          >
-            {showHint ? 'Hide Hint' : 'Show Hint'}
-          </button>
-          
-          {showHint && (
-            <div style={styles.hintBox}>
-              <strong>💡 Hint:</strong> {levels[currentLevel].hint}
-            </div>
-          )}
-
-          {/* Level 1 Content */}
-          {currentLevel === 1 && (
-            <div style={styles.levelContent}>
-              <div style={styles.problemBox}>
-                <p>Find the slope and y-intercept that connect these points:</p>
-                <p style={styles.points}>Point 1: ({levels[1].points.p1.x}, {levels[1].points.p1.y})</p>
-                <p style={styles.points}>Point 2: ({levels[1].points.p2.x}, {levels[1].points.p2.y})</p>
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Slope (m):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={level1Answers.slope}
-                  onChange={(e) => setLevel1Answers({...level1Answers, slope: e.target.value})}
-                  placeholder="Enter slope"
-                  style={styles.input}
-                />
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Y-intercept (b):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={level1Answers.intercept}
-                  onChange={(e) => setLevel1Answers({...level1Answers, intercept: e.target.value})}
-                  placeholder="Enter y-intercept"
-                  style={styles.input}
-                />
-              </div>
-              
-              <button style={styles.checkBtn} onClick={checkLevel1}>
-                Unlock Level <IoMdArrowForward />
-              </button>
-            </div>
-          )}
-
-          {/* Level 2 Content */}
-          {currentLevel === 2 && (
-            <div style={styles.levelContent}>
-              <div style={styles.problemBox}>
-                <p>Given a slope of <strong>{levels[2].slope}</strong> and point</p>
-                <p style={styles.points}>({levels[2].point.x}, {levels[2].point.y})</p>
-                <p>Write the equation in slope-intercept form!</p>
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Equation (y = mx + b):</label>
-                <input
-                  type="text"
-                  value={level2Answers.equation}
-                  onChange={(e) => setLevel2Answers({...level2Answers, equation: e.target.value})}
-                  placeholder="e.g., y = 3x + 2"
-                  style={styles.input}
-                />
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Y-intercept (b):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={level2Answers.intercept}
-                  onChange={(e) => setLevel2Answers({...level2Answers, intercept: e.target.value})}
-                  placeholder="Enter y-intercept"
-                  style={styles.input}
-                />
-              </div>
-              
-              <button style={styles.checkBtn} onClick={checkLevel2}>
-                Unlock Level <IoMdArrowForward />
-              </button>
-            </div>
-          )}
-
-          {/* Level 3 Content */}
-          {currentLevel === 3 && (
-            <div style={styles.levelContent}>
-              <div style={styles.problemBox}>
-                <p style={styles.wordProblem}>{levels[3].problem.text}</p>
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Slope (cost per text):</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={level3Answers.slope}
-                  onChange={(e) => setLevel3Answers({...level3Answers, slope: e.target.value})}
-                  placeholder="Enter slope"
-                  style={styles.input}
-                />
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Y-intercept (monthly fee):</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={level3Answers.intercept}
-                  onChange={(e) => setLevel3Answers({...level3Answers, intercept: e.target.value})}
-                  placeholder="Enter y-intercept"
-                  style={styles.input}
-                />
-              </div>
-              
-              <div style={styles.inputGroup}>
-                <label>Equation:</label>
-                <input
-                  type="text"
-                  value={level3Answers.equation}
-                  onChange={(e) => setLevel3Answers({...level3Answers, equation: e.target.value})}
-                  placeholder="e.g., y = 0.10x + 30"
-                  style={styles.input}
-                />
-              </div>
-              
-              <button style={styles.checkBtn} onClick={checkLevel3}>
-                Unlock Level <IoMdArrowForward />
-              </button>
-            </div>
-          )}
-
-          {/* Level 4 Content */}
-          {currentLevel === 4 && (
-            <div style={styles.levelContent}>
-              <div style={styles.problemBox}>
-                <p>Final Challenge! From these two points, find everything:</p>
-                <p style={styles.points}>Point 1: ({levels[4].points.p1.x}, {levels[4].points.p1.y})</p>
-                <p style={styles.points}>Point 2: ({levels[4].points.p2.x}, {levels[4].points.p2.y})</p>
-              </div>
-              
-              <div style={styles.inputGrid}>
-                <div style={styles.inputGroup}>
-                  <label>Slope:</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={finalAnswers.slope}
-                    onChange={(e) => setFinalAnswers({...finalAnswers, slope: e.target.value})}
-                    placeholder="Slope"
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.inputGroup}>
-                  <label>Y-intercept:</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={finalAnswers.intercept}
-                    onChange={(e) => setFinalAnswers({...finalAnswers, intercept: e.target.value})}
-                    placeholder="Y-intercept"
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.inputGroup}>
-                  <label>Equation:</label>
-                  <input
-                    type="text"
-                    value={finalAnswers.equation}
-                    onChange={(e) => setFinalAnswers({...finalAnswers, equation: e.target.value})}
-                    placeholder="Equation"
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.inputGroup}>
-                  <label>X-intercept:</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={finalAnswers.xIntercept}
-                    onChange={(e) => setFinalAnswers({...finalAnswers, xIntercept: e.target.value})}
-                    placeholder="X-intercept"
-                    style={styles.input}
-                  />
-                </div>
-                
-                <div style={styles.inputGroup}>
-                  <label>Y-intercept:</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={finalAnswers.yIntercept}
-                    onChange={(e) => setFinalAnswers({...finalAnswers, yIntercept: e.target.value})}
-                    placeholder="Y-intercept"
-                    style={styles.input}
-                  />
-                </div>
-              </div>
-              
-              <button style={{...styles.checkBtn, backgroundColor: '#ef4444'}} onClick={checkFinalBoss}>
-                Attempt Final Escape! <IoMdArrowForward />
-              </button>
-            </div>
-          )}
-
-          {/* Feedback Message */}
-          {feedback && (
-            <div style={{
-              ...styles.feedback,
-              backgroundColor: feedback.includes('✅') || feedback.includes('🎉') ? '#10b981' : '#ef4444'
-            }}>
-              {feedback}
-            </div>
-          )}
-        </div>
-      ) : (
-        // Victory Screen
-        <div style={styles.victoryScreen}>
-          <GiFinishLine size={80} color="#f59e0b" />
-          <h2 style={styles.victoryTitle}>ESCAPE SUCCESSFUL!</h2>
-          <p style={styles.victoryText}>You've mastered linear equations!</p>
-          <div style={styles.victoryStats}>
-            <div style={styles.victoryStat}>
-              <FaTrophy size={24} color="#f59e0b" />
-              <span style={styles.victoryStatValue}>{score}</span>
-              <span>Final Score</span>
-            </div>
-            <div style={styles.victoryStat}>
-              <MdAccessTime size={24} color="#3b82f6" />
-              <span style={styles.victoryStatValue}>{Math.floor(timeElapsed / 60)}:{(timeElapsed % 60).toString().padStart(2, '0')}</span>
-              <span>Total Time</span>
-            </div>
-            <div style={styles.victoryStat}>
-              <FaBrain size={24} color="#8b5cf6" />
-              <span style={styles.victoryStatValue}>{attempts}</span>
-              <span>Attempts</span>
-            </div>
-          </div>
-          <button style={styles.resetBtn} onClick={resetGame}>
-            <IoMdRefresh /> Play Again
+      {/* Start Screen */}
+      {gameState === 'start' && (
+        <div style={styles.startScreen}>
+          <h2 style={styles.subtitle}>Welcome to the Equation Escape Room!</h2>
+          <p style={styles.text}>You have 10 minutes to solve all puzzles and escape.</p>
+          <p style={styles.text}>Each puzzle unlocks a new challenge. Work quickly and carefully!</p>
+          <button style={styles.startBtn} onClick={startGame}>
+            🚪 START ESCAPE
           </button>
         </div>
       )}
 
-      {/* Leaderboard Preview */}
-      <div style={styles.leaderboardPreview}>
-        <div style={styles.leaderboardHeader}>
-          <MdLeaderboard size={24} color="#f59e0b" />
-          <h3 style={styles.leaderboardTitle}>Escape Room Champions</h3>
-        </div>
-        <div style={styles.leaderboardList}>
-          {[
-            { name: 'MathMaster', score: 95, time: '4:32' },
-            { name: 'EquationPro', score: 90, time: '5:15' },
-            { name: 'SlopeKing', score: 85, time: '6:00' },
-            { name: 'InterceptQueen', score: 80, time: '6:45' },
-            { name: 'NumberNinja', score: 75, time: '7:20' }
-          ].map((player, index) => (
-            <div key={index} style={styles.leaderboardItem}>
-              <span style={styles.position}>#{index + 1}</span>
-              <span style={styles.playerName}>{player.name}</span>
-              <span style={styles.playerScore}>{player.score} pts</span>
-              <span style={styles.playerTime}>{player.time}</span>
+      {/* Puzzle 1 - Match equations to answers */}
+      {gameState === 'puzzle1' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🔒 LOCK #1: Match the Equation</h2>
+          <div style={styles.puzzleContent}>
+            <p style={styles.question}>"A number plus 3 equals 7"</p>
+            <p style={styles.questionSmall}>Which equation matches this statement?</p>
+            
+            <div style={styles.equationBox} onClick={() => setPuzzle1Answer('x=4')}>
+              <input 
+                type="radio" 
+                name="puzzle1" 
+                value="x=4" 
+                checked={puzzle1Answer === 'x=4'}
+                onChange={(e) => setPuzzle1Answer(e.target.value)}
+                style={styles.radio}
+              />
+              <span style={styles.equationText}>x + 3 = 7  →  x = 4</span>
             </div>
-          ))}
+            
+            <div style={styles.equationBox} onClick={() => setPuzzle1Answer('x=10')}>
+              <input 
+                type="radio" 
+                name="puzzle1" 
+                value="x=10"
+                checked={puzzle1Answer === 'x=10'}
+                onChange={(e) => setPuzzle1Answer(e.target.value)}
+                style={styles.radio}
+              />
+              <span style={styles.equationText}>x - 3 = 7  →  x = 10</span>
+            </div>
+            
+            <div style={styles.equationBox} onClick={() => setPuzzle1Answer('x=21')}>
+              <input 
+                type="radio" 
+                name="puzzle1" 
+                value="x=21"
+                checked={puzzle1Answer === 'x=21'}
+                onChange={(e) => setPuzzle1Answer(e.target.value)}
+                style={styles.radio}
+              />
+              <span style={styles.equationText}>3x = 7  →  x = 21</span>
+            </div>
+            
+            <button 
+              style={styles.unlockBtn} 
+              onClick={checkPuzzle1}
+              disabled={!puzzle1Answer}
+            >
+              🔓 TRY TO UNLOCK
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Puzzle 2 - Interactive Graph */}
+      {gameState === 'puzzle2' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🔒 LOCK #2: Interactive Graph</h2>
+          <div style={styles.puzzleContent}>
+            <div style={styles.graphContainer}>
+              <div style={styles.graph}>
+                <div style={styles.grid}>
+                  {/* Y-axis line */}
+                  <div style={styles.yAxis}></div>
+                  {/* X-axis line */}
+                  <div style={styles.xAxis}></div>
+                  
+                  {/* Line for y = 2x + 3 */}
+                  <div style={styles.graphLine}></div>
+                  
+                  {/* Point marker that moves with slider */}
+                  <div style={{
+                    ...styles.graphPoint,
+                    left: `${50 + graphValue * 20}px`,
+                    bottom: `${50 + (2 * graphValue + 3) * 10}px`
+                  }}></div>
+                </div>
+              </div>
+              
+              <div style={styles.sliderContainer}>
+                <span>Move the point: x = {graphValue}</span>
+                <input 
+                  type="range" 
+                  min="-2" 
+                  max="4" 
+                  step="0.5"
+                  value={graphValue}
+                  onChange={(e) => updateGraph(parseFloat(e.target.value))}
+                  style={styles.slider}
+                />
+                <span>y = 2({graphValue}) + 3 = {2 * graphValue + 3}</span>
+              </div>
+              
+              <p style={styles.question}>What is the y-intercept? (y when x=0)</p>
+              <input 
+                type="number" 
+                value={puzzle2Answer}
+                onChange={(e) => setPuzzle2Answer(e.target.value)}
+                placeholder="Enter y-intercept"
+                style={styles.input}
+              />
+            </div>
+            
+            <button style={styles.hintBtn} onClick={() => setShowHint(!showHint)}>
+              💡 HINT
+            </button>
+            {showHint && (
+              <div style={styles.hint}>
+                The y-intercept is where the line crosses the y-axis (when x=0). Look at x=0 on the graph!
+              </div>
+            )}
+            
+            <button 
+              style={styles.unlockBtn} 
+              onClick={checkPuzzle2}
+              disabled={!puzzle2Answer}
+            >
+              🔓 TRY TO UNLOCK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Puzzle 3 - Solve equation */}
+      {gameState === 'puzzle3' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🔒 LOCK #3: Solve the Equation</h2>
+          <div style={styles.puzzleContent}>
+            <div style={styles.equationDisplay}>
+              <span style={styles.bigEquation}>3x + 5 = 41</span>
+            </div>
+            
+            <div style={styles.solveSteps}>
+              <p>Step 1: 3x + 5 = 41</p>
+              <p>Step 2: 3x = 41 - 5</p>
+              <p>Step 3: 3x = 36</p>
+              <p>Step 4: x = 36 ÷ 3</p>
+            </div>
+            
+            <p style={styles.question}>What is the value of x?</p>
+            <input 
+              type="number" 
+              value={puzzle3Answer}
+              onChange={(e) => setPuzzle3Answer(e.target.value)}
+              placeholder="Enter number"
+              style={styles.input}
+            />
+            
+            <button 
+              style={styles.unlockBtn} 
+              onClick={checkPuzzle3}
+              disabled={!puzzle3Answer}
+            >
+              🔓 TRY TO UNLOCK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Puzzle 4 - Find errors */}
+      {gameState === 'puzzle4' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🔒 LOCK #4: Find the Error</h2>
+          <div style={styles.puzzleContent}>
+            <div style={styles.clues}>
+              <div style={styles.clue}>📝 Clue 1: 2 + 2 = 5</div>
+              <div style={styles.clue}>📝 Clue 2: 3 × 3 = 9</div>
+              <div style={styles.clue}>📝 Clue 3: 10 - 4 = 6</div>
+            </div>
+            
+            <p style={styles.question}>One clue has an error. Which one?</p>
+            <p style={styles.smallText}>Type the clue with the error (e.g., "Clue 1" or "2+2=5")</p>
+            
+            <input 
+              type="text" 
+              value={puzzle4Input}
+              onChange={(e) => setPuzzle4Input(e.target.value)}
+              placeholder="Enter the incorrect clue"
+              style={styles.input}
+            />
+            
+            <button 
+              style={styles.unlockBtn} 
+              onClick={checkPuzzle4}
+              disabled={!puzzle4Input}
+            >
+              🔓 CHECK ERROR
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Puzzle 5 - Choose correct key */}
+      {gameState === 'puzzle5' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🔒 LOCK #5: Choose the Right Key</h2>
+          <div style={styles.puzzleContent}>
+            <p style={styles.question}>The equation x² = 16 has two solutions</p>
+            
+            <div style={styles.keys}>
+              <button 
+                style={{
+                  ...styles.keyBtn,
+                  ...(selectedKey === 'key1' ? styles.selectedKey : {})
+                }}
+                onClick={() => setSelectedKey('key1')}
+              >
+                🔑 Key 1: x = 4
+              </button>
+              
+              <button 
+                style={{
+                  ...styles.keyBtn,
+                  ...(selectedKey === 'key2' ? styles.selectedKey : {})
+                }}
+                onClick={() => setSelectedKey('key2')}
+              >
+                🔑 Key 2: x = -4
+              </button>
+              
+              <button 
+                style={{
+                  ...styles.keyBtn,
+                  ...(selectedKey === 'key3' ? styles.selectedKey : {})
+                }}
+                onClick={() => setSelectedKey('key3')}
+              >
+                🔑 Key 3: x = ±4 (both)
+              </button>
+              
+              <button 
+                style={{
+                  ...styles.keyBtn,
+                  ...(selectedKey === 'key4' ? styles.selectedKey : {})
+                }}
+                onClick={() => setSelectedKey('key4')}
+              >
+                🔑 Key 4: x = 8
+              </button>
+            </div>
+            
+            <button 
+              style={styles.unlockBtn} 
+              onClick={checkPuzzle5}
+              disabled={!selectedKey}
+            >
+              🔓 TRY KEY
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Final Puzzle */}
+      {gameState === 'final' && (
+        <div style={styles.puzzleCard}>
+          <h2 style={styles.puzzleTitle}>🚪 FINAL DOOR: Create the Escape Equation</h2>
+          <div style={styles.puzzleContent}>
+            <p style={styles.question}>Einstein's most famous equation relates energy and mass</p>
+            
+            <div style={styles.einsteinHint}>
+              <span style={styles.bigEquation}>E = m ?</span>
+            </div>
+            
+            <input 
+              type="text" 
+              value={finalEquation}
+              onChange={(e) => setFinalEquation(e.target.value)}
+              placeholder="Enter the complete equation (e.g., e=mc^2)"
+              style={styles.finalInput}
+            />
+            
+            <button 
+              style={styles.escapeBtn} 
+              onClick={checkFinal}
+              disabled={!finalEquation}
+            >
+              🚪 ATTEMPT TO ESCAPE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Failed Screen */}
+      {gameState === 'failed' && (
+        <div style={styles.endScreen}>
+          <h2 style={styles.failedTitle}>💀 TIME'S UP! 💀</h2>
+          <p style={styles.text}>The room remains locked...</p>
+          <p style={styles.text}>Better luck next time!</p>
+          <button style={styles.resetBtn} onClick={resetGame}>
+            🔄 TRY AGAIN
+          </button>
+        </div>
+      )}
+
+      {/* Escape Screen */}
+      {gameState === 'escaped' && (
+        <div style={styles.endScreen}>
+          <h2 style={styles.successTitle}>🎉 ESCAPE SUCCESSFUL! 🎉</h2>
+          <p style={styles.text}>You've solved all puzzles and escaped!</p>
+          <p style={styles.text}>Time remaining: {formatTime()}</p>
+          <button style={styles.resetBtn} onClick={resetGame}>
+            🔄 PLAY AGAIN
+          </button>
+        </div>
+      )}
+
+      {/* Progress Bar */}
+      {gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && (
+        <div style={styles.progress}>
+          <div style={styles.progressText}>
+            Puzzle {currentPuzzle}/6
+          </div>
+          <div style={styles.progressBar}>
+            <div 
+              style={{
+                ...styles.progressFill,
+                width: `${(currentPuzzle / 6) * 100}%`
+              }}
+            ></div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
 
 const styles = {
   container: {
-    padding: '20px',
-    maxWidth: '1000px',
+    maxWidth: '600px',
     margin: '0 auto',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+    backgroundColor: '#1a1a2e',
+    minHeight: '100vh',
+    color: '#fff',
   },
   header: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '16px',
-    padding: '24px',
-    marginBottom: '20px',
-    color: 'white',
-  },
-  headerContent: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '15px',
+    textAlign: 'center',
+    marginBottom: '30px',
   },
   title: {
-    fontSize: '28px',
-    fontWeight: '700',
-    margin: 0,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
+    color: '#ffd700',
+    fontSize: '24px',
+    marginBottom: '10px',
   },
-  titleIcon: {
-    fontSize: '32px',
-  },
-  stats: {
-    display: 'flex',
-    gap: '20px',
-    flexWrap: 'wrap',
-  },
-  stat: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    background: 'rgba(255,255,255,0.2)',
-    padding: '8px 12px',
-    borderRadius: '20px',
-    fontSize: '14px',
-  },
-  statText: {
-    fontWeight: '500',
-  },
-  attempts: {
-    background: 'rgba(0,0,0,0.2)',
-    padding: '2px 8px',
-    borderRadius: '12px',
-  },
-  levelNav: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-  },
-  levelBtn: {
-    flex: 1,
-    minWidth: '100px',
-    padding: '12px',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '14px',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  levelIcon: {
-    fontSize: '16px',
-  },
-  gameArea: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '24px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    marginBottom: '20px',
-  },
-  levelInfo: {
-    display: 'flex',
-    gap: '15px',
-    marginBottom: '20px',
-    paddingBottom: '20px',
-    borderBottom: '2px solid #f3f4f6',
-  },
-  levelIconLarge: {
-    width: '60px',
-    height: '60px',
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelText: {
-    flex: 1,
-  },
-  levelTitle: {
+  timer: {
     fontSize: '20px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: '0 0 4px 0',
-  },
-  levelDescription: {
-    fontSize: '14px',
-    color: '#6b7280',
-    margin: 0,
-  },
-  hintBtn: {
-    background: '#f3f4f6',
-    border: 'none',
-    padding: '8px 16px',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#4b5563',
-    cursor: 'pointer',
-    marginBottom: '15px',
-  },
-  hintBox: {
-    background: '#fef3c7',
-    border: '1px solid #fbbf24',
-    borderRadius: '8px',
-    padding: '12px',
-    marginBottom: '20px',
-    fontSize: '14px',
-    color: '#92400e',
-  },
-  levelContent: {
-    animation: 'fadeIn 0.3s ease',
-  },
-  problemBox: {
-    background: '#f9fafb',
+    fontWeight: 'bold',
+    color: '#ff6b6b',
+    backgroundColor: '#2a2a4a',
+    padding: '10px',
     borderRadius: '10px',
-    padding: '20px',
+    display: 'inline-block',
+  },
+  message: {
+    backgroundColor: '#4a4a6a',
+    padding: '10px',
+    borderRadius: '5px',
+    marginTop: '10px',
+    color: '#fff',
+  },
+  startScreen: {
+    textAlign: 'center',
+    padding: '40px 20px',
+    backgroundColor: '#2a2a4a',
+    borderRadius: '15px',
+  },
+  subtitle: {
+    color: '#ffd700',
+    fontSize: '22px',
     marginBottom: '20px',
+  },
+  text: {
     fontSize: '16px',
-    lineHeight: '1.6',
-    border: '1px solid #e5e7eb',
+    marginBottom: '15px',
+    lineHeight: '1.5',
   },
-  points: {
-    fontFamily: 'monospace',
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#2563eb',
-    margin: '5px 0',
-  },
-  wordProblem: {
-    fontSize: '16px',
-    color: '#374151',
-    lineHeight: '1.6',
-  },
-  inputGroup: {
-    marginBottom: '20px',
-  },
-  input: {
-    width: '100%',
-    padding: '12px',
-    border: '2px solid #e5e7eb',
-    borderRadius: '8px',
-    fontSize: '16px',
-    marginTop: '6px',
-    transition: 'border-color 0.2s',
-  },
-  inputGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '15px',
-  },
-  checkBtn: {
-    width: '100%',
-    padding: '14px',
-    background: '#2563eb',
+  startBtn: {
+    backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
+    padding: '15px 40px',
+    fontSize: '20px',
+    borderRadius: '25px',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
-  },
-  feedback: {
     marginTop: '20px',
+    fontWeight: 'bold',
+    boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
+  },
+  puzzleCard: {
+    backgroundColor: '#2a2a4a',
+    borderRadius: '15px',
+    padding: '25px',
+    marginBottom: '20px',
+  },
+  puzzleTitle: {
+    color: '#ffd700',
+    fontSize: '20px',
+    marginBottom: '20px',
+    textAlign: 'center',
+  },
+  puzzleContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+  },
+  question: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '10px',
+  },
+  questionSmall: {
+    fontSize: '14px',
+    color: '#aaa',
+    marginBottom: '15px',
+  },
+  equationBox: {
+    backgroundColor: '#3a3a5a',
     padding: '15px',
     borderRadius: '8px',
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '500',
-    animation: 'slideIn 0.3s ease',
-  },
-  victoryScreen: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '40px',
-    textAlign: 'center',
-    marginBottom: '20px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-  },
-  victoryTitle: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#f59e0b',
-    margin: '20px 0 10px 0',
-  },
-  victoryText: {
-    fontSize: '18px',
-    color: '#6b7280',
-    marginBottom: '30px',
-  },
-  victoryStats: {
+    cursor: 'pointer',
     display: 'flex',
-    justifyContent: 'center',
-    gap: '40px',
-    marginBottom: '30px',
-    flexWrap: 'wrap',
-  },
-  victoryStat: {
-    display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
+    transition: 'background-color 0.3s',
   },
-  victoryStatValue: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#1f2937',
+  radio: {
+    width: '20px',
+    height: '20px',
+    cursor: 'pointer',
   },
-  resetBtn: {
-    padding: '12px 30px',
-    background: '#3b82f6',
+  equationText: {
+    fontSize: '18px',
+  },
+  unlockBtn: {
+    backgroundColor: '#4a6fa5',
     color: 'white',
     border: 'none',
+    padding: '15px',
+    fontSize: '18px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    marginTop: '10px',
+    fontWeight: 'bold',
+  },
+  hintBtn: {
+    backgroundColor: '#6c757d',
+    color: 'white',
+    border: 'none',
+    padding: '10px',
+    fontSize: '14px',
+    borderRadius: '5px',
+    cursor: 'pointer',
+  },
+  hint: {
+    backgroundColor: '#ffd700',
+    color: '#1a1a2e',
+    padding: '10px',
+    borderRadius: '5px',
+    fontSize: '14px',
+  },
+  graphContainer: {
+    backgroundColor: '#3a3a5a',
+    padding: '20px',
+    borderRadius: '8px',
+  },
+  graph: {
+    height: '200px',
+    position: 'relative',
+    backgroundColor: '#fff',
+    marginBottom: '20px',
+    overflow: 'hidden',
+  },
+  grid: {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  },
+  yAxis: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: '2px',
+    backgroundColor: '#000',
+  },
+  xAxis: {
+    position: 'absolute',
+    bottom: '50%',
+    left: 0,
+    right: 0,
+    height: '2px',
+    backgroundColor: '#000',
+  },
+  graphLine: {
+    position: 'absolute',
+    width: '100%',
+    height: '2px',
+    backgroundColor: 'red',
+    transform: 'rotate(63deg)',
+    transformOrigin: 'center',
+    top: '50%',
+  },
+  graphPoint: {
+    position: 'absolute',
+    width: '12px',
+    height: '12px',
+    backgroundColor: 'red',
+    borderRadius: '50%',
+    transform: 'translate(-50%, 50%)',
+  },
+  sliderContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    color: '#fff',
+  },
+  slider: {
+    width: '100%',
+    cursor: 'pointer',
+  },
+  input: {
+    padding: '12px',
+    fontSize: '16px',
+    borderRadius: '5px',
+    border: '1px solid #4a6fa5',
+    backgroundColor: '#3a3a5a',
+    color: '#fff',
+  },
+  equationDisplay: {
+    textAlign: 'center',
+    padding: '20px',
+    backgroundColor: '#3a3a5a',
+    borderRadius: '8px',
+  },
+  bigEquation: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#ffd700',
+  },
+  solveSteps: {
+    backgroundColor: '#3a3a5a',
+    padding: '15px',
     borderRadius: '8px',
     fontSize: '16px',
-    fontWeight: '600',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
+    lineHeight: '2',
   },
-  leaderboardPreview: {
-    background: 'white',
-    borderRadius: '12px',
-    padding: '20px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-  },
-  leaderboardHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '15px',
-  },
-  leaderboardTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1f2937',
-    margin: 0,
-  },
-  leaderboardList: {
+  clues: {
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
   },
-  leaderboardItem: {
+  clue: {
+    backgroundColor: '#3a3a5a',
+    padding: '15px',
+    borderRadius: '5px',
+    fontSize: '18px',
+    textAlign: 'center',
+  },
+  smallText: {
+    fontSize: '12px',
+    color: '#aaa',
+  },
+  keys: {
     display: 'grid',
-    gridTemplateColumns: '40px 1fr 80px 60px',
-    alignItems: 'center',
-    padding: '8px 12px',
-    background: '#f9fafb',
-    borderRadius: '8px',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '10px',
+  },
+  keyBtn: {
+    backgroundColor: '#3a3a5a',
+    color: '#fff',
+    border: '2px solid #4a6fa5',
+    padding: '15px',
     fontSize: '14px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.3s',
   },
-  position: {
-    fontWeight: '600',
-    color: '#6b7280',
+  selectedKey: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#fff',
   },
-  playerName: {
-    fontWeight: '500',
-    color: '#1f2937',
+  finalInput: {
+    padding: '15px',
+    fontSize: '18px',
+    borderRadius: '5px',
+    border: '2px solid #ffd700',
+    backgroundColor: '#3a3a5a',
+    color: '#fff',
+    textAlign: 'center',
   },
-  playerScore: {
-    fontWeight: '600',
-    color: '#f59e0b',
-    textAlign: 'right',
+  escapeBtn: {
+    backgroundColor: '#ff6b6b',
+    color: 'white',
+    border: 'none',
+    padding: '15px',
+    fontSize: '20px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    marginTop: '10px',
   },
-  playerTime: {
-    color: '#6b7280',
-    textAlign: 'right',
+  endScreen: {
+    textAlign: 'center',
+    padding: '40px 20px',
+    backgroundColor: '#2a2a4a',
+    borderRadius: '15px',
+  },
+  failedTitle: {
+    color: '#ff6b6b',
+    fontSize: '28px',
+    marginBottom: '20px',
+  },
+  successTitle: {
+    color: '#4CAF50',
+    fontSize: '28px',
+    marginBottom: '20px',
+  },
+  resetBtn: {
+    backgroundColor: '#4a6fa5',
+    color: 'white',
+    border: 'none',
+    padding: '15px 40px',
+    fontSize: '18px',
+    borderRadius: '25px',
+    cursor: 'pointer',
+    marginTop: '20px',
+    fontWeight: 'bold',
+  },
+  progress: {
+    marginTop: '20px',
+  },
+  progressText: {
+    textAlign: 'center',
+    marginBottom: '5px',
+    color: '#aaa',
+  },
+  progressBar: {
+    height: '10px',
+    backgroundColor: '#3a3a5a',
+    borderRadius: '5px',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    transition: 'width 0.3s',
   },
 };
-
-// Add keyframes for animations
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes slideIn {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default EquationEscapeRoom;

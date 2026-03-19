@@ -137,8 +137,10 @@ function StudentHub() {
         </header>
 
         {/* Content Area - Uses Outlet for nested routes */}
-        <div style={styles.content}>
-          <Outlet />
+        <div style={styles.contentWrapper}>
+          <div style={styles.content}>
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
@@ -148,7 +150,7 @@ function StudentHub() {
 const styles = {
   wrapper: {
     display: 'flex',
-    height: '100vh',
+    minHeight: '100vh',
     position: 'relative',
     backgroundColor: '#f5f5f5',
   },
@@ -164,6 +166,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    overflowY: 'auto',
+    overflowX: 'hidden',
   },
   iconWrapper: {
     display: 'flex',
@@ -189,6 +193,10 @@ const styles = {
     flex: 1,
     transition: 'margin-left 0.3s ease',
     paddingTop: '60px',
+    minHeight: '100vh',
+    backgroundColor: '#f5f5f5',
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
     height: '60px',
@@ -258,10 +266,28 @@ const styles = {
       backgroundColor: '#f0f0f0',
     },
   },
+  contentWrapper: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#f5f5f5',
+  },
   content: {
     padding: '20px',
     maxWidth: '1200px',
     margin: '0 auto',
+    width: '100%',
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    // This ensures the content area expands with its children
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  // These styles are for the page components that will be rendered in Outlet
+  pageContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: '20px',
   },
   cardContainer: {
     display: 'grid',
@@ -282,5 +308,28 @@ const styles = {
     },
   },
 };
+
+// Add this CSS to your App.css or global styles file
+const globalStyles = `
+  /* Ensure all page components take full height */
+  .page-content {
+    min-height: 100%;
+    background-color: #f5f5f5;
+    padding: 20px;
+  }
+  
+  /* Make sure the Outlet container expands */
+  .outlet-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* Ensure all direct children of Outlet take full height */
+  .outlet-container > * {
+    flex: 1;
+    background-color: #f5f5f5;
+  }
+`;
 
 export default StudentHub;
