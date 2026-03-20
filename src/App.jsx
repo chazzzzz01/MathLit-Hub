@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
 import SignIn from "./SignIn"
-import LandingPage from "./LandingPage"  // Import the new LandingPage component
+import AuthCallback from "./AuthCallback.jsx"  // Added .jsx extension
+import LandingPage from "./LandingPage"
 import Homepage from "./menu/Homepage"  
 import Missions from "./menu/Missions" 
 import Games from "./menu/Games" 
@@ -13,12 +14,12 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<LandingPage />} />  {/* Now using LandingPage component */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/signin" element={<SignIn />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         
         {/* Student hub with nested routes */}
         <Route path="/studenthub" element={<StudentHub />}>
-          {/* Index route for /studenthub - redirects to homepage or renders default content */}
           <Route index element={<Homepage />} />
           <Route path="homepage" element={<Homepage />} />
           <Route path="missions" element={<Missions />} />
