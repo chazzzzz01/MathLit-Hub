@@ -85,9 +85,11 @@ function SignIn() {
 
   const handleContinue = () => {
     if (selectedRole === 'student') {
-      navigate("/studenthub");
+      // Pass user data to StudentHub
+      navigate("/studenthub", { state: { user: user } });
     } else if (selectedRole === 'teacher') {
-      navigate("/teacherhub");
+      // Pass user data to TeacherHub (if needed)
+      navigate("/teacherhub", { state: { user: user } });
     }
   };
 

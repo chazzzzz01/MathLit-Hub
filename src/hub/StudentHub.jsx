@@ -10,8 +10,16 @@ import { MdAssignment } from 'react-icons/md';
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
+  const [user, setUser] = useState(null); // Add state for user data
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Get user data from navigation state
+  useEffect(() => {
+    if (location.state?.user) {
+      setUser(location.state.user);
+    }
+  }, [location.state]);
 
   // Redirect to homepage if at exactly /studenthub
   useEffect(() => {
@@ -113,20 +121,39 @@ function StudentHub() {
 
           {/* Right side - Student name and profile icon */}
           <div style={styles.rightSection}>
-            <span style={styles.studentName}>Student</span>
+            <span style={styles.studentName}>
+              {user ? user.name.split(' ')[0] : 'Student'}
+            </span>
             
             {/* Profile icon with dropdown */}
             <div style={{ position: 'relative' }}>
-              <FiUser
-                size={24}
-                color="white"
-                style={{ cursor: 'pointer' }}
-                onClick={() =>
-                  setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
-                }
-              />
+              {user?.picture ? (
+                <img 
+                  src={user.picture}
+                  alt={user.name}
+                  style={styles.userAvatar}
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
+                  }
+                />
+              ) : (
+                <FiUser
+                  size={24}
+                  color="white"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
+                  }
+                />
+              )}
               {openDropdown === 'profile' && (
                 <div style={styles.dropdown}>
+                  {user && (
+                    <>
+                      <div style={styles.dropdownEmail}>{user.email}</div>
+                      <div style={styles.dropdownDivider}></div>
+                    </>
+                  )}
                   <div style={styles.dropdownItem} onClick={handleLogout}>
                     Logout
                   </div>
@@ -245,25 +272,46 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '2px',
   },
+  userAvatar: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    cursor: 'pointer',
+    objectFit: 'cover',
+    border: '2px solid white',
+  },
   dropdown: {
     position: 'absolute',
-    top: '30px',
+    top: '40px',
     right: 0,
     backgroundColor: 'white',
     color: 'black',
-    borderRadius: '5px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '120px',
+    minWidth: '200px',
     zIndex: 1000,
   },
+  dropdownEmail: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+    wordBreak: 'break-all',
+  },
+  dropdownDivider: {
+    height: '1px',
+    backgroundColor: '#e0e0e0',
+  },
   dropdownItem: {
-    padding: '10px',
+    padding: '12px 16px',
     cursor: 'pointer',
-    borderBottom: '1px solid #eee',
     transition: 'background-color 0.2s',
+    color: '#dc2626',
+    fontSize: '14px',
+    fontWeight: '500',
     ':hover': {
-      backgroundColor: '#f0f0f0',
+      backgroundColor: '#fee2e2',
     },
   },
   contentWrapper: {
@@ -279,11 +327,9 @@ const styles = {
     width: '100%',
     flex: 1,
     backgroundColor: '#f5f5f5',
-    // This ensures the content area expands with its children
     display: 'flex',
     flexDirection: 'column',
   },
-  // These styles are for the page components that will be rendered in Outlet
   pageContainer: {
     flex: 1,
     backgroundColor: '#f5f5f5',
