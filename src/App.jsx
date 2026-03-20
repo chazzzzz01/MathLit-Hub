@@ -1,5 +1,6 @@
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom"
 import SignIn from "./SignIn"
+import LandingPage from "./LandingPage"  // Import the new LandingPage component
 import Homepage from "./menu/Homepage"  
 import Missions from "./menu/Missions" 
 import Games from "./menu/Games" 
@@ -8,26 +9,11 @@ import StudentHub from "./hub/StudentHub";
 import TeacherHub from "./hub/TeacherHub";
 import '/src/App.css'
 
-function Home() {
-  const navigate = useNavigate()
-
-  return (
-    <div style={styles.container}>
-      <button 
-        style={styles.button}
-        onClick={() => navigate("/signin")}
-      >
-        Get Started
-      </button>
-    </div>
-  )
-}
-
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<LandingPage />} />  {/* Now using LandingPage component */}
         <Route path="/signin" element={<SignIn />} />
         
         {/* Student hub with nested routes */}
@@ -47,29 +33,10 @@ function App() {
         </Route>
         
         {/* Catch all - redirect to home if no route matches */}
-        <Route path="*" element={<Home />} />
+        <Route path="*" element={<LandingPage />} />
       </Routes>
     </Router>
   )
-}
-
-const styles = {
-  container: {
-    height: '100vh',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5'
-  },
-  button: {
-    backgroundColor: '#2563eb',
-    color: 'white',
-    padding: '12px 24px',
-    fontSize: '18px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer'
-  }
 }
 
 export default App
