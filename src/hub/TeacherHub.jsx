@@ -1,13 +1,22 @@
 import '../App.css';  // Changed from './App.css' to '../App.css'
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AiFillHome } from 'react-icons/ai'; // Home icon
 import { FiPlus, FiUser } from 'react-icons/fi'; // Plus and Profile icons
 
 function TeacherHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null); // 'plus' or 'profile' or null
+  const [user, setUser] = useState(null); // Add state for user data
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get user data from navigation state
+  useEffect(() => {
+    if (location.state?.user) {
+      setUser(location.state.user);
+    }
+  }, [location.state]);
 
   const toggleSidebar = () => {
     setSidebarCollapsed(!sidebarCollapsed);
@@ -91,16 +100,33 @@ function TeacherHub() {
 
             {/* Profile icon */}
             <div style={{ position: 'relative' }}>
-              <FiUser
-                size={24}
-                color="white"
-                style={{ cursor: 'pointer' }}
-                onClick={() =>
-                  setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
-                }
-              />
+              {user?.picture ? (
+                <img 
+                  src={user.picture}
+                  alt={user.name}
+                  style={styles.userAvatar}
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
+                  }
+                />
+              ) : (
+                <FiUser
+                  size={24}
+                  color="white"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() =>
+                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
+                  }
+                />
+              )}
               {openDropdown === 'profile' && (
                 <div style={styles.dropdown}>
+                  {user && (
+                    <>
+                      <div style={styles.dropdownEmail}>{user.email}</div>
+                      <div style={styles.dropdownDivider}></div>
+                    </>
+                  )}
                   <div style={styles.dropdownItem} onClick={handleLogout}>
                     Logout
                   </div>
@@ -110,24 +136,24 @@ function TeacherHub() {
           </div>
         </header>
 
-        {/* Student Hub Content */}
+        {/* Teacher Hub Content */}
         <div style={styles.content}>
           <h1>Teacher Hub</h1>
-          <p>Welcome to the Teacher Hub! This is where students can access their learning materials.</p>
+          <p>Welcome to the Teacher Hub! {user ? user.name.split(' ')[0] : 'Teacher'}! This is where teachers can manage their classes and assignments.</p>
           
-          {/* Add your student-specific content here */}
+          {/* Add your teacher-specific content here */}
           <div style={styles.cardContainer}>
             <div style={styles.card}>
-              <h3>My Courses</h3>
-              <p>View your enrolled courses</p>
+              <h3>My Classes</h3>
+              <p>Manage your classes and students</p>
             </div>
             <div style={styles.card}>
-              <h3>Assignments</h3>
-              <p>Check pending assignments</p>
+              <h3>Create Assignments</h3>
+              <p>Create and manage assignments</p>
             </div>
             <div style={styles.card}>
-              <h3>Grades</h3>
-              <p>View your academic progress</p>
+              <h3>Grade Submissions</h3>
+              <p>Review and grade student work</p>
             </div>
           </div>
         </div>
@@ -162,6 +188,11 @@ const styles = {
     padding: '10px',
     cursor: 'pointer',
     width: '100%',
+    transition: 'background-color 0.2s',
+    borderRadius: '0 20px 20px 0',
+    ':hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
   },
   iconText: {
     marginLeft: '10px',
@@ -214,21 +245,48 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '2px',
   },
+  userAvatar: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    cursor: 'pointer',
+    objectFit: 'cover',
+    border: '2px solid white',
+  },
   dropdown: {
     position: 'absolute',
-    top: '30px',
+    top: '40px',
     right: 0,
     backgroundColor: 'white',
     color: 'black',
-    borderRadius: '5px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '120px',
+    minWidth: '200px',
+    zIndex: 1000,
+  },
+  dropdownEmail: {
+    padding: '12px 16px',
+    fontSize: '14px',
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+    wordBreak: 'break-all',
+  },
+  dropdownDivider: {
+    height: '1px',
+    backgroundColor: '#e0e0e0',
   },
   dropdownItem: {
-    padding: '10px',
+    padding: '12px 16px',
     cursor: 'pointer',
-    borderBottom: '1px solid #eee',
+    transition: 'background-color 0.2s',
+    color: '#dc2626',
+    fontSize: '14px',
+    fontWeight: '500',
+    borderBottom: 'none',
+    ':hover': {
+      backgroundColor: '#fee2e2',
+    },
   },
   content: {
     padding: '20px',
@@ -248,6 +306,10 @@ const styles = {
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     cursor: 'pointer',
     transition: 'transform 0.2s, box-shadow 0.2s',
+    ':hover': {
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+    },
   },
 };
 
