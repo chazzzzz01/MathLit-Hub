@@ -43,7 +43,7 @@ function AuthCallback() {
 
           // Check if this is a popup window
           if (window.opener) {
-            // Send message to parent window/ test
+            // Send message to parent window
             window.opener.postMessage({
               type: 'google-auth-success',
               user: userInfo
