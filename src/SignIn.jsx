@@ -229,7 +229,7 @@ function SignIn() {
   );
 }
 
-// Add the styles object here
+// Responsive styles with full screen adaptation
 const styles = {
   container: {
     minHeight: '100vh',
@@ -237,27 +237,33 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
-    padding: '20px',
+    padding: '16px',
+    boxSizing: 'border-box',
   },
   card: {
     backgroundColor: 'white',
-    padding: '40px',
-    borderRadius: '12px',
+    padding: 'clamp(20px, 5vw, 48px)',
+    borderRadius: 'clamp(8px, 2vw, 12px)',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    maxWidth: '700px',
     width: '100%',
+    maxWidth: 'min(700px, 100%)',
+    margin: '0 auto',
+    boxSizing: 'border-box',
   },
   title: {
-    fontSize: '32px',
+    fontSize: 'clamp(20px, 6vw, 32px)',
     color: '#333',
-    marginBottom: '10px',
+    marginBottom: 'clamp(8px, 2vw, 12px)',
     textAlign: 'center',
+    lineHeight: 1.2,
+    fontWeight: 'bold',
   },
   subtitle: {
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 3.5vw, 16px)',
     color: '#666',
-    marginBottom: '30px',
+    marginBottom: 'clamp(20px, 5vw, 30px)',
     textAlign: 'center',
+    lineHeight: 1.4,
   },
   googleButton: {
     display: 'flex',
@@ -265,16 +271,17 @@ const styles = {
     justifyContent: 'center',
     gap: '10px',
     width: '100%',
-    padding: '14px 24px',
+    padding: 'clamp(10px, 3vw, 14px) clamp(16px, 4vw, 24px)',
     backgroundColor: '#fff',
     border: '1px solid #dadce0',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 3.5vw, 16px)',
     fontWeight: '500',
     color: '#3c4043',
     cursor: 'pointer',
-    transition: 'all 0.3s',
-    marginBottom: '30px',
+    transition: 'all 0.3s ease',
+    marginBottom: 'clamp(20px, 5vw, 30px)',
+    boxSizing: 'border-box',
     ':hover': {
       backgroundColor: '#f8f9fa',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
@@ -285,8 +292,8 @@ const styles = {
     },
   },
   googleIcon: {
-    width: '20px',
-    height: '20px',
+    width: 'clamp(16px, 4vw, 20px)',
+    height: 'clamp(16px, 4vw, 20px)',
   },
   loadingContainer: {
     display: 'flex',
@@ -301,162 +308,180 @@ const styles = {
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
-  termsText: {
-    fontSize: '12px',
-    color: '#999',
-    marginTop: '20px',
-    textAlign: 'center',
-  },
   userInfo: {
     display: 'flex',
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: '15px',
-    padding: '20px',
+    gap: 'clamp(12px, 3vw, 20px)',
+    padding: 'clamp(15px, 4vw, 20px)',
     backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    marginBottom: '30px',
+    borderRadius: '12px',
+    marginBottom: 'clamp(20px, 5vw, 30px)',
+    flexWrap: 'wrap',
+    boxSizing: 'border-box',
   },
   userAvatar: {
-    width: '60px',
-    height: '60px',
+    width: 'clamp(45px, 10vw, 60px)',
+    height: 'clamp(45px, 10vw, 60px)',
     borderRadius: '50%',
     objectFit: 'cover',
+    flexShrink: 0,
   },
   userDetails: {
-    flex: 1,
+    flex: '1',
+    minWidth: '140px',
   },
   userName: {
-    fontSize: '18px',
+    fontSize: 'clamp(15px, 4vw, 18px)',
     color: '#333',
     marginBottom: '4px',
+    fontWeight: '600',
+    wordBreak: 'break-word',
   },
   userEmail: {
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3vw, 14px)',
     color: '#666',
+    wordBreak: 'break-word',
   },
   userActions: {
     display: 'flex',
-    gap: '10px',
+    gap: 'clamp(8px, 2vw, 12px)',
+    flexWrap: 'wrap',
+    flexShrink: 0,
   },
   switchAccountButton: {
-    padding: '8px 16px',
+    padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px)',
     backgroundColor: 'transparent',
     border: '1px solid #2563eb',
     borderRadius: '6px',
     color: '#2563eb',
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3vw, 14px)',
+    fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
+    transition: 'all 0.3s ease',
+    whiteSpace: 'nowrap',
     ':hover': {
       backgroundColor: '#2563eb',
       color: 'white',
     },
   },
   signOutButton: {
-    padding: '8px 16px',
+    padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px)',
     backgroundColor: 'transparent',
     border: '1px solid #dc2626',
     borderRadius: '6px',
     color: '#dc2626',
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3vw, 14px)',
+    fontWeight: '500',
     cursor: 'pointer',
-    transition: 'all 0.3s',
+    transition: 'all 0.3s ease',
+    whiteSpace: 'nowrap',
     ':hover': {
       backgroundColor: '#dc2626',
       color: 'white',
     },
   },
   roleSelectionContainer: {
-    marginTop: '20px',
+    marginTop: 'clamp(16px, 4vw, 20px)',
+    width: '100%',
   },
   roleSelectionTitle: {
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
     color: '#333',
-    marginBottom: '10px',
+    marginBottom: 'clamp(8px, 2vw, 12px)',
     textAlign: 'center',
+    fontWeight: '600',
   },
   rolePrompt: {
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3vw, 14px)',
     color: '#666',
-    marginBottom: '20px',
+    marginBottom: 'clamp(16px, 4vw, 24px)',
     textAlign: 'center',
+    lineHeight: 1.5,
+    padding: '0 10px',
   },
   roleContainer: {
     display: 'flex',
-    gap: '20px',
-    marginBottom: '30px',
+    gap: 'clamp(16px, 4vw, 24px)',
+    marginBottom: 'clamp(24px, 6vw, 32px)',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    width: '100%',
   },
   roleCard: {
     flex: '1',
-    minWidth: '220px',
-    padding: '30px 20px',
+    minWidth: '260px',
+    maxWidth: '100%',
+    padding: 'clamp(20px, 5vw, 32px) clamp(16px, 4vw, 24px)',
     border: '2px solid #e0e0e0',
     borderRadius: '12px',
     cursor: 'pointer',
-    transition: 'all 0.3s',
+    transition: 'all 0.3s ease',
     textAlign: 'center',
     position: 'relative',
+    backgroundColor: '#fff',
+    boxSizing: 'border-box',
     ':hover': {
       borderColor: '#2563eb',
       transform: 'translateY(-4px)',
-      boxShadow: '0 8px 16px rgba(37,99,235,0.2)',
+      boxShadow: '0 8px 20px rgba(37,99,235,0.15)',
     },
   },
   roleCardPreview: {
-    opacity: '0.9',
+    opacity: '0.95',
     ':hover': {
       borderColor: '#2563eb',
       transform: 'translateY(-4px)',
-      boxShadow: '0 8px 16px rgba(37,99,235,0.2)',
+      boxShadow: '0 8px 20px rgba(37,99,235,0.15)',
     },
   },
   selectedRole: {
     borderColor: '#2563eb',
     backgroundColor: '#f0f7ff',
-    boxShadow: '0 8px 16px rgba(37,99,235,0.2)',
+    boxShadow: '0 8px 20px rgba(37,99,235,0.15)',
   },
   roleIcon: {
-    fontSize: '64px',
-    marginBottom: '15px',
+    fontSize: 'clamp(40px, 12vw, 64px)',
+    marginBottom: 'clamp(12px, 3vw, 16px)',
   },
   roleTitle: {
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
     color: '#333',
-    marginBottom: '10px',
+    marginBottom: 'clamp(8px, 2vw, 12px)',
+    fontWeight: '600',
   },
   roleDescription: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     color: '#666',
-    lineHeight: '1.6',
+    lineHeight: '1.5',
   },
   selectedBadge: {
     position: 'absolute',
-    top: '10px',
-    right: '10px',
+    top: 'clamp(8px, 2vw, 12px)',
+    right: 'clamp(8px, 2vw, 12px)',
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '4px 8px',
+    padding: '4px 10px',
     borderRadius: '20px',
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
     fontWeight: 'bold',
   },
   continueButton: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '16px 32px',
-    fontSize: '18px',
+    padding: 'clamp(12px, 3.5vw, 16px) clamp(20px, 5vw, 32px)',
+    fontSize: 'clamp(13px, 3.5vw, 18px)',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
     width: '100%',
-    transition: 'all 0.3s',
+    transition: 'all 0.3s ease',
     fontWeight: '600',
+    boxSizing: 'border-box',
     ':hover': {
       backgroundColor: '#1d4ed8',
       transform: 'translateY(-2px)',
-      boxShadow: '0 4px 8px rgba(37,99,235,0.3)',
+      boxShadow: '0 6px 12px rgba(37,99,235,0.3)',
     },
   },
   buttonDisabled: {
@@ -468,14 +493,132 @@ const styles = {
       boxShadow: 'none',
     },
   },
+  termsText: {
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
+    color: '#999',
+    marginTop: 'clamp(16px, 4vw, 24px)',
+    textAlign: 'center',
+    lineHeight: 1.4,
+  },
 };
 
-// Add this CSS animation
+// Add global styles and animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  /* Responsive styles for all screen sizes */
+  @media (max-width: 768px) {
+    .user-info {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .user-details {
+      text-align: center;
+    }
+    
+    .user-actions {
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .role-container {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .role-card {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .user-info {
+      flex-direction: column;
+      text-align: center;
+      padding: 16px;
+    }
+    
+    .user-details {
+      text-align: center;
+      width: 100%;
+    }
+    
+    .user-actions {
+      flex-direction: column;
+      width: 100%;
+      gap: 10px;
+    }
+    
+    .switch-account-button,
+    .sign-out-button {
+      width: 100%;
+      text-align: center;
+      white-space: normal;
+    }
+    
+    .role-card {
+      min-width: auto;
+      padding: 20px 16px;
+    }
+    
+    .continue-button {
+      font-size: 14px;
+      padding: 12px 20px;
+    }
+  }
+
+  @media (max-width: 320px) {
+    .card {
+      padding: 16px;
+    }
+    
+    .title {
+      font-size: 18px;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+    }
+    
+    .role-title {
+      font-size: 16px;
+    }
+    
+    .role-description {
+      font-size: 11px;
+    }
+  }
+
+  @media (min-width: 1400px) {
+    .card {
+      max-width: 800px;
+    }
+    
+    .title {
+      font-size: 36px;
+    }
+    
+    .role-card {
+      min-width: 320px;
+    }
+  }
+
+  /* Smooth transitions */
+  * {
+    transition: all 0.2s ease-in-out;
+  }
+
+  /* Better touch targets for mobile */
+  button, [role="button"], .role-card {
+    touch-action: manipulation;
   }
 `;
 document.head.appendChild(styleSheet);
