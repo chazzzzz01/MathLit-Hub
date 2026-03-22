@@ -1,14 +1,11 @@
-// src/menu/Game.jsx
-import React, { useState } from 'react';
+// src/menu/Games.jsx (or Game.jsx)
+import React from 'react';
 import { FaPlay, FaArrowLeft } from 'react-icons/fa';
-import { GiPuzzle, GiSwordsEmblem, GiConsoleController, GiPlatform } from 'react-icons/gi'; // Added GiPlatform here
-import EquationEscapeRoom from '../games/EquationEscapeRoom';
-import BattleArena from '../games/BattleArena';
-import SpaceShooter from '../games/SpaceShooter';
+import { GiPuzzle, GiSwordsEmblem, GiConsoleController } from 'react-icons/gi';
+import { useNavigate } from 'react-router-dom';
 
-function Game() {
-  const [gameStarted, setGameStarted] = useState(false);
-  const [selectedGame, setSelectedGame] = useState(null);
+function Games() {
+  const navigate = useNavigate();
 
   const games = {
     equation: {
@@ -21,7 +18,7 @@ function Game() {
       difficulty: "Beginner to Advanced",
       timeEstimate: "15-20 min",
       features: ["4 Challenging Levels", "Timed Challenges", "Leaderboard Rankings", "Helpful Hints"],
-      component: EquationEscapeRoom,
+      path: "/game/equation",
       buttonText: "Play Now"
     },
     battle: {
@@ -34,8 +31,8 @@ function Game() {
       difficulty: "Intermediate to Expert",
       timeEstimate: "20-30 min",
       features: ["Turn-based Combat", "Math Challenges", "Power-ups", "10 Enemy Waves", "Boss Battles"],
-      component: BattleArena,
-      buttonText: "Enter Arena"
+      path: "/game/battle",
+      buttonText: "Play Now"
     },
     spaceShooter: {
       id: 'spaceShooter',
@@ -47,15 +44,22 @@ function Game() {
       difficulty: "Beginner to Intermediate",
       timeEstimate: "15-25 min",
       features: ["Fast-paced Action", "Math-based Weapons", "Upgrade System", "Multiple Enemy Types"],
-      component: SpaceShooter,
-      buttonText: "Launch Mission"
+      path: "/game/spaceshooter",
+      buttonText: "Play Now"
     },
   };
 
-  // ... rest of your component remains exactly the same ...
+  const handleStartGame = (gameId) => {
+    const gamePath = games[gameId].path;
+    // Open in new tab
+    window.open(gamePath, '_blank');
+    
+    // Alternative: Open in same tab
+    // navigate(gamePath);
+  };
 
   const GameCard = ({ game, onStart }) => (
-    <div style={styles.cardContainer}>
+    <div style={styles.cardContainer} className="game-card">
       <div style={styles.cardContent}>
         <div style={styles.cardLeft}>
           <div style={{
@@ -101,18 +105,6 @@ function Game() {
     </div>
   );
 
-  const GameDetail = ({ game, onBack }) => {
-    const GameComponent = game.component;
-    return (
-      <div style={styles.gameDetail}>
-        <button style={styles.backButton} onClick={onBack}>
-          <FaArrowLeft /> Back to Games
-        </button>
-        <GameComponent />
-      </div>
-    );
-  };
-
   return (
     <div style={styles.container}>
       <header style={styles.header}>
@@ -123,28 +115,15 @@ function Game() {
         <p style={styles.subtitle}>Choose a game to start your mathematical adventure</p>
       </header>
 
-      {!gameStarted ? (
-        <div style={styles.gamesGrid}>
-          {Object.values(games).map(game => (
-            <GameCard 
-              key={game.id} 
-              game={game} 
-              onStart={(id) => {
-                setSelectedGame(id);
-                setGameStarted(true);
-              }}
-            />
-          ))}
-        </div>
-      ) : (
-        <GameDetail 
-          game={games[selectedGame]} 
-          onBack={() => {
-            setGameStarted(false);
-            setSelectedGame(null);
-          }}
-        />
-      )}
+      <div style={styles.gamesGrid}>
+        {Object.values(games).map(game => (
+          <GameCard 
+            key={game.id} 
+            game={game} 
+            onStart={handleStartGame}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -194,11 +173,6 @@ const styles = {
     padding: '24px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
     transition: 'transform 0.2s, box-shadow 0.2s',
-    cursor: 'pointer',
-    ':hover': {
-      transform: 'translateY(-4px)',
-      boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
-    },
   },
   cardContent: {
     display: 'flex',
@@ -290,55 +264,25 @@ const styles = {
     gap: '8px',
     cursor: 'pointer',
     transition: 'opacity 0.2s',
-    ':hover': {
-      opacity: '0.9',
-    },
   },
   playIcon: {
     fontSize: '12px',
-  },
-  gameDetail: {
-    background: 'white',
-    borderRadius: '16px',
-    padding: '24px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-  },
-  backButton: {
-    background: 'none',
-    border: 'none',
-    color: '#3b82f6',
-    fontSize: '15px',
-    fontWeight: '500',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    cursor: 'pointer',
-    marginBottom: '20px',
-    padding: '8px 12px',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#f3f4f6',
-    },
   },
 };
 
 // Add hover effect styles
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  .cardContainer:hover {
+  .game-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 12px 24px rgba(0,0,0,0.15) !important;
   }
   
   .start-button:hover {
     opacity: 0.9;
-  }
-  
-  .back-button:hover {
-    background-color: #f3f4f6;
+    transform: scale(1.02);
   }
 `;
 document.head.appendChild(styleSheet);
 
-export default Game;
+export default Games;

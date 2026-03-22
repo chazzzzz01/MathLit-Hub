@@ -1,7 +1,11 @@
 // src/games/BattleArena.jsx
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaArrowLeft } from 'react-icons/fa';
 
 const BattleArena = () => {
+  const navigate = useNavigate();
+  
   // Game state
   const [gameState, setGameState] = useState('menu'); // menu, playing, gameOver, victory
   const [playerHP, setPlayerHP] = useState(100);
@@ -59,6 +63,10 @@ const BattleArena = () => {
       { name: 'Geometry Shield', damage: 15, manaCost: 10, equationType: 'geometry' },
       { name: 'Calculus Fury', damage: 30, manaCost: 25, equationType: 'calculus' }
     ]
+  };
+
+  const handleBackToGames = () => {
+    navigate('/studenthub/games');
   };
 
   // Generate random equation based on type
@@ -272,9 +280,9 @@ const BattleArena = () => {
 
   // Game over screen
   const GameOver = () => (
-    <div style={styles.gameOverContainer}>
-      <h1>💀 GAME OVER 💀</h1>
-      <p>Final Score: {score}</p>
+    <div style={styles.endScreen}>
+      <h1 style={styles.failedTitle}>💀 GAME OVER 💀</h1>
+      <p style={styles.text}>Final Score: {score}</p>
       <button style={styles.menuButton} onClick={() => setGameState('menu')}>
         Back to Menu
       </button>
@@ -283,10 +291,10 @@ const BattleArena = () => {
 
   // Victory screen
   const VictoryScreen = () => (
-    <div style={styles.victoryContainer}>
-      <h1>🎉 VICTORY! 🎉</h1>
-      <p>You defeated {enemies[selectedEnemy].name}!</p>
-      <p>Final Score: {score}</p>
+    <div style={styles.endScreen}>
+      <h1 style={styles.successTitle}>🎉 VICTORY! 🎉</h1>
+      <p style={styles.text}>You defeated {enemies[selectedEnemy].name}!</p>
+      <p style={styles.text}>Final Score: {score}</p>
       <button style={styles.menuButton} onClick={() => setGameState('menu')}>
         Next Battle
       </button>
@@ -394,6 +402,11 @@ const BattleArena = () => {
 
   return (
     <div style={styles.container}>
+      <button onClick={handleBackToGames} style={styles.backButton}>
+        <FaArrowLeft style={styles.backIcon} />
+        Back to Games
+      </button>
+      
       {gameState === 'menu' && <GameMenu />}
       {gameState === 'playing' && <GamePlay />}
       {gameState === 'gameOver' && <GameOver />}
@@ -405,26 +418,49 @@ const BattleArena = () => {
 // Styles
 const styles = {
   container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif',
+    width: '100%',
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
-    borderRadius: '10px'
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif',
+    boxSizing: 'border-box',
+  },
+  backButton: {
+    position: 'fixed',
+    top: '20px',
+    left: '20px',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    color: 'white',
+    border: 'none',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    zIndex: 1000,
+    transition: 'background-color 0.3s',
+    backdropFilter: 'blur(10px)',
+  },
+  backIcon: {
+    fontSize: '16px',
   },
   menuContainer: {
     textAlign: 'center',
-    padding: '40px'
+    padding: 'clamp(30px, 8vw, 60px) clamp(20px, 5vw, 40px)',
+    maxWidth: '800px',
+    margin: '40px auto 0 auto',
   },
   title: {
-    fontSize: '3em',
+    fontSize: 'clamp(28px, 8vw, 48px)',
     marginBottom: '20px',
     textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
   },
   subtitle: {
-    fontSize: '1.2em',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     marginBottom: '40px'
   },
   characterSelect: {
@@ -460,15 +496,18 @@ const styles = {
     hard: { color: '#f44336' }
   },
   startButton: {
-    padding: '15px 40px',
-    fontSize: '1.5em',
+    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
+    fontSize: 'clamp(18px, 4vw, 24px)',
     background: '#4CAF50',
     color: 'white',
     border: 'none',
     borderRadius: '50px',
     cursor: 'pointer',
     boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-    transition: 'transform 0.2s'
+    transition: 'transform 0.2s',
+    ':hover': {
+      transform: 'scale(1.05)',
+    }
   },
   tutorial: {
     marginTop: '40px',
@@ -478,7 +517,9 @@ const styles = {
     textAlign: 'left'
   },
   gameContainer: {
-    padding: '20px'
+    padding: 'clamp(15px, 4vw, 20px)',
+    maxWidth: '1000px',
+    margin: '40px auto 0 auto',
   },
   battlefield: {
     display: 'grid',
@@ -489,7 +530,7 @@ const styles = {
   },
   characterCard: {
     background: 'rgba(255,255,255,0.1)',
-    padding: '20px',
+    padding: 'clamp(15px, 4vw, 20px)',
     borderRadius: '10px',
     backdropFilter: 'blur(10px)'
   },
@@ -500,10 +541,10 @@ const styles = {
     marginBottom: '10px'
   },
   avatar: {
-    fontSize: '3em'
+    fontSize: 'clamp(2em, 8vw, 3em)'
   },
   stats: {
-    fontSize: '0.9em',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     marginTop: '5px'
   },
   hpBar: {
@@ -519,7 +560,7 @@ const styles = {
     transition: 'width 0.3s'
   },
   vs: {
-    fontSize: '2em',
+    fontSize: 'clamp(1.5em, 6vw, 2em)',
     fontWeight: 'bold'
   },
   battleLog: {
@@ -531,11 +572,12 @@ const styles = {
   },
   logEntry: {
     padding: '5px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)'
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    fontSize: 'clamp(12px, 3vw, 14px)'
   },
   equationArena: {
     background: 'rgba(255,255,255,0.1)',
-    padding: '30px',
+    padding: 'clamp(20px, 5vw, 30px)',
     borderRadius: '10px',
     marginBottom: '20px'
   },
@@ -543,7 +585,7 @@ const styles = {
     textAlign: 'center'
   },
   equation: {
-    fontSize: '3em',
+    fontSize: 'clamp(2em, 8vw, 3em)',
     margin: '20px 0',
     fontFamily: 'monospace'
   },
@@ -551,18 +593,19 @@ const styles = {
     display: 'flex',
     gap: '10px',
     justifyContent: 'center',
-    marginBottom: '15px'
+    marginBottom: '15px',
+    flexWrap: 'wrap',
   },
   input: {
-    padding: '10px 15px',
-    fontSize: '1.2em',
+    padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 15px)',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     border: 'none',
     borderRadius: '5px',
-    width: '150px'
+    width: 'clamp(120px, 30vw, 150px)'
   },
   attackButton: {
-    padding: '10px 30px',
-    fontSize: '1.2em',
+    padding: 'clamp(8px, 2.5vw, 10px) clamp(20px, 5vw, 30px)',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     background: '#f44336',
     color: 'white',
     border: 'none',
@@ -570,7 +613,7 @@ const styles = {
     cursor: 'pointer'
   },
   feedback: {
-    fontSize: '1.2em',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     marginTop: '10px'
   },
   specialAttacks: {
@@ -578,37 +621,53 @@ const styles = {
   },
   attackGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
     gap: '10px',
     marginTop: '10px'
   },
   specialButton: {
-    padding: '10px',
+    padding: 'clamp(8px, 2.5vw, 10px)',
     background: '#2196F3',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    transition: 'transform 0.2s'
+    transition: 'transform 0.2s',
+    fontSize: 'clamp(12px, 3vw, 14px)',
+    ':hover': {
+      transform: 'scale(1.05)',
+    }
   },
   scoreBoard: {
     textAlign: 'center',
-    fontSize: '1.5em',
+    fontSize: 'clamp(18px, 4vw, 24px)',
     padding: '10px',
     background: 'rgba(0,0,0,0.3)',
     borderRadius: '5px'
   },
-  gameOverContainer: {
+  endScreen: {
     textAlign: 'center',
-    padding: '100px 20px'
+    padding: 'clamp(40px, 10vw, 80px) clamp(20px, 5vw, 40px)',
+    maxWidth: '800px',
+    margin: '40px auto 0 auto',
   },
-  victoryContainer: {
-    textAlign: 'center',
-    padding: '100px 20px'
+  failedTitle: {
+    fontSize: 'clamp(32px, 8vw, 48px)',
+    color: '#ff6b6b',
+    marginBottom: '20px',
+  },
+  successTitle: {
+    fontSize: 'clamp(32px, 8vw, 48px)',
+    color: '#4CAF50',
+    marginBottom: '20px',
+  },
+  text: {
+    fontSize: 'clamp(16px, 4vw, 20px)',
+    marginBottom: '15px',
   },
   menuButton: {
-    padding: '15px 30px',
-    fontSize: '1.2em',
+    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     background: '#4CAF50',
     color: 'white',
     border: 'none',

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaArrowLeft } from 'react-icons/fa';
 
 const EquationEscapeRoom = () => {
+  const navigate = useNavigate();
   const [gameState, setGameState] = useState('start');
   const [timeLeft, setTimeLeft] = useState(600);
   const [currentPuzzle, setCurrentPuzzle] = useState(1);
@@ -126,6 +129,10 @@ const EquationEscapeRoom = () => {
     setGraphValue(0);
   };
 
+  const handleBackToGames = () => {
+    navigate('/studenthub/games');
+  };
+
   // Interactive graph for puzzle 2
   const updateGraph = (value) => {
     setGraphValue(value);
@@ -136,6 +143,12 @@ const EquationEscapeRoom = () => {
 
   return (
     <div style={styles.container}>
+      {/* Back Button */}
+      <button onClick={handleBackToGames} style={styles.backButton}>
+        <FaArrowLeft style={styles.backIcon} />
+        Back to Games
+      </button>
+
       {/* Game Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>🧮 EQUATION ESCAPE ROOM 🧮</h1>
@@ -233,8 +246,8 @@ const EquationEscapeRoom = () => {
                   {/* Point marker that moves with slider */}
                   <div style={{
                     ...styles.graphPoint,
-                    left: `${50 + graphValue * 20}px`,
-                    bottom: `${50 + (2 * graphValue + 3) * 10}px`
+                    left: `calc(50% + ${graphValue * 40}px)`,
+                    bottom: `calc(50% + ${(2 * graphValue + 3) * 20}px)`
                   }}></div>
                 </div>
               </div>
@@ -488,52 +501,78 @@ const EquationEscapeRoom = () => {
 
 const styles = {
   container: {
-    maxWidth: '600px',
-    margin: '0 auto',
+    width: '100%',
+    minHeight: '100vh',
+    backgroundColor: '#1a1a2e',
     padding: '20px',
     fontFamily: 'Arial, sans-serif',
-    backgroundColor: '#1a1a2e',
-    minHeight: '100vh',
     color: '#fff',
+    boxSizing: 'border-box',
+  },
+  backButton: {
+    position: 'fixed',
+    top: '20px',
+    left: '20px',
+    backgroundColor: '#4a6fa5',
+    color: 'white',
+    border: 'none',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    zIndex: 1000,
+    transition: 'background-color 0.3s',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+  },
+  backIcon: {
+    fontSize: '16px',
   },
   header: {
     textAlign: 'center',
     marginBottom: '30px',
+    marginTop: '40px',
   },
   title: {
     color: '#ffd700',
-    fontSize: '24px',
+    fontSize: 'clamp(20px, 5vw, 28px)',
     marginBottom: '10px',
   },
   timer: {
-    fontSize: '20px',
+    fontSize: 'clamp(18px, 4vw, 24px)',
     fontWeight: 'bold',
     color: '#ff6b6b',
     backgroundColor: '#2a2a4a',
-    padding: '10px',
+    padding: '10px 20px',
     borderRadius: '10px',
     display: 'inline-block',
   },
   message: {
     backgroundColor: '#4a4a6a',
-    padding: '10px',
-    borderRadius: '5px',
-    marginTop: '10px',
+    padding: '12px',
+    borderRadius: '8px',
+    marginTop: '15px',
     color: '#fff',
+    fontSize: 'clamp(12px, 3vw, 14px)',
   },
   startScreen: {
     textAlign: 'center',
-    padding: '40px 20px',
+    padding: 'clamp(30px, 8vw, 60px) clamp(20px, 5vw, 40px)',
     backgroundColor: '#2a2a4a',
     borderRadius: '15px',
+    maxWidth: '800px',
+    margin: '0 auto',
   },
   subtitle: {
     color: '#ffd700',
-    fontSize: '22px',
+    fontSize: 'clamp(20px, 5vw, 28px)',
     marginBottom: '20px',
   },
   text: {
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     marginBottom: '15px',
     lineHeight: '1.5',
   },
@@ -541,23 +580,26 @@ const styles = {
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
-    padding: '15px 40px',
-    fontSize: '20px',
+    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
+    fontSize: 'clamp(16px, 4vw, 20px)',
     borderRadius: '25px',
     cursor: 'pointer',
     marginTop: '20px',
     fontWeight: 'bold',
     boxShadow: '0 4px 15px rgba(76, 175, 80, 0.3)',
+    transition: 'transform 0.2s, opacity 0.2s',
   },
   puzzleCard: {
     backgroundColor: '#2a2a4a',
     borderRadius: '15px',
-    padding: '25px',
+    padding: 'clamp(20px, 5vw, 30px)',
     marginBottom: '20px',
+    maxWidth: '800px',
+    margin: '0 auto 20px auto',
   },
   puzzleTitle: {
     color: '#ffd700',
-    fontSize: '20px',
+    fontSize: 'clamp(18px, 4vw, 24px)',
     marginBottom: '20px',
     textAlign: 'center',
   },
@@ -567,71 +609,79 @@ const styles = {
     gap: '15px',
   },
   question: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 4vw, 18px)',
     fontWeight: 'bold',
     marginBottom: '10px',
   },
   questionSmall: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     color: '#aaa',
     marginBottom: '15px',
   },
   equationBox: {
     backgroundColor: '#3a3a5a',
-    padding: '15px',
+    padding: 'clamp(12px, 3vw, 15px)',
     borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     gap: '10px',
     transition: 'background-color 0.3s',
+    ':hover': {
+      backgroundColor: '#4a4a6a',
+    },
   },
   radio: {
-    width: '20px',
-    height: '20px',
+    width: 'clamp(16px, 4vw, 20px)',
+    height: 'clamp(16px, 4vw, 20px)',
     cursor: 'pointer',
   },
   equationText: {
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
   },
   unlockBtn: {
     backgroundColor: '#4a6fa5',
     color: 'white',
     border: 'none',
-    padding: '15px',
-    fontSize: '18px',
+    padding: 'clamp(12px, 3vw, 15px)',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     borderRadius: '8px',
     cursor: 'pointer',
     marginTop: '10px',
     fontWeight: 'bold',
+    transition: 'transform 0.2s, opacity 0.2s',
+    ':hover': {
+      transform: 'scale(1.02)',
+    },
   },
   hintBtn: {
     backgroundColor: '#6c757d',
     color: 'white',
     border: 'none',
-    padding: '10px',
-    fontSize: '14px',
+    padding: 'clamp(8px, 2.5vw, 10px)',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     borderRadius: '5px',
     cursor: 'pointer',
   },
   hint: {
     backgroundColor: '#ffd700',
     color: '#1a1a2e',
-    padding: '10px',
+    padding: '12px',
     borderRadius: '5px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
   },
   graphContainer: {
     backgroundColor: '#3a3a5a',
-    padding: '20px',
+    padding: 'clamp(15px, 4vw, 20px)',
     borderRadius: '8px',
   },
   graph: {
-    height: '200px',
+    height: 'clamp(200px, 40vh, 300px)',
     position: 'relative',
     backgroundColor: '#fff',
     marginBottom: '20px',
     overflow: 'hidden',
+    borderRadius: '4px',
   },
   grid: {
     position: 'relative',
@@ -670,6 +720,7 @@ const styles = {
     backgroundColor: 'red',
     borderRadius: '50%',
     transform: 'translate(-50%, 50%)',
+    transition: 'all 0.1s ease',
   },
   sliderContainer: {
     display: 'flex',
@@ -682,8 +733,8 @@ const styles = {
     cursor: 'pointer',
   },
   input: {
-    padding: '12px',
-    fontSize: '16px',
+    padding: 'clamp(10px, 3vw, 12px)',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     borderRadius: '5px',
     border: '1px solid #4a6fa5',
     backgroundColor: '#3a3a5a',
@@ -691,20 +742,20 @@ const styles = {
   },
   equationDisplay: {
     textAlign: 'center',
-    padding: '20px',
+    padding: 'clamp(15px, 4vw, 20px)',
     backgroundColor: '#3a3a5a',
     borderRadius: '8px',
   },
   bigEquation: {
-    fontSize: '28px',
+    fontSize: 'clamp(20px, 6vw, 32px)',
     fontWeight: 'bold',
     color: '#ffd700',
   },
   solveSteps: {
     backgroundColor: '#3a3a5a',
-    padding: '15px',
+    padding: 'clamp(12px, 3vw, 15px)',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
     lineHeight: '2',
   },
   clues: {
@@ -714,26 +765,26 @@ const styles = {
   },
   clue: {
     backgroundColor: '#3a3a5a',
-    padding: '15px',
+    padding: 'clamp(12px, 3vw, 15px)',
     borderRadius: '5px',
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     textAlign: 'center',
   },
   smallText: {
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 2.5vw, 12px)',
     color: '#aaa',
   },
   keys: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
     gap: '10px',
   },
   keyBtn: {
     backgroundColor: '#3a3a5a',
     color: '#fff',
     border: '2px solid #4a6fa5',
-    padding: '15px',
-    fontSize: '14px',
+    padding: 'clamp(10px, 3vw, 15px)',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.3s',
@@ -743,8 +794,8 @@ const styles = {
     borderColor: '#fff',
   },
   finalInput: {
-    padding: '15px',
-    fontSize: '18px',
+    padding: 'clamp(12px, 3vw, 15px)',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     borderRadius: '5px',
     border: '2px solid #ffd700',
     backgroundColor: '#3a3a5a',
@@ -755,47 +806,54 @@ const styles = {
     backgroundColor: '#ff6b6b',
     color: 'white',
     border: 'none',
-    padding: '15px',
-    fontSize: '20px',
+    padding: 'clamp(12px, 3vw, 15px)',
+    fontSize: 'clamp(16px, 4vw, 20px)',
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: 'bold',
     marginTop: '10px',
+    transition: 'transform 0.2s, opacity 0.2s',
   },
   endScreen: {
     textAlign: 'center',
-    padding: '40px 20px',
+    padding: 'clamp(30px, 8vw, 60px) clamp(20px, 5vw, 40px)',
     backgroundColor: '#2a2a4a',
     borderRadius: '15px',
+    maxWidth: '800px',
+    margin: '0 auto',
   },
   failedTitle: {
     color: '#ff6b6b',
-    fontSize: '28px',
+    fontSize: 'clamp(24px, 6vw, 32px)',
     marginBottom: '20px',
   },
   successTitle: {
     color: '#4CAF50',
-    fontSize: '28px',
+    fontSize: 'clamp(24px, 6vw, 32px)',
     marginBottom: '20px',
   },
   resetBtn: {
     backgroundColor: '#4a6fa5',
     color: 'white',
     border: 'none',
-    padding: '15px 40px',
-    fontSize: '18px',
+    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     borderRadius: '25px',
     cursor: 'pointer',
     marginTop: '20px',
     fontWeight: 'bold',
+    transition: 'transform 0.2s, opacity 0.2s',
   },
   progress: {
     marginTop: '20px',
+    maxWidth: '800px',
+    margin: '20px auto 0 auto',
   },
   progressText: {
     textAlign: 'center',
     marginBottom: '5px',
     color: '#aaa',
+    fontSize: 'clamp(12px, 3vw, 14px)',
   },
   progressBar: {
     height: '10px',

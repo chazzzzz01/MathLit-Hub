@@ -6,20 +6,21 @@ import { FiUser } from 'react-icons/fi';
 import { GiAchievement } from 'react-icons/gi';
 import { IoGameController } from 'react-icons/io5';
 import { MdAssignment } from 'react-icons/md';
+import { useUser } from '../context/UserContext';
 
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [user, setUser] = useState(null); // Add state for user data
+  const { user, setUser } = useUser(); // Use context instead of local state
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get user data from navigation state
+  // Get user data from navigation state only if user is not already set
   useEffect(() => {
-    if (location.state?.user) {
+    if (location.state?.user && !user) {
       setUser(location.state.user);
     }
-  }, [location.state]);
+  }, [location.state, user, setUser]);
 
   // Redirect to homepage if at exactly /studenthub
   useEffect(() => {
@@ -33,6 +34,7 @@ function StudentHub() {
   };
 
   const handleLogout = () => {
+    setUser(null); // Clear user data on logout
     navigate("/");
     setOpenDropdown(null);
   };
@@ -354,28 +356,5 @@ const styles = {
     },
   },
 };
-
-// Add this CSS to your App.css or global styles file
-const globalStyles = `
-  /* Ensure all page components take full height */
-  .page-content {
-    min-height: 100%;
-    background-color: #f5f5f5;
-    padding: 20px;
-  }
-  
-  /* Make sure the Outlet container expands */
-  .outlet-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  /* Ensure all direct children of Outlet take full height */
-  .outlet-container > * {
-    flex: 1;
-    background-color: #f5f5f5;
-  }
-`;
 
 export default StudentHub;
