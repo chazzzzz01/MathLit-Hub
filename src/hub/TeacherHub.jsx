@@ -1,104 +1,162 @@
-import '../App.css';  // Changed from './App.css' to '../App.css'
+import '../App.css';
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { AiFillHome } from 'react-icons/ai'; // Home icon
-import { FiPlus, FiUser } from 'react-icons/fi'; // Plus and Profile icons
+import { useNavigate, Outlet, useLocation } from 'react-router-dom';
+import { FiUser, FiMenu, FiX } from 'react-icons/fi';
+import { MdDashboard, MdPeople, MdTrendingUp } from 'react-icons/md';
+import { useUser } from '../context/UserContext';
 
 function TeacherHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null); // 'plus' or 'profile' or null
-  const [user, setUser] = useState(null); // Add state for user data
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const { user, setUser } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get user data from navigation state
+  // Check screen size for responsive behavior
   useEffect(() => {
-    if (location.state?.user) {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        setMobileMenuOpen(false);
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Get user data from navigation state only if user is not already set
+  useEffect(() => {
+    if (location.state?.user && !user) {
       setUser(location.state.user);
     }
-  }, [location.state]);
+  }, [location.state, user, setUser]);
+
+  // Redirect to dashboard if at exactly /teacherhub
+  useEffect(() => {
+    if (location.pathname === '/teacherhub') {
+      navigate('/teacherhub/dashboard', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   const toggleSidebar = () => {
-    setSidebarCollapsed(!sidebarCollapsed);
+    if (isMobile) {
+      setMobileMenuOpen(!mobileMenuOpen);
+    } else {
+      setSidebarCollapsed(!sidebarCollapsed);
+    }
   };
 
   const handleLogout = () => {
-    navigate("/"); // go back to Get Started
+    setUser(null);
+    navigate("/");
     setOpenDropdown(null);
+    setMobileMenuOpen(false);
   };
 
-  const handleHome = () => {
-    navigate("/homepage");
+  const handleNavigation = (path) => {
+    navigate(path);
     setOpenDropdown(null);
+    if (isMobile) {
+      setMobileMenuOpen(false);
+    }
   };
 
-  const handleStudentHub = () => {
-    navigate("/studenthub");
-    setOpenDropdown(null);
-  };
-
-  const handleTeacherHub = () => {
-    navigate("/teacherhub");
-    setOpenDropdown(null);
-  };
+  // Teacher navigation items - Home removed
+  const navItems = [
+    { path: "/teacherhub/dashboard", icon: MdDashboard, label: "Dashboard" },
+    { path: "/teacherhub/students", icon: MdPeople, label: "Students" },
+    { path: "/teacherhub/progress", icon: MdTrendingUp, label: "Progress" }
+  ];
 
   return (
     <div style={styles.wrapper}>
-      {/* Sidebar */}
-      <aside
-        style={{
-          ...styles.sidebar,
-          width: sidebarCollapsed ? '60px' : '220px',
-        }}
-      >
-        {/* Home Icon */}
-        <div style={styles.iconWrapper} onClick={handleHome}>
-          <AiFillHome size={24} color="white" />
-          {!sidebarCollapsed && <span style={styles.iconText}>Home</span>}
+      {/* Sidebar - Desktop */}
+      {!isMobile && (
+        <aside
+          style={{
+            ...styles.sidebar,
+            width: sidebarCollapsed ? '70px' : '260px',
+          }}
+        >
+          <div style={styles.sidebarContent}>
+            {navItems.map((item, index) => (
+              <div 
+                key={index}
+                style={styles.iconWrapper}
+                onClick={() => handleNavigation(item.path)}
+              >
+                <item.icon size={24} color="white" />
+                {!sidebarCollapsed && <span style={styles.iconText}>{item.label}</span>}
+              </div>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {/* Mobile Menu Overlay */}
+      {isMobile && mobileMenuOpen && (
+        <div style={styles.mobileOverlay} onClick={() => setMobileMenuOpen(false)}>
+          <div style={styles.mobileSidebar} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.mobileSidebarHeader}>
+              <div style={styles.mobileLogo}>MathLit Teacher Hub</div>
+              <button 
+                style={styles.mobileCloseButton}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <FiX size={24} color="#2563EB" />
+              </button>
+            </div>
+            <div style={styles.mobileNavItems}>
+              {navItems.map((item, index) => (
+                <div 
+                  key={index}
+                  style={styles.mobileNavItem}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <item.icon size={22} color="#2563EB" />
+                  <span style={styles.mobileNavText}>{item.label}</span>
+                </div>
+              ))}
+              <div style={styles.mobileDivider}></div>
+              <div 
+                style={styles.mobileNavItem}
+                onClick={handleLogout}
+              >
+                <FiUser size={22} color="#dc2626" />
+                <span style={{...styles.mobileNavText, color: '#dc2626'}}>Logout</span>
+              </div>
+            </div>
+          </div>
         </div>
-      </aside>
+      )}
 
       {/* Main content */}
       <main
         style={{
           ...styles.main,
-          marginLeft: sidebarCollapsed ? '60px' : '220px',
+          ...(!isMobile && {
+            marginLeft: sidebarCollapsed ? '70px' : '260px',
+          })
         }}
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger fixed top-left */}
-          <div style={styles.hamburger} onClick={toggleSidebar}>
-            <div style={styles.bar}></div>
-            <div style={styles.bar}></div>
-            <div style={styles.bar}></div>
-          </div>
+          {/* Hamburger Menu Button */}
+          <button style={styles.hamburgerButton} onClick={toggleSidebar}>
+            <FiMenu size={24} color="white" />
+          </button>
 
-          {/* Right side icons */}
-          <div style={styles.rightIcons}>
-            {/* Plus icon */}
-            <div style={{ position: 'relative', marginRight: '15px' }}>
-              <FiPlus
-                size={24}
-                color="white"
-                style={{ cursor: 'pointer' }}
-                onClick={() =>
-                  setOpenDropdown(openDropdown === 'plus' ? null : 'plus')
-                }
-              />
-              {openDropdown === 'plus' && (
-                <div style={styles.dropdown}>
-                  <div style={styles.dropdownItem} onClick={handleStudentHub}>
-                    Student Hub
-                  </div>
-                  <div style={styles.dropdownItem} onClick={handleTeacherHub}>
-                    Teacher Hub
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Profile icon */}
+          {/* Right side - Teacher name and profile icon */}
+          <div style={styles.rightSection}>
+            <span style={styles.teacherName}>
+              {user ? user.name.split(' ')[0] : 'Teacher'}
+            </span>
+            
+            {/* Profile icon with dropdown */}
             <div style={{ position: 'relative' }}>
               {user?.picture ? (
                 <img 
@@ -113,7 +171,7 @@ function TeacherHub() {
                 <FiUser
                   size={24}
                   color="white"
-                  style={{ cursor: 'pointer' }}
+                  style={styles.userIcon}
                   onClick={() =>
                     setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
                   }
@@ -136,25 +194,10 @@ function TeacherHub() {
           </div>
         </header>
 
-        {/* Teacher Hub Content */}
-        <div style={styles.content}>
-          <h1>Teacher Hub</h1>
-          <p>Welcome to the Teacher Hub! {user ? user.name.split(' ')[0] : 'Teacher'}! This is where teachers can manage their classes and assignments.</p>
-          
-          {/* Add your teacher-specific content here */}
-          <div style={styles.cardContainer}>
-            <div style={styles.card}>
-              <h3>My Classes</h3>
-              <p>Manage your classes and students</p>
-            </div>
-            <div style={styles.card}>
-              <h3>Create Assignments</h3>
-              <p>Create and manage assignments</p>
-            </div>
-            <div style={styles.card}>
-              <h3>Grade Submissions</h3>
-              <p>Review and grade student work</p>
-            </div>
+        {/* Content Area - Uses Outlet for nested routes */}
+        <div style={styles.contentWrapper}>
+          <div style={styles.content}>
+            <Outlet />
           </div>
         </div>
       </main>
@@ -165,48 +208,63 @@ function TeacherHub() {
 const styles = {
   wrapper: {
     display: 'flex',
-    height: '100vh',
+    minHeight: '100vh',
     position: 'relative',
     backgroundColor: '#f5f5f5',
   },
   sidebar: {
     position: 'fixed',
-    top: '60px',
+    top: '70px',
     left: 0,
-    height: 'calc(100vh - 60px)',
+    height: 'calc(100vh - 70px)',
     backgroundColor: '#2563eb',
     transition: 'width 0.3s ease',
     zIndex: 100,
     paddingTop: '20px',
     display: 'flex',
     flexDirection: 'column',
+    overflowY: 'auto',
+    overflowX: 'hidden',
+    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+  },
+  sidebarContent: {
+    display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
+    width: '100%',
   },
   iconWrapper: {
     display: 'flex',
     alignItems: 'center',
-    padding: '10px',
+    padding: '12px 16px',
     cursor: 'pointer',
     width: '100%',
-    transition: 'background-color 0.2s',
+    marginBottom: '8px',
     borderRadius: '0 20px 20px 0',
+    transition: 'all 0.2s',
     ':hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      transform: 'translateX(4px)',
     },
   },
   iconText: {
-    marginLeft: '10px',
+    marginLeft: '12px',
     color: 'white',
-    fontSize: '16px',
+    fontSize: '15px',
     fontWeight: '500',
+    whiteSpace: 'nowrap',
   },
   main: {
     flex: 1,
     transition: 'margin-left 0.3s ease',
-    paddingTop: '60px', // Add padding to account for fixed header
+    paddingTop: '70px',
+    minHeight: '100vh',
+    backgroundColor: '#f5f5f5',
+    display: 'flex',
+    flexDirection: 'column',
   },
   header: {
-    height: '60px',
+    height: '70px',
     width: '100%',
     backgroundColor: '#2563eb',
     display: 'flex',
@@ -218,56 +276,67 @@ const styles = {
     top: 0,
     left: 0,
     zIndex: 150,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   },
-  hamburger: {
-    position: 'fixed',
-    top: '15px',
-    left: '15px',
-    width: '30px',
-    height: '25px',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+  hamburgerButton: {
+    background: 'transparent',
+    border: 'none',
     cursor: 'pointer',
-    zIndex: 200,
-  },
-  rightIcons: {
     display: 'flex',
     alignItems: 'center',
-    position: 'absolute',
-    right: '15px',
-    top: '50%',
-    transform: 'translateY(-50%)',
+    justifyContent: 'center',
+    padding: '8px',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
+    ':hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
   },
-  bar: {
-    height: '4px',
-    width: '100%',
-    backgroundColor: 'white',
-    borderRadius: '2px',
+  rightSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+  },
+  teacherName: {
+    color: 'white',
+    fontSize: 'clamp(14px, 4vw, 16px)',
+    fontWeight: '500',
+  },
+  userIcon: {
+    cursor: 'pointer',
+    transition: 'opacity 0.2s',
+    ':hover': {
+      opacity: 0.8,
+    },
   },
   userAvatar: {
-    width: '32px',
-    height: '32px',
+    width: '36px',
+    height: '36px',
     borderRadius: '50%',
     cursor: 'pointer',
     objectFit: 'cover',
     border: '2px solid white',
+    transition: 'transform 0.2s',
+    ':hover': {
+      transform: 'scale(1.05)',
+    },
   },
   dropdown: {
     position: 'absolute',
-    top: '40px',
+    top: '45px',
     right: 0,
     backgroundColor: 'white',
     color: 'black',
-    borderRadius: '8px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    borderRadius: '12px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '200px',
+    minWidth: '220px',
     zIndex: 1000,
+    animation: 'slideDown 0.2s ease',
   },
   dropdownEmail: {
     padding: '12px 16px',
-    fontSize: '14px',
+    fontSize: '13px',
     color: '#333',
     backgroundColor: '#f8f9fa',
     wordBreak: 'break-all',
@@ -283,34 +352,171 @@ const styles = {
     color: '#dc2626',
     fontSize: '14px',
     fontWeight: '500',
-    borderBottom: 'none',
     ':hover': {
       backgroundColor: '#fee2e2',
     },
   },
+  contentWrapper: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    backgroundColor: '#f5f5f5',
+  },
   content: {
-    padding: '20px',
-    maxWidth: '1200px',
+    padding: 'clamp(16px, 4vw, 24px)',
+    maxWidth: '1400px',
     margin: '0 auto',
+    width: '100%',
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    display: 'flex',
+    flexDirection: 'column',
+    boxSizing: 'border-box',
   },
-  cardContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '20px',
-    marginTop: '30px',
+  
+  // Mobile Menu Styles
+  mobileOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+    animation: 'fadeIn 0.3s ease',
   },
-  card: {
+  mobileSidebar: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '280px',
+    height: '100vh',
     backgroundColor: 'white',
+    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+    animation: 'slideInLeft 0.3s ease',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  mobileSidebarHeader: {
     padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    borderBottom: '1px solid #e0e0e0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  mobileLogo: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  mobileCloseButton: {
+    background: 'transparent',
+    border: 'none',
     cursor: 'pointer',
-    transition: 'transform 0.2s, box-shadow 0.2s',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
     ':hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
+      backgroundColor: '#f0f0f0',
     },
   },
+  mobileNavItems: {
+    flex: 1,
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  mobileNavItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    ':hover': {
+      backgroundColor: '#f0f7ff',
+      transform: 'translateX(4px)',
+    },
+  },
+  mobileNavText: {
+    fontSize: '16px',
+    fontWeight: '500',
+    color: '#333',
+  },
+  mobileDivider: {
+    height: '1px',
+    backgroundColor: '#e0e0e0',
+    margin: '12px 0',
+  },
 };
+
+// Add animations
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .teacher-name {
+      font-size: 14px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .teacher-name {
+      display: none;
+    }
+    
+    .content {
+      padding: 12px;
+    }
+  }
+  
+  /* Better touch targets for mobile */
+  @media (max-width: 768px) {
+    button, [role="button"], .mobile-nav-item {
+      min-height: 44px;
+    }
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default TeacherHub;

@@ -20,6 +20,14 @@ const BattleArena = () => {
   const [selectedEnemy, setSelectedEnemy] = useState(0);
   const [showTutorial, setShowTutorial] = useState(true);
   const [battleLog, setBattleLog] = useState([]);
+  const [gameStartTime, setGameStartTime] = useState(null);
+  const [gameResultSent, setGameResultSent] = useState(false);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [totalAnswers, setTotalAnswers] = useState(0);
+  const [enemiesDefeated, setEnemiesDefeated] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [timeSpent, setTimeSpent] = useState(0);
+  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(0); // Add this to track current enemy
 
   // Enemy types
   const enemies = [
@@ -65,9 +73,70 @@ const BattleArena = () => {
     ]
   };
 
+  // Function to send game result to parent window
+  const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
+    if (gameResultSent) return; // Prevent sending multiple times
+    
+    // Calculate accuracy
+    const accuracy = stats.totalAnswers > 0 
+      ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) 
+      : 0;
+    
+    const gameResult = {
+      type: 'GAME_RESULT',
+      gameId: 'battle',
+      completed: completed,
+      score: finalScore,
+      timeSpent: timeSpentSeconds,
+      timestamp: new Date().toISOString(),
+      stats: {
+        correctAnswers: stats.correctAnswers,
+        totalAnswers: stats.totalAnswers,
+        accuracy: accuracy,
+        maxCombo: stats.maxCombo,
+        enemiesDefeated: stats.enemiesDefeated,
+        enemyType: enemies[selectedEnemy]?.name || 'Unknown',
+        totalEnemies: enemies.length
+      }
+    };
+    
+    // Send to parent window (the games dashboard)
+    if (window.opener) {
+      window.opener.postMessage(gameResult, '*');
+      setGameResultSent(true);
+    }
+    
+    // Also store in localStorage for backup
+    const previousResults = localStorage.getItem('battleGameResults');
+    const results = previousResults ? JSON.parse(previousResults) : [];
+    results.push(gameResult);
+    localStorage.setItem('battleGameResults', JSON.stringify(results));
+  };
+
   const handleBackToGames = () => {
+    // Send result if game is in progress but not completed
+    if (gameState === 'playing' && !gameResultSent && gameStartTime) {
+      const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+      sendGameResult(false, score, currentTimeSpent, {
+        correctAnswers,
+        totalAnswers,
+        maxCombo,
+        enemiesDefeated
+      });
+    }
     navigate('/studenthub/games');
   };
+
+  // Update time spent during gameplay
+  useEffect(() => {
+    let timer;
+    if (gameState === 'playing' && gameStartTime && !gameResultSent) {
+      timer = setInterval(() => {
+        setTimeSpent(Math.floor((Date.now() - gameStartTime) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState, gameStartTime, gameResultSent]);
 
   // Generate random equation based on type
   const generateEquation = (type = 'random') => {
@@ -125,9 +194,17 @@ const BattleArena = () => {
     setPlayerMana(50);
     setScore(0);
     setCombo(0);
+    setCorrectAnswers(0);
+    setTotalAnswers(0);
+    setMaxCombo(0);
+    setEnemiesDefeated(0);
+    setCurrentEnemyIndex(selectedEnemy); // Set current enemy index
     setBattleLog(['Battle started! Solve equations to attack!']);
     setCurrentEquation(generateEquation());
     setTurn('player');
+    setGameStartTime(Date.now());
+    setGameResultSent(false);
+    setTimeSpent(0);
   };
 
   // Handle player attack
@@ -135,6 +212,7 @@ const BattleArena = () => {
     if (!currentEquation || turn !== 'player') return;
     
     const numAnswer = parseFloat(userAnswer);
+    setTotalAnswers(prev => prev + 1);
     
     if (isNaN(numAnswer)) {
       setFeedback('❌ Enter a number!');
@@ -143,6 +221,7 @@ const BattleArena = () => {
     
     if (numAnswer === currentEquation.answer) {
       // Correct answer
+      setCorrectAnswers(prev => prev + 1);
       const damage = 15 + (combo * 5);
       const manaGain = 5;
       const newEnemyHP = Math.max(0, enemyHP - damage);
@@ -150,15 +229,39 @@ const BattleArena = () => {
       
       setEnemyHP(newEnemyHP);
       setPlayerMana(newMana);
-      setCombo(combo + 1);
-      setScore(score + 10 * (combo + 1));
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      if (newCombo > maxCombo) setMaxCombo(newCombo);
+      setScore(score + 10 * newCombo);
       
-      addBattleLog(`🎯 Correct! Dealt ${damage} damage! Combo x${combo + 1}!`);
+      addBattleLog(`🎯 Correct! Dealt ${damage} damage! Combo x${newCombo}!`);
       
       if (newEnemyHP <= 0) {
-        setGameState('victory');
-        addBattleLog('🎉 Victory! Enemy defeated!');
-        setScore(score + 500);
+        const newEnemiesDefeated = enemiesDefeated + 1;
+        setEnemiesDefeated(newEnemiesDefeated);
+        const bonusScore = 500;
+        setScore(prevScore => prevScore + bonusScore);
+        addBattleLog(`🎉 Victory! ${enemies[currentEnemyIndex].name} defeated! +${bonusScore} bonus!`);
+        
+        // Check if this was the last enemy
+        if (currentEnemyIndex === enemies.length - 1) {
+          const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+          const finalScore = score + bonusScore;
+          sendGameResult(true, finalScore, finalTimeSpent, {
+            correctAnswers: correctAnswers + 1,
+            totalAnswers: totalAnswers + 1,
+            maxCombo: newCombo,
+            enemiesDefeated: newEnemiesDefeated
+          });
+          setGameState('victory');
+        } else {
+          // Move to next enemy
+          const nextEnemyIndex = currentEnemyIndex + 1;
+          setCurrentEnemyIndex(nextEnemyIndex);
+          setEnemyHP(enemies[nextEnemyIndex].hp);
+          addBattleLog(`⚔️ New challenger appears: ${enemies[nextEnemyIndex].name}!`);
+          setTurn('enemy');
+        }
       } else {
         setTurn('enemy');
         setFeedback('✅ Correct! Enemy takes damage!');
@@ -173,6 +276,13 @@ const BattleArena = () => {
       addBattleLog(`❌ Wrong answer! Took ${missDamage} damage!`);
       
       if (newPlayerHP <= 0) {
+        const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+        sendGameResult(false, score, finalTimeSpent, {
+          correctAnswers,
+          totalAnswers: totalAnswers + 1,
+          maxCombo,
+          enemiesDefeated
+        });
         setGameState('gameOver');
         addBattleLog('💀 Game Over...');
       } else {
@@ -192,16 +302,23 @@ const BattleArena = () => {
 
   // Enemy turn
   useEffect(() => {
-    if (turn === 'enemy' && gameState === 'playing' && enemyHP > 0) {
+    if (turn === 'enemy' && gameState === 'playing' && enemyHP > 0 && playerHP > 0) {
       const timer = setTimeout(() => {
         // Enemy attacks
         const enemyAttack = Math.floor(Math.random() * 15) + 5;
         const newPlayerHP = Math.max(0, playerHP - enemyAttack);
         setPlayerHP(newPlayerHP);
         
-        addBattleLog(`👾 Enemy attacks for ${enemyAttack} damage!`);
+        addBattleLog(`👾 ${enemies[currentEnemyIndex].name} attacks for ${enemyAttack} damage!`);
         
         if (newPlayerHP <= 0) {
+          const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+          sendGameResult(false, score, finalTimeSpent, {
+            correctAnswers,
+            totalAnswers,
+            maxCombo,
+            enemiesDefeated
+          });
           setGameState('gameOver');
           addBattleLog('💀 Game Over...');
         } else {
@@ -211,7 +328,7 @@ const BattleArena = () => {
       
       return () => clearTimeout(timer);
     }
-  }, [turn, gameState, enemyHP, playerHP]);
+  }, [turn, gameState, enemyHP, playerHP, currentEnemyIndex]);
 
   // Add message to battle log
   const addBattleLog = (message) => {
@@ -279,126 +396,175 @@ const BattleArena = () => {
   );
 
   // Game over screen
-  const GameOver = () => (
-    <div style={styles.endScreen}>
-      <h1 style={styles.failedTitle}>💀 GAME OVER 💀</h1>
-      <p style={styles.text}>Final Score: {score}</p>
-      <button style={styles.menuButton} onClick={() => setGameState('menu')}>
-        Back to Menu
-      </button>
-    </div>
-  );
+  const GameOver = () => {
+    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
+    
+    return (
+      <div style={styles.endScreen}>
+        <h1 style={styles.failedTitle}>💀 GAME OVER 💀</h1>
+        <p style={styles.text}>Final Score: {score}</p>
+        <p style={styles.text}>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
+        <p style={styles.text}>Accuracy: {accuracy}% ({correctAnswers}/{totalAnswers})</p>
+        <p style={styles.text}>Max Combo: x{maxCombo}</p>
+        <p style={styles.text}>Enemies Defeated: {enemiesDefeated}/{enemies.length}</p>
+        <button style={styles.menuButton} onClick={() => setGameState('menu')}>
+          Back to Menu
+        </button>
+      </div>
+    );
+  };
 
   // Victory screen
-  const VictoryScreen = () => (
-    <div style={styles.endScreen}>
-      <h1 style={styles.successTitle}>🎉 VICTORY! 🎉</h1>
-      <p style={styles.text}>You defeated {enemies[selectedEnemy].name}!</p>
-      <p style={styles.text}>Final Score: {score}</p>
-      <button style={styles.menuButton} onClick={() => setGameState('menu')}>
-        Next Battle
-      </button>
-    </div>
-  );
+  const VictoryScreen = () => {
+    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
+    const minutes = Math.floor(timeSpent / 60);
+    const seconds = timeSpent % 60;
+    
+    return (
+      <div style={styles.endScreen}>
+        <h1 style={styles.successTitle}>🎉 VICTORY! 🎉</h1>
+        <p style={styles.text}>You defeated all enemies!</p>
+        <p style={styles.text}>Final Score: {score}</p>
+        <p style={styles.text}>Time: {minutes}:{seconds.toString().padStart(2, '0')}</p>
+        <p style={styles.text}>Accuracy: {accuracy}% ({correctAnswers}/{totalAnswers})</p>
+        <p style={styles.text}>Max Combo: x{maxCombo}</p>
+        <p style={styles.text}>Enemies Defeated: {enemiesDefeated}/{enemies.length}</p>
+        <button style={styles.menuButton} onClick={() => setGameState('menu')}>
+          Play Again
+        </button>
+      </div>
+    );
+  };
 
   // Main game UI
-  const GamePlay = () => (
-    <div style={styles.gameContainer}>
-      {/* Battlefield */}
-      <div style={styles.battlefield}>
-        {/* Player */}
-        <div style={styles.characterCard}>
-          <div style={styles.characterHeader}>
-            <span style={styles.avatar}>{player.avatar}</span>
-            <div>
-              <h3>{player.name}</h3>
-              <div style={styles.stats}>
-                <div>❤️ HP: {playerHP}</div>
-                <div>💙 MP: {playerMana}</div>
-                <div>✨ Combo: x{combo}</div>
+  const GamePlay = () => {
+    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
+    // Calculate progress based on current enemy index and enemies defeated
+    // If we're on the first enemy and haven't defeated any, progress is based on current enemy index
+    // If we've defeated some enemies, progress includes defeated ones plus current enemy progress
+    const progress = ((currentEnemyIndex) / enemies.length) * 100 + ((enemies[currentEnemyIndex].maxHp - enemyHP) / enemies[currentEnemyIndex].maxHp) * (100 / enemies.length);
+    
+    return (
+      <div style={styles.gameContainer}>
+        {/* Progress Bar */}
+        <div style={styles.progressBarContainer}>
+          <div style={styles.progressText}>
+            Progress: {Math.floor(progress)}% - Enemy {currentEnemyIndex + 1}/{enemies.length}
+          </div>
+          <div style={styles.progressBar}>
+            <div 
+              style={{
+                ...styles.progressFill,
+                width: `${Math.min(100, progress)}%`
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Battlefield */}
+        <div style={styles.battlefield}>
+          {/* Player */}
+          <div style={styles.characterCard}>
+            <div style={styles.characterHeader}>
+              <span style={styles.avatar}>{player.avatar}</span>
+              <div>
+                <h3>{player.name}</h3>
+                <div style={styles.stats}>
+                  <div>❤️ HP: {playerHP}</div>
+                  <div>💙 MP: {playerMana}</div>
+                  <div>✨ Combo: x{combo}</div>
+                </div>
               </div>
             </div>
-          </div>
-          <div style={styles.hpBar}>
-            <div style={{...styles.hpFill, width: `${playerHP}%`}} />
-          </div>
-        </div>
-
-        <div style={styles.vs}>VS</div>
-
-        {/* Enemy */}
-        <div style={styles.characterCard}>
-          <div style={styles.characterHeader}>
-            <span style={styles.avatar}>{enemies[selectedEnemy].avatar}</span>
-            <div>
-              <h3>{enemies[selectedEnemy].name}</h3>
-              <div>❤️ HP: {enemyHP}</div>
+            <div style={styles.hpBar}>
+              <div style={{...styles.hpFill, width: `${Math.max(0, playerHP)}%`}} />
             </div>
           </div>
-          <div style={styles.hpBar}>
-            <div style={{...styles.hpFill, width: `${(enemyHP/enemies[selectedEnemy].maxHp)*100}%`}} />
+
+          <div style={styles.vs}>VS</div>
+
+          {/* Enemy */}
+          <div style={styles.characterCard}>
+            <div style={styles.characterHeader}>
+              <span style={styles.avatar}>{enemies[currentEnemyIndex].avatar}</span>
+              <div>
+                <h3>{enemies[currentEnemyIndex].name}</h3>
+                <div>❤️ HP: {Math.max(0, enemyHP)}</div>
+                <div style={styles.difficulty[enemies[currentEnemyIndex].difficulty]}>
+                  {enemies[currentEnemyIndex].difficulty.toUpperCase()}
+                </div>
+              </div>
+            </div>
+            <div style={styles.hpBar}>
+              <div style={{...styles.hpFill, width: `${(Math.max(0, enemyHP)/enemies[currentEnemyIndex].maxHp)*100}%`, background: '#f44336'}} />
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Battle Log */}
-      <div style={styles.battleLog}>
-        {battleLog.map((log, i) => (
-          <div key={i} style={styles.logEntry}>{log}</div>
-        ))}
-      </div>
-
-      {/* Equation Arena */}
-      <div style={styles.equationArena}>
-        <div style={styles.equationBox}>
-          <h2>Solve to Attack!</h2>
-          <div style={styles.equation}>{currentEquation?.text}</div>
-          <div style={styles.inputArea}>
-            <input
-              type="number"
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAttack()}
-              placeholder="Enter answer"
-              style={styles.input}
-              disabled={turn !== 'player'}
-            />
-            <button 
-              onClick={handleAttack}
-              style={styles.attackButton}
-              disabled={turn !== 'player'}
-            >
-              ⚔️ Attack
-            </button>
-          </div>
-          {feedback && <div style={styles.feedback}>{feedback}</div>}
+        {/* Timer and Stats Summary */}
+        <div style={styles.statsSummary}>
+          <div>⏱️ Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</div>
+          <div>📊 Accuracy: {accuracy}%</div>
+          <div>🎯 Correct: {correctAnswers}</div>
+          <div>❌ Wrong: {totalAnswers - correctAnswers}</div>
+          <div>⚡ Max Combo: x{maxCombo}</div>
+          <div>🏆 Score: {score}</div>
         </div>
 
-        {/* Special Attacks */}
-        <div style={styles.specialAttacks}>
-          <h3>Special Attacks:</h3>
-          <div style={styles.attackGrid}>
-            {player.attacks.map((attack, index) => (
-              <button
-                key={index}
-                style={styles.specialButton}
-                onClick={() => useSpecialAttack(attack)}
-                disabled={turn !== 'player' || playerMana < attack.manaCost}
+        {/* Battle Log */}
+        <div style={styles.battleLog}>
+          {battleLog.map((log, i) => (
+            <div key={i} style={styles.logEntry}>{log}</div>
+          ))}
+        </div>
+
+        {/* Equation Arena */}
+        <div style={styles.equationArena}>
+          <div style={styles.equationBox}>
+            <h2>Solve to Attack!</h2>
+            <div style={styles.equation}>{currentEquation?.text}</div>
+            <div style={styles.inputArea}>
+              <input
+                type="number"
+                value={userAnswer}
+                onChange={(e) => setUserAnswer(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAttack()}
+                placeholder="Enter answer"
+                style={styles.input}
+                disabled={turn !== 'player'}
+              />
+              <button 
+                onClick={handleAttack}
+                style={styles.attackButton}
+                disabled={turn !== 'player'}
               >
-                <div>{attack.name}</div>
-                <small>{attack.manaCost} MP</small>
+                ⚔️ Attack
               </button>
-            ))}
+            </div>
+            {feedback && <div style={styles.feedback}>{feedback}</div>}
+          </div>
+
+          {/* Special Attacks */}
+          <div style={styles.specialAttacks}>
+            <h3>Special Attacks:</h3>
+            <div style={styles.attackGrid}>
+              {player.attacks.map((attack, index) => (
+                <button
+                  key={index}
+                  style={styles.specialButton}
+                  onClick={() => useSpecialAttack(attack)}
+                  disabled={turn !== 'player' || playerMana < attack.manaCost}
+                >
+                  <div>{attack.name}</div>
+                  <small>{attack.manaCost} MP</small>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Score */}
-      <div style={styles.scoreBoard}>
-        Score: {score}
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={styles.container}>
@@ -505,9 +671,6 @@ const styles = {
     cursor: 'pointer',
     boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
     transition: 'transform 0.2s',
-    ':hover': {
-      transform: 'scale(1.05)',
-    }
   },
   tutorial: {
     marginTop: '40px',
@@ -521,12 +684,31 @@ const styles = {
     maxWidth: '1000px',
     margin: '40px auto 0 auto',
   },
+  progressBarContainer: {
+    marginBottom: '20px',
+  },
+  progressText: {
+    fontSize: 'clamp(12px, 3vw, 14px)',
+    marginBottom: '5px',
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: '10px',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: '5px',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    transition: 'width 0.3s ease',
+  },
   battlefield: {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     gap: '20px',
     alignItems: 'center',
-    marginBottom: '30px'
+    marginBottom: '20px'
   },
   characterCard: {
     background: 'rgba(255,255,255,0.1)',
@@ -546,6 +728,17 @@ const styles = {
   stats: {
     fontSize: 'clamp(12px, 3vw, 14px)',
     marginTop: '5px'
+  },
+  statsSummary: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+    gap: '10px',
+    background: 'rgba(0,0,0,0.3)',
+    padding: '10px',
+    borderRadius: '8px',
+    marginBottom: '15px',
+    textAlign: 'center',
+    fontSize: 'clamp(12px, 3vw, 14px)'
   },
   hpBar: {
     width: '100%',
@@ -634,16 +827,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'transform 0.2s',
     fontSize: 'clamp(12px, 3vw, 14px)',
-    ':hover': {
-      transform: 'scale(1.05)',
-    }
-  },
-  scoreBoard: {
-    textAlign: 'center',
-    fontSize: 'clamp(18px, 4vw, 24px)',
-    padding: '10px',
-    background: 'rgba(0,0,0,0.3)',
-    borderRadius: '5px'
   },
   endScreen: {
     textAlign: 'center',

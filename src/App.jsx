@@ -12,6 +12,8 @@ import TeacherHub from "./hub/TeacherHub";
 import EquationEscapeRoom from "./games/EquationEscapeRoom"
 import BattleArena from "./games/BattleArena"
 import SpaceShooter from "./games/SpaceShooter"
+
+import Dashboard from "./menu1/Dashboard"  
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
 import '/src/App.css'
@@ -36,8 +38,8 @@ function App() {
           
           {/* Teacher hub routes */}
           <Route path="/teacherhub" element={<TeacherHub />}>
-            <Route index element={<Homepage />} />
-            <Route path="homepage" element={<Homepage />} />
+            <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
           </Route>
           
           {/* Game routes - These will open in new tabs/pages */}
