@@ -1,4 +1,3 @@
-// src/games/BattleArena.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft } from 'react-icons/fa';
@@ -27,7 +26,8 @@ const BattleArena = () => {
   const [enemiesDefeated, setEnemiesDefeated] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [timeSpent, setTimeSpent] = useState(0);
-  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(0); // Add this to track current enemy
+  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(0);
+  const [isWaitingForNext, setIsWaitingForNext] = useState(false);
 
   // Enemy types
   const enemies = [
@@ -75,9 +75,8 @@ const BattleArena = () => {
 
   // Function to send game result to parent window
   const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
-    if (gameResultSent) return; // Prevent sending multiple times
+    if (gameResultSent) return;
     
-    // Calculate accuracy
     const accuracy = stats.totalAnswers > 0 
       ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) 
       : 0;
@@ -100,13 +99,16 @@ const BattleArena = () => {
       }
     };
     
-    // Send to parent window (the games dashboard)
+    console.log('Sending game result:', gameResult);
+    
     if (window.opener) {
       window.opener.postMessage(gameResult, '*');
       setGameResultSent(true);
+      console.log('Game result sent to parent window');
+    } else {
+      console.log('No opener window found');
     }
     
-    // Also store in localStorage for backup
     const previousResults = localStorage.getItem('battleGameResults');
     const results = previousResults ? JSON.parse(previousResults) : [];
     results.push(gameResult);
@@ -114,7 +116,6 @@ const BattleArena = () => {
   };
 
   const handleBackToGames = () => {
-    // Send result if game is in progress but not completed
     if (gameState === 'playing' && !gameResultSent && gameStartTime) {
       const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
       sendGameResult(false, score, currentTimeSpent, {
@@ -127,7 +128,6 @@ const BattleArena = () => {
     navigate('/studenthub/games');
   };
 
-  // Update time spent during gameplay
   useEffect(() => {
     let timer;
     if (gameState === 'playing' && gameStartTime && !gameResultSent) {
@@ -138,7 +138,6 @@ const BattleArena = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
-  // Generate random equation based on type
   const generateEquation = (type = 'random') => {
     const types = ['addition', 'subtraction', 'multiplication', 'division', 'algebra'];
     const selectedType = type === 'random' ? types[Math.floor(Math.random() * types.length)] : type;
@@ -186,7 +185,6 @@ const BattleArena = () => {
     return { text: equation, answer, type: selectedType };
   };
 
-  // Start new game
   const startGame = () => {
     setGameState('playing');
     setPlayerHP(100);
@@ -198,29 +196,32 @@ const BattleArena = () => {
     setTotalAnswers(0);
     setMaxCombo(0);
     setEnemiesDefeated(0);
-    setCurrentEnemyIndex(selectedEnemy); // Set current enemy index
+    setCurrentEnemyIndex(selectedEnemy);
+    setIsWaitingForNext(false);
     setBattleLog(['Battle started! Solve equations to attack!']);
     setCurrentEquation(generateEquation());
     setTurn('player');
     setGameStartTime(Date.now());
     setGameResultSent(false);
     setTimeSpent(0);
+    setUserAnswer('');
+    setFeedback('');
   };
 
-  // Handle player attack
   const handleAttack = () => {
-    if (!currentEquation || turn !== 'player') return;
+    if (!currentEquation || turn !== 'player' || isWaitingForNext) return;
     
     const numAnswer = parseFloat(userAnswer);
     setTotalAnswers(prev => prev + 1);
+    setIsWaitingForNext(true);
     
     if (isNaN(numAnswer)) {
       setFeedback('❌ Enter a number!');
+      setIsWaitingForNext(false);
       return;
     }
     
     if (numAnswer === currentEquation.answer) {
-      // Correct answer
       setCorrectAnswers(prev => prev + 1);
       const damage = 15 + (combo * 5);
       const manaGain = 5;
@@ -232,7 +233,8 @@ const BattleArena = () => {
       const newCombo = combo + 1;
       setCombo(newCombo);
       if (newCombo > maxCombo) setMaxCombo(newCombo);
-      setScore(score + 10 * newCombo);
+      const newScore = score + 10 * newCombo;
+      setScore(newScore);
       
       addBattleLog(`🎯 Correct! Dealt ${damage} damage! Combo x${newCombo}!`);
       
@@ -243,10 +245,9 @@ const BattleArena = () => {
         setScore(prevScore => prevScore + bonusScore);
         addBattleLog(`🎉 Victory! ${enemies[currentEnemyIndex].name} defeated! +${bonusScore} bonus!`);
         
-        // Check if this was the last enemy
         if (currentEnemyIndex === enemies.length - 1) {
           const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-          const finalScore = score + bonusScore;
+          const finalScore = newScore + bonusScore;
           sendGameResult(true, finalScore, finalTimeSpent, {
             correctAnswers: correctAnswers + 1,
             totalAnswers: totalAnswers + 1,
@@ -255,19 +256,23 @@ const BattleArena = () => {
           });
           setGameState('victory');
         } else {
-          // Move to next enemy
           const nextEnemyIndex = currentEnemyIndex + 1;
           setCurrentEnemyIndex(nextEnemyIndex);
           setEnemyHP(enemies[nextEnemyIndex].hp);
           addBattleLog(`⚔️ New challenger appears: ${enemies[nextEnemyIndex].name}!`);
           setTurn('enemy');
+          setTimeout(() => {
+            setIsWaitingForNext(false);
+          }, 1000);
         }
       } else {
         setTurn('enemy');
         setFeedback('✅ Correct! Enemy takes damage!');
+        setTimeout(() => {
+          setIsWaitingForNext(false);
+        }, 1000);
       }
     } else {
-      // Wrong answer
       const missDamage = 5;
       const newPlayerHP = Math.max(0, playerHP - missDamage);
       setPlayerHP(newPlayerHP);
@@ -287,24 +292,30 @@ const BattleArena = () => {
         addBattleLog('💀 Game Over...');
       } else {
         setFeedback(`❌ Wrong! The answer was ${currentEquation.answer}`);
+        setTimeout(() => {
+          setIsWaitingForNext(false);
+        }, 1500);
       }
     }
     
     setUserAnswer('');
     
-    // Generate new equation for next turn
     setTimeout(() => {
-      if (gameState === 'playing') {
+      if (gameState === 'playing' && turn !== 'player') {
         setCurrentEquation(generateEquation());
       }
     }, 1000);
   };
 
-  // Enemy turn
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && turn === 'player' && !isWaitingForNext) {
+      handleAttack();
+    }
+  };
+
   useEffect(() => {
-    if (turn === 'enemy' && gameState === 'playing' && enemyHP > 0 && playerHP > 0) {
+    if (turn === 'enemy' && gameState === 'playing' && enemyHP > 0 && playerHP > 0 && !isWaitingForNext) {
       const timer = setTimeout(() => {
-        // Enemy attacks
         const enemyAttack = Math.floor(Math.random() * 15) + 5;
         const newPlayerHP = Math.max(0, playerHP - enemyAttack);
         setPlayerHP(newPlayerHP);
@@ -323,22 +334,22 @@ const BattleArena = () => {
           addBattleLog('💀 Game Over...');
         } else {
           setTurn('player');
+          setCurrentEquation(generateEquation());
+          setFeedback('');
         }
       }, 1500);
       
       return () => clearTimeout(timer);
     }
-  }, [turn, gameState, enemyHP, playerHP, currentEnemyIndex]);
+  }, [turn, gameState, enemyHP, playerHP, currentEnemyIndex, isWaitingForNext]);
 
-  // Add message to battle log
   const addBattleLog = (message) => {
     setBattleLog(prev => [message, ...prev].slice(0, 5));
   };
 
-  // Use special attack
   const useSpecialAttack = (attack) => {
-    if (playerMana < attack.manaCost) {
-      setFeedback('❌ Not enough mana!');
+    if (playerMana < attack.manaCost || turn !== 'player' || isWaitingForNext) {
+      setFeedback('❌ Not enough mana or not your turn!');
       return;
     }
     
@@ -347,7 +358,6 @@ const BattleArena = () => {
     setFeedback(`⚡ ${attack.name} activated! Solve to unleash!`);
   };
 
-  // Game menu component
   const GameMenu = () => (
     <div style={styles.menuContainer}>
       <h1 style={styles.title}>📐 Math Battle Arena 🧮</h1>
@@ -395,7 +405,6 @@ const BattleArena = () => {
     </div>
   );
 
-  // Game over screen
   const GameOver = () => {
     const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
     
@@ -414,7 +423,6 @@ const BattleArena = () => {
     );
   };
 
-  // Victory screen
   const VictoryScreen = () => {
     const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
     const minutes = Math.floor(timeSpent / 60);
@@ -436,17 +444,12 @@ const BattleArena = () => {
     );
   };
 
-  // Main game UI
   const GamePlay = () => {
     const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
-    // Calculate progress based on current enemy index and enemies defeated
-    // If we're on the first enemy and haven't defeated any, progress is based on current enemy index
-    // If we've defeated some enemies, progress includes defeated ones plus current enemy progress
     const progress = ((currentEnemyIndex) / enemies.length) * 100 + ((enemies[currentEnemyIndex].maxHp - enemyHP) / enemies[currentEnemyIndex].maxHp) * (100 / enemies.length);
     
     return (
       <div style={styles.gameContainer}>
-        {/* Progress Bar */}
         <div style={styles.progressBarContainer}>
           <div style={styles.progressText}>
             Progress: {Math.floor(progress)}% - Enemy {currentEnemyIndex + 1}/{enemies.length}
@@ -461,9 +464,7 @@ const BattleArena = () => {
           </div>
         </div>
 
-        {/* Battlefield */}
         <div style={styles.battlefield}>
-          {/* Player */}
           <div style={styles.characterCard}>
             <div style={styles.characterHeader}>
               <span style={styles.avatar}>{player.avatar}</span>
@@ -483,7 +484,6 @@ const BattleArena = () => {
 
           <div style={styles.vs}>VS</div>
 
-          {/* Enemy */}
           <div style={styles.characterCard}>
             <div style={styles.characterHeader}>
               <span style={styles.avatar}>{enemies[currentEnemyIndex].avatar}</span>
@@ -501,7 +501,6 @@ const BattleArena = () => {
           </div>
         </div>
 
-        {/* Timer and Stats Summary */}
         <div style={styles.statsSummary}>
           <div>⏱️ Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</div>
           <div>📊 Accuracy: {accuracy}%</div>
@@ -511,14 +510,12 @@ const BattleArena = () => {
           <div>🏆 Score: {score}</div>
         </div>
 
-        {/* Battle Log */}
         <div style={styles.battleLog}>
           {battleLog.map((log, i) => (
             <div key={i} style={styles.logEntry}>{log}</div>
           ))}
         </div>
 
-        {/* Equation Arena */}
         <div style={styles.equationArena}>
           <div style={styles.equationBox}>
             <h2>Solve to Attack!</h2>
@@ -528,15 +525,16 @@ const BattleArena = () => {
                 type="number"
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAttack()}
+                onKeyPress={handleKeyPress}
                 placeholder="Enter answer"
                 style={styles.input}
-                disabled={turn !== 'player'}
+                disabled={turn !== 'player' || isWaitingForNext}
+                autoFocus
               />
               <button 
                 onClick={handleAttack}
                 style={styles.attackButton}
-                disabled={turn !== 'player'}
+                disabled={turn !== 'player' || isWaitingForNext}
               >
                 ⚔️ Attack
               </button>
@@ -544,7 +542,6 @@ const BattleArena = () => {
             {feedback && <div style={styles.feedback}>{feedback}</div>}
           </div>
 
-          {/* Special Attacks */}
           <div style={styles.specialAttacks}>
             <h3>Special Attacks:</h3>
             <div style={styles.attackGrid}>
@@ -553,7 +550,7 @@ const BattleArena = () => {
                   key={index}
                   style={styles.specialButton}
                   onClick={() => useSpecialAttack(attack)}
-                  disabled={turn !== 'player' || playerMana < attack.manaCost}
+                  disabled={turn !== 'player' || playerMana < attack.manaCost || isWaitingForNext}
                 >
                   <div>{attack.name}</div>
                   <small>{attack.manaCost} MP</small>
@@ -581,7 +578,6 @@ const BattleArena = () => {
   );
 };
 
-// Styles
 const styles = {
   container: {
     width: '100%',

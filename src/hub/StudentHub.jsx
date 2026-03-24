@@ -11,13 +11,21 @@ import { useUser } from '../context/UserContext';
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const { user, setUser } = useUser(); // Use context instead of local state
+  const { user, setUser, logout, userData, updateUserData } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Debug: Log user data and current path
+  useEffect(() => {
+    console.log('StudentHub - User:', user);
+    console.log('StudentHub - UserData:', userData);
+    console.log('StudentHub - Current Path:', location.pathname);
+  }, [user, userData, location.pathname]);
 
   // Get user data from navigation state only if user is not already set
   useEffect(() => {
     if (location.state?.user && !user) {
+      console.log('Setting user from location state:', location.state.user);
       setUser(location.state.user);
     }
   }, [location.state, user, setUser]);
@@ -25,6 +33,7 @@ function StudentHub() {
   // Redirect to homepage if at exactly /studenthub
   useEffect(() => {
     if (location.pathname === '/studenthub') {
+      console.log('Redirecting to homepage');
       navigate('/studenthub/homepage', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -34,30 +43,52 @@ function StudentHub() {
   };
 
   const handleLogout = () => {
-    setUser(null); // Clear user data on logout
+    logout();
     navigate("/");
     setOpenDropdown(null);
   };
 
   const handleHomeClick = () => {
+    console.log('Navigating to homepage');
     navigate("/studenthub/homepage");
     setOpenDropdown(null);
   };
 
   const handleMissionsClick = () => {
+    console.log('Navigating to missions');
     navigate("/studenthub/missions");
     setOpenDropdown(null);
   };
 
   const handleGamesClick = () => {
+    console.log('Navigating to games');
     navigate("/studenthub/games");
     setOpenDropdown(null);
   };
 
   const handleAchievementClick = () => {
+    console.log('Navigating to achievement');
     navigate("/studenthub/achievement");
     setOpenDropdown(null);
   };
+
+  // Get user identifier for display
+  const getUserIdentifier = () => {
+    if (user && user.email) {
+      return user.email.split('@')[0];
+    }
+    return 'Student';
+  };
+
+  // If no user, show loading
+  if (!user) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading your dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.wrapper}>
@@ -68,36 +99,44 @@ function StudentHub() {
           width: sidebarCollapsed ? '60px' : '220px',
         }}
       >
-        {/* Home Icon */}
         <div 
-          style={styles.iconWrapper}
+          style={{
+            ...styles.iconWrapper,
+            backgroundColor: location.pathname.includes('/studenthub/homepage') ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
+          }} 
           onClick={handleHomeClick}
         >
           <AiFillHome size={24} color="white" />
           {!sidebarCollapsed && <span style={styles.iconText}>Home</span>}
         </div>
 
-        {/* Missions Icon */}
         <div 
-          style={styles.iconWrapper}
+          style={{
+            ...styles.iconWrapper,
+            backgroundColor: location.pathname.includes('/studenthub/missions') ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
+          }} 
           onClick={handleMissionsClick}
         >
           <MdAssignment size={24} color="white" />
           {!sidebarCollapsed && <span style={styles.iconText}>Missions</span>}
         </div>
 
-        {/* Games Icon */}
         <div 
-          style={styles.iconWrapper}
+          style={{
+            ...styles.iconWrapper,
+            backgroundColor: location.pathname.includes('/studenthub/games') ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
+          }} 
           onClick={handleGamesClick}
         >
           <IoGameController size={24} color="white" />
           {!sidebarCollapsed && <span style={styles.iconText}>Games</span>}
         </div>
 
-        {/* Achievement Icon */}
         <div 
-          style={styles.iconWrapper}
+          style={{
+            ...styles.iconWrapper,
+            backgroundColor: location.pathname.includes('/studenthub/achievement') ? 'rgba(255, 255, 255, 0.2)' : 'transparent'
+          }} 
           onClick={handleAchievementClick}
         >
           <GiAchievement size={24} color="white" />
@@ -114,20 +153,17 @@ function StudentHub() {
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger fixed top-left */}
           <div style={styles.hamburger} onClick={toggleSidebar}>
             <div style={styles.bar}></div>
             <div style={styles.bar}></div>
             <div style={styles.bar}></div>
           </div>
 
-          {/* Right side - Student name and profile icon */}
           <div style={styles.rightSection}>
             <span style={styles.studentName}>
-              {user ? user.name.split(' ')[0] : 'Student'}
+              {getUserIdentifier()}
             </span>
             
-            {/* Profile icon with dropdown */}
             <div style={{ position: 'relative' }}>
               {user?.picture ? (
                 <img 
@@ -153,6 +189,17 @@ function StudentHub() {
                   {user && (
                     <>
                       <div style={styles.dropdownEmail}>{user.email}</div>
+                      <div style={styles.dropdownUserId}>
+                        Username: {getUserIdentifier()}
+                      </div>
+                      {userData && (
+                        <div style={styles.dropdownStats}>
+                          <div>🎓 Member since: {new Date(userData.createdAt).toLocaleDateString()}</div>
+                          <div>🕒 Last login: {new Date(userData.lastLogin).toLocaleDateString()}</div>
+                          <div>🏆 XP: {userData.totalXP || 0}</div>
+                          <div>💰 Coins: {userData.totalCoins || 0}</div>
+                        </div>
+                      )}
                       <div style={styles.dropdownDivider}></div>
                     </>
                   )}
@@ -165,10 +212,15 @@ function StudentHub() {
           </div>
         </header>
 
-        {/* Content Area - Uses Outlet for nested routes */}
+        {/* Content Area - Pass user data to child routes */}
         <div style={styles.contentWrapper}>
           <div style={styles.content}>
-            <Outlet />
+            <Outlet context={{ 
+              user, 
+              userData, 
+              updateUserData, 
+              getUserIdentifier 
+            }} />
           </div>
         </div>
       </main>
@@ -182,6 +234,22 @@ const styles = {
     minHeight: '100vh',
     position: 'relative',
     backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #2563eb',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   sidebar: {
     position: 'fixed',
@@ -206,7 +274,7 @@ const styles = {
     width: '100%',
     marginBottom: '5px',
     borderRadius: '0 20px 20px 0',
-    transition: 'background-color 0.2s',
+    transition: 'all 0.2s ease',
     ':hover': {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
@@ -287,11 +355,10 @@ const styles = {
     top: '40px',
     right: 0,
     backgroundColor: 'white',
-    color: 'black',
     borderRadius: '8px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '200px',
+    minWidth: '280px',
     zIndex: 1000,
   },
   dropdownEmail: {
@@ -300,6 +367,22 @@ const styles = {
     color: '#333',
     backgroundColor: '#f8f9fa',
     wordBreak: 'break-all',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownUserId: {
+    padding: '8px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownStats: {
+    padding: '10px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+    lineHeight: '1.6',
   },
   dropdownDivider: {
     height: '1px',
@@ -312,6 +395,7 @@ const styles = {
     color: '#dc2626',
     fontSize: '14px',
     fontWeight: '500',
+    textAlign: 'center',
     ':hover': {
       backgroundColor: '#fee2e2',
     },
@@ -332,29 +416,16 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
   },
-  pageContainer: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
-  },
-  cardContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-    gap: '20px',
-    marginTop: '30px',
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    cursor: 'pointer',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    ':hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
-    },
-  },
 };
+
+// Add keyframes for spinner animation
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default StudentHub;

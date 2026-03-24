@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { GiAchievement, GiTrophy, GiMedal, GiStarMedal, GiLaurelCrown, GiCupcake } from 'react-icons/gi';
 import { FaMedal, FaStar, FaCrown, FaRocket, FaBolt, FaShieldAlt } from 'react-icons/fa';
 import { MdLock, MdEmojiEvents, MdTimeline, MdTrendingUp, MdSchool, MdCode } from 'react-icons/md';
@@ -6,12 +7,17 @@ import { IoMdTrophy } from 'react-icons/io';
 import { RiMedalLine } from 'react-icons/ri';
 
 function Achievement() {
+  // Get user data from context
+  const { user, userData, updateUserData, getUserIdentifier } = useOutletContext();
+  
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedRarity, setSelectedRarity] = useState('all');
   const [showUnlocked, setShowUnlocked] = useState(true);
   const [showLocked, setShowLocked] = useState(true);
+  const [achievements, setAchievements] = useState([]);
 
-  const [achievements, setAchievements] = useState([
+  // Define the base achievement templates
+  const achievementTemplates = [
     // Math Achievements
     {
       id: 1,
@@ -22,11 +28,10 @@ function Achievement() {
       xpReward: 50,
       coinReward: 25,
       icon: <FaStar size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-01-15",
-      progress: 10,
       total: 10,
-      color: "#3b82f6"
+      color: "#3b82f6",
+      requirementType: "mathProblems",
+      requirementValue: 10
     },
     {
       id: 2,
@@ -37,11 +42,10 @@ function Achievement() {
       xpReward: 150,
       coinReward: 75,
       icon: <FaBolt size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-02-03",
-      progress: 50,
       total: 50,
-      color: "#8b5cf6"
+      color: "#8b5cf6",
+      requirementType: "mathProblems",
+      requirementValue: 50
     },
     {
       id: 3,
@@ -52,12 +56,11 @@ function Achievement() {
       xpReward: 300,
       coinReward: 150,
       icon: <GiTrophy size={24} />,
-      unlocked: false,
-      progress: 78,
       total: 100,
-      color: "#f59e0b"
+      color: "#f59e0b",
+      requirementType: "mathProblems",
+      requirementValue: 100
     },
-
     // Reading Achievements
     {
       id: 4,
@@ -68,11 +71,10 @@ function Achievement() {
       xpReward: 50,
       coinReward: 25,
       icon: <FaStar size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-01-20",
-      progress: 5,
       total: 5,
-      color: "#10b981"
+      color: "#10b981",
+      requirementType: "storiesRead",
+      requirementValue: 5
     },
     {
       id: 5,
@@ -83,11 +85,10 @@ function Achievement() {
       xpReward: 150,
       coinReward: 75,
       icon: <RiMedalLine size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-02-10",
-      progress: 20,
       total: 20,
-      color: "#14b8a6"
+      color: "#14b8a6",
+      requirementType: "storiesRead",
+      requirementValue: 20
     },
     {
       id: 6,
@@ -98,12 +99,11 @@ function Achievement() {
       xpReward: 300,
       coinReward: 150,
       icon: <FaCrown size={24} />,
-      unlocked: false,
-      progress: 32,
       total: 50,
-      color: "#ef4444"
+      color: "#ef4444",
+      requirementType: "storiesRead",
+      requirementValue: 50
     },
-
     // Science Achievements
     {
       id: 7,
@@ -114,11 +114,10 @@ function Achievement() {
       xpReward: 50,
       coinReward: 25,
       icon: <FaStar size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-01-25",
-      progress: 5,
       total: 5,
-      color: "#6366f1"
+      color: "#6366f1",
+      requirementType: "scienceExperiments",
+      requirementValue: 5
     },
     {
       id: 8,
@@ -129,12 +128,11 @@ function Achievement() {
       xpReward: 150,
       coinReward: 75,
       icon: <FaShieldAlt size={24} />,
-      unlocked: false,
-      progress: 12,
       total: 15,
-      color: "#a855f7"
+      color: "#a855f7",
+      requirementType: "scienceExperiments",
+      requirementValue: 15
     },
-
     // Language Achievements
     {
       id: 9,
@@ -145,11 +143,10 @@ function Achievement() {
       xpReward: 50,
       coinReward: 25,
       icon: <FaStar size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-01-18",
-      progress: 20,
       total: 20,
-      color: "#ec4899"
+      color: "#ec4899",
+      requirementType: "wordsLearned",
+      requirementValue: 20
     },
     {
       id: 10,
@@ -160,13 +157,11 @@ function Achievement() {
       xpReward: 150,
       coinReward: 75,
       icon: <GiMedal size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-02-05",
-      progress: 50,
       total: 50,
-      color: "#d946ef"
+      color: "#d946ef",
+      requirementType: "wordsLearned",
+      requirementValue: 50
     },
-
     // Special Achievements
     {
       id: 11,
@@ -177,10 +172,10 @@ function Achievement() {
       xpReward: 500,
       coinReward: 250,
       icon: <GiLaurelCrown size={24} />,
-      unlocked: false,
-      progress: 0,
       total: 1,
-      color: "#f97316"
+      color: "#f97316",
+      requirementType: "perfectScore",
+      requirementValue: 1
     },
     {
       id: 12,
@@ -191,11 +186,10 @@ function Achievement() {
       xpReward: 200,
       coinReward: 100,
       icon: <FaRocket size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-02-15",
-      progress: 1,
       total: 1,
-      color: "#06b6d4"
+      color: "#06b6d4",
+      requirementType: "speedRun",
+      requirementValue: 1
     },
     {
       id: 13,
@@ -206,11 +200,10 @@ function Achievement() {
       xpReward: 400,
       coinReward: 200,
       icon: <GiCupcake size={24} />,
-      unlocked: true,
-      unlockedDate: "2024-02-20",
-      progress: 7,
       total: 7,
-      color: "#84cc16"
+      color: "#84cc16",
+      requirementType: "learningStreak",
+      requirementValue: 7
     },
     {
       id: 14,
@@ -221,12 +214,141 @@ function Achievement() {
       xpReward: 1000,
       coinReward: 500,
       icon: <GiAchievement size={24} />,
-      unlocked: false,
-      progress: 7,
       total: 10,
-      color: "#eab308"
+      color: "#eab308",
+      requirementType: "achievementCount",
+      requirementValue: 10
     }
-  ]);
+  ];
+
+  // Load user achievements from userData
+  useEffect(() => {
+    if (!user || !user.email) {
+      console.log('No user found, waiting for user data...');
+      return;
+    }
+
+    try {
+      // Get user-specific achievement data
+      let userAchievements = userData?.achievements || [];
+      
+      // If no achievements data exists, initialize with default unlocked ones
+      if (userAchievements.length === 0) {
+        // Check which achievements should be unlocked based on user stats
+        const initialAchievements = achievementTemplates.map(template => {
+          const shouldBeUnlocked = checkIfAchievementUnlocked(template, userData);
+          return {
+            ...template,
+            unlocked: shouldBeUnlocked,
+            unlockedDate: shouldBeUnlocked ? new Date().toISOString() : null,
+            progress: shouldBeUnlocked ? template.total : 0
+          };
+        });
+        
+        userAchievements = initialAchievements;
+        
+        // Save initial achievements to userData
+        if (updateUserData) {
+          updateUserData({
+            achievements: userAchievements
+          });
+        }
+      }
+      
+      setAchievements(userAchievements);
+    } catch (error) {
+      console.error('Error loading achievements:', error);
+    }
+  }, [user, userData]); // Re-run when user or userData changes
+
+  // Check if an achievement should be unlocked based on user stats
+  const checkIfAchievementUnlocked = (template, userStats) => {
+    if (!userStats) return false;
+    
+    switch(template.requirementType) {
+      case 'mathProblems':
+        return (userStats.mathProblemsCompleted || 0) >= template.requirementValue;
+      case 'storiesRead':
+        return (userStats.storiesRead || 0) >= template.requirementValue;
+      case 'scienceExperiments':
+        return (userStats.scienceExperiments || 0) >= template.requirementValue;
+      case 'wordsLearned':
+        return (userStats.wordsLearned || 0) >= template.requirementValue;
+      case 'perfectScore':
+        return (userStats.perfectScores || 0) >= template.requirementValue;
+      case 'speedRun':
+        return (userStats.speedRuns || 0) >= template.requirementValue;
+      case 'learningStreak':
+        return (userStats.learningStreak || 0) >= template.requirementValue;
+      case 'achievementCount':
+        return (userStats.unlockedAchievements || 0) >= template.requirementValue;
+      default:
+        return false;
+    }
+  };
+
+  // Update achievement progress based on user activity
+  const updateAchievementProgress = (achievementId, progress) => {
+    setAchievements(prev => {
+      const updated = prev.map(achievement => {
+        if (achievement.id === achievementId && !achievement.unlocked) {
+          const newProgress = Math.min(achievement.total, progress);
+          const nowUnlocked = newProgress >= achievement.total;
+          
+          if (nowUnlocked && !achievement.unlocked) {
+            // Achievement just unlocked!
+            console.log(`🎉 Achievement unlocked: ${achievement.name} for user ${user?.email}`);
+            
+            // Update user stats with XP and coins
+            if (updateUserData) {
+              const currentStats = userData || {};
+              updateUserData({
+                totalXP: (currentStats.totalXP || 0) + achievement.xpReward,
+                totalCoins: (currentStats.totalCoins || 0) + achievement.coinReward,
+                unlockedAchievements: (currentStats.unlockedAchievements || 0) + 1
+              });
+            }
+            
+            return {
+              ...achievement,
+              unlocked: true,
+              unlockedDate: new Date().toISOString(),
+              progress: newProgress
+            };
+          }
+          
+          return {
+            ...achievement,
+            progress: newProgress
+          };
+        }
+        return achievement;
+      });
+      
+      // Save updated achievements to userData
+      if (updateUserData) {
+        updateUserData({ achievements: updated });
+      }
+      
+      return updated;
+    });
+  };
+
+  // Listen for achievement updates from other components
+  useEffect(() => {
+    const handleAchievementUpdate = (event) => {
+      if (event.data && event.data.type === 'ACHIEVEMENT_UPDATE') {
+        const { achievementId, progress } = event.data;
+        updateAchievementProgress(achievementId, progress);
+      }
+    };
+    
+    window.addEventListener('message', handleAchievementUpdate);
+    
+    return () => {
+      window.removeEventListener('message', handleAchievementUpdate);
+    };
+  }, [user, updateUserData]);
 
   const categories = [
     { id: 'all', name: 'All Categories', icon: <GiAchievement /> },
@@ -278,8 +400,18 @@ function Achievement() {
     locked: achievements.filter(a => !a.unlocked).length,
     totalXP: achievements.filter(a => a.unlocked).reduce((sum, a) => sum + a.xpReward, 0),
     totalCoins: achievements.filter(a => a.unlocked).reduce((sum, a) => sum + a.coinReward, 0),
-    completionRate: Math.round((achievements.filter(a => a.unlocked).length / achievements.length) * 100)
+    completionRate: achievements.length > 0 ? Math.round((achievements.filter(a => a.unlocked).length / achievements.length) * 100) : 0
   };
+
+  // Show loading state if no user
+  if (!user || !user.email) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading your achievements...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.container}>
@@ -289,7 +421,7 @@ function Achievement() {
           <GiAchievement size={40} color="#f59e0b" />
           <h1 style={styles.title}>Achievement Gallery</h1>
         </div>
-        <p style={styles.subtitle}>Track your progress and earn rewards!</p>
+        <p style={styles.subtitle}>Track your progress and earn rewards, {user?.name?.split(' ')[0] || getUserIdentifier()}!</p>
       </div>
 
       {/* Stats Overview */}
@@ -349,6 +481,11 @@ function Achievement() {
             <span style={styles.rewardText}>{stats.totalCoins} Total Coins Earned</span>
           </div>
         </div>
+      </div>
+
+      {/* Privacy Note */}
+      <div style={styles.privacyNote}>
+        <p>🔒 Your achievements are private and only visible to you, {user?.name?.split(' ')[0] || 'Student'}.</p>
       </div>
 
       {/* Filters */}
@@ -476,7 +613,7 @@ function Achievement() {
               </div>
 
               {/* Unlocked Date */}
-              {achievement.unlocked && (
+              {achievement.unlocked && achievement.unlockedDate && (
                 <div style={styles.unlockedInfo}>
                   <MdEmojiEvents size={14} color="#10b981" />
                   <span style={styles.unlockedDate}>
@@ -506,36 +643,38 @@ function Achievement() {
       )}
 
       {/* Next Achievements Preview */}
-      <div style={styles.nextAchievements}>
-        <h3 style={styles.nextTitle}>🎯 Next Achievements to Unlock</h3>
-        <div style={styles.nextGrid}>
-          {achievements.filter(a => !a.unlocked).slice(0, 3).map(achievement => (
-            <div key={achievement.id} style={styles.nextCard}>
-              <div style={{ ...styles.nextIcon, backgroundColor: achievement.color + '20', color: achievement.color }}>
-                {achievement.icon}
-              </div>
-              <div style={styles.nextInfo}>
-                <h4 style={styles.nextName}>{achievement.name}</h4>
-                <p style={styles.nextDesc}>{achievement.description}</p>
-                <div style={styles.nextProgress}>
-                  <div style={styles.nextProgressBar}>
-                    <div 
-                      style={{
-                        ...styles.nextProgressFill,
-                        width: `${(achievement.progress / achievement.total) * 100}%`,
-                        backgroundColor: achievement.color
-                      }}
-                    />
+      {achievements.filter(a => !a.unlocked).length > 0 && (
+        <div style={styles.nextAchievements}>
+          <h3 style={styles.nextTitle}>🎯 Next Achievements to Unlock</h3>
+          <div style={styles.nextGrid}>
+            {achievements.filter(a => !a.unlocked).slice(0, 3).map(achievement => (
+              <div key={achievement.id} style={styles.nextCard}>
+                <div style={{ ...styles.nextIcon, backgroundColor: achievement.color + '20', color: achievement.color }}>
+                  {achievement.icon}
+                </div>
+                <div style={styles.nextInfo}>
+                  <h4 style={styles.nextName}>{achievement.name}</h4>
+                  <p style={styles.nextDesc}>{achievement.description}</p>
+                  <div style={styles.nextProgress}>
+                    <div style={styles.nextProgressBar}>
+                      <div 
+                        style={{
+                          ...styles.nextProgressFill,
+                          width: `${(achievement.progress / achievement.total) * 100}%`,
+                          backgroundColor: achievement.color
+                        }}
+                      />
+                    </div>
+                    <span style={styles.nextProgressText}>
+                      {achievement.progress}/{achievement.total}
+                    </span>
                   </div>
-                  <span style={styles.nextProgressText}>
-                    {achievement.progress}/{achievement.total}
-                  </span>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -545,6 +684,22 @@ const styles = {
     padding: '20px',
     maxWidth: '1200px',
     margin: '0 auto',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '400px',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   header: {
     marginBottom: '30px',
@@ -567,6 +722,15 @@ const styles = {
     fontSize: '18px',
     color: '#6b7280',
     margin: 0,
+  },
+  privacyNote: {
+    marginBottom: '20px',
+    padding: '12px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '8px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#92400e',
   },
   statsGrid: {
     display: 'grid',
@@ -901,5 +1065,15 @@ const styles = {
     minWidth: '40px',
   },
 };
+
+// Add keyframes for spinner animation
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default Achievement;

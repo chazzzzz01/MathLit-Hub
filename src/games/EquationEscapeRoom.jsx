@@ -5,7 +5,7 @@ import { FaArrowLeft } from 'react-icons/fa';
 const EquationEscapeRoom = () => {
   const navigate = useNavigate();
   const [gameState, setGameState] = useState('start');
-  const [timeLeft, setTimeLeft] = useState(360); // Changed from 600 to 360 (6 minutes)
+  const [timeLeft, setTimeLeft] = useState(360); // 6 minutes
   const [currentPuzzle, setCurrentPuzzle] = useState(1);
   const [puzzle1Answer, setPuzzle1Answer] = useState('');
   const [puzzle2Answer, setPuzzle2Answer] = useState('');
@@ -17,32 +17,54 @@ const EquationEscapeRoom = () => {
   const [message, setMessage] = useState('');
   const [puzzle4Input, setPuzzle4Input] = useState('');
   const [graphValue, setGraphValue] = useState(0);
-  // New state for polynomial puzzle
   const [polynomialCode, setPolynomialCode] = useState(['', '', '']);
   const [polynomialAttempts, setPolynomialAttempts] = useState(3);
   const [gameResultSent, setGameResultSent] = useState(false);
+  const [playTime, setPlayTime] = useState(0); // Track actual gameplay time
+  const [gameStartTime, setGameStartTime] = useState(null);
+
+  // Track play time
+  useEffect(() => {
+    let timer;
+    if (gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && gameStartTime && !gameResultSent) {
+      timer = setInterval(() => {
+        setPlayTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState, gameStartTime, gameResultSent]);
 
   // Function to send game result to parent window
-  const sendGameResult = (completed, timeRemaining, timeSpent, puzzlesCompleted) => {
-    if (gameResultSent) return; // Prevent sending multiple times
+  const sendGameResult = (completed, timeRemaining, timeSpentSeconds, puzzlesCompleted) => {
+    if (gameResultSent) return;
     
     const gameResult = {
       type: 'GAME_RESULT',
       gameId: 'equation',
       completed: completed,
       timeRemaining: timeRemaining,
-      timeSpent: timeSpent,
+      timeSpent: timeSpentSeconds,
+      playTime: playTime, // Actual gameplay time
       puzzlesCompleted: puzzlesCompleted,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      stats: {
+        puzzlesCompleted: puzzlesCompleted,
+        totalPuzzles: 7,
+        timeRemaining: timeRemaining,
+        completionRate: Math.round((puzzlesCompleted / 7) * 100)
+      }
     };
     
-    // Send to parent window (the games dashboard)
+    console.log('Sending equation game result:', gameResult);
+    
     if (window.opener) {
       window.opener.postMessage(gameResult, '*');
       setGameResultSent(true);
+      console.log('Equation game result sent to parent window');
+    } else {
+      console.log('No opener window found');
     }
     
-    // Also store in localStorage for backup
     const previousResults = localStorage.getItem('equationGameResults');
     const results = previousResults ? JSON.parse(previousResults) : [];
     results.push(gameResult);
@@ -56,7 +78,7 @@ const EquationEscapeRoom = () => {
       timer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
-            const timeSpent = 360; // Total time when failed
+            const timeSpent = 360;
             const puzzlesCompleted = currentPuzzle - 1;
             sendGameResult(false, 0, timeSpent, puzzlesCompleted);
             setGameState('failed');
@@ -76,12 +98,20 @@ const EquationEscapeRoom = () => {
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
+  const formatPlayTime = () => {
+    const minutes = Math.floor(playTime / 60);
+    const seconds = playTime % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
   const startGame = () => {
     setGameState('puzzle1');
-    setTimeLeft(360); // Changed from 600 to 360 (6 minutes)
+    setTimeLeft(360);
     setCurrentPuzzle(1);
     setMessage('');
     setGameResultSent(false);
+    setPlayTime(0);
+    setGameStartTime(Date.now());
   };
 
   const checkPuzzle1 = () => {
@@ -140,13 +170,7 @@ const EquationEscapeRoom = () => {
   };
 
   const checkPolynomialPuzzle = () => {
-    // The polynomial P(x) = ax² + bx + c
-    // Given: P(1) = 6, P(2) = 11, P(3) = 18
-    // Solve: a + b + c = 6
-    //        4a + 2b + c = 11
-    //        9a + 3b + c = 18
-    
-    const correctCode = ['2', '3', '1']; // a=2, b=3, c=1
+    const correctCode = ['2', '3', '1'];
     
     if (polynomialCode[0] === correctCode[0] && 
         polynomialCode[1] === correctCode[1] && 
@@ -191,7 +215,7 @@ const EquationEscapeRoom = () => {
 
   const resetGame = () => {
     setGameState('start');
-    setTimeLeft(360); // Changed from 600 to 360 (6 minutes)
+    setTimeLeft(360);
     setCurrentPuzzle(1);
     setPuzzle1Answer('');
     setPuzzle2Answer('');
@@ -206,11 +230,12 @@ const EquationEscapeRoom = () => {
     setPolynomialCode(['', '', '']);
     setPolynomialAttempts(3);
     setGameResultSent(false);
+    setPlayTime(0);
+    setGameStartTime(null);
   };
 
   const handleBackToGames = () => {
-    // Send result if game is in progress but not completed
-    if (gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && !gameResultSent) {
+    if (gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && !gameResultSent && gameStartTime) {
       const timeSpent = 360 - timeLeft;
       const puzzlesCompleted = currentPuzzle - 1;
       sendGameResult(false, timeLeft, timeSpent, puzzlesCompleted);
@@ -218,34 +243,31 @@ const EquationEscapeRoom = () => {
     navigate('/studenthub/games');
   };
 
-  // Interactive graph for puzzle 2
   const updateGraph = (value) => {
     setGraphValue(value);
-    // Update the displayed y-value based on the equation y = 2x + 3
     const yValue = 2 * value + 3;
     setPuzzle2Answer(yValue.toString());
   };
 
   return (
     <div style={styles.container}>
-      {/* Back Button */}
       <button onClick={handleBackToGames} style={styles.backButton}>
         <FaArrowLeft style={styles.backIcon} />
         Back to Games
       </button>
 
-      {/* Game Header */}
       <div style={styles.header}>
         <h1 style={styles.title}>🧮 EQUATION ESCAPE ROOM 🧮</h1>
         {gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && (
-          <div style={styles.timer}>
-            ⏱️ Time: {formatTime()}
+          <div style={styles.timerContainer}>
+            <div style={styles.timer}>⏱️ Time Left: {formatTime()}</div>
+            <div style={styles.playTime}>🎮 Play Time: {formatPlayTime()}</div>
           </div>
         )}
         {message && <div style={styles.message}>{message}</div>}
       </div>
 
-      {/* Start Screen */}
+      {/* All the puzzle sections remain the same */}
       {gameState === 'start' && (
         <div style={styles.startScreen}>
           <h2 style={styles.subtitle}>Welcome to the Equation Escape Room!</h2>
@@ -257,7 +279,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 1 - Match equations to answers */}
       {gameState === 'puzzle1' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #1: Match the Equation</h2>
@@ -312,7 +333,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 2 - Interactive Graph */}
       {gameState === 'puzzle2' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #2: Interactive Graph</h2>
@@ -320,15 +340,9 @@ const EquationEscapeRoom = () => {
             <div style={styles.graphContainer}>
               <div style={styles.graph}>
                 <div style={styles.grid}>
-                  {/* Y-axis line */}
                   <div style={styles.yAxis}></div>
-                  {/* X-axis line */}
                   <div style={styles.xAxis}></div>
-                  
-                  {/* Line for y = 2x + 3 */}
                   <div style={styles.graphLine}></div>
-                  
-                  {/* Point marker that moves with slider */}
                   <div style={{
                     ...styles.graphPoint,
                     left: `calc(50% + ${graphValue * 40}px)`,
@@ -358,6 +372,7 @@ const EquationEscapeRoom = () => {
                 onChange={(e) => setPuzzle2Answer(e.target.value)}
                 placeholder="Enter y-intercept"
                 style={styles.input}
+                onKeyPress={(e) => e.key === 'Enter' && checkPuzzle2()}
               />
             </div>
             
@@ -381,7 +396,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 3 - Solve equation */}
       {gameState === 'puzzle3' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #3: Solve the Equation</h2>
@@ -404,6 +418,7 @@ const EquationEscapeRoom = () => {
               onChange={(e) => setPuzzle3Answer(e.target.value)}
               placeholder="Enter number"
               style={styles.input}
+              onKeyPress={(e) => e.key === 'Enter' && checkPuzzle3()}
             />
             
             <button 
@@ -417,7 +432,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 4 - Find errors */}
       {gameState === 'puzzle4' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #4: Find the Error</h2>
@@ -437,6 +451,7 @@ const EquationEscapeRoom = () => {
               onChange={(e) => setPuzzle4Input(e.target.value)}
               placeholder="Enter the incorrect clue"
               style={styles.input}
+              onKeyPress={(e) => e.key === 'Enter' && checkPuzzle4()}
             />
             
             <button 
@@ -450,7 +465,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 5 - Choose correct key */}
       {gameState === 'puzzle5' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #5: Choose the Right Key</h2>
@@ -510,7 +524,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Puzzle 6 - Polynomial Decoder */}
       {gameState === 'puzzle6' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🔒 LOCK #6: Polynomial Decoder</h2>
@@ -602,7 +615,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Final Puzzle */}
       {gameState === 'final' && (
         <div style={styles.puzzleCard}>
           <h2 style={styles.puzzleTitle}>🚪 FINAL DOOR: Create the Escape Equation</h2>
@@ -619,6 +631,7 @@ const EquationEscapeRoom = () => {
               onChange={(e) => setFinalEquation(e.target.value)}
               placeholder="Enter the complete equation (e.g., e=mc^2)"
               style={styles.finalInput}
+              onKeyPress={(e) => e.key === 'Enter' && checkFinal()}
             />
             
             <button 
@@ -632,7 +645,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Failed Screen */}
       {gameState === 'failed' && (
         <div style={styles.endScreen}>
           <h2 style={styles.failedTitle}>💀 TIME'S UP! 💀</h2>
@@ -644,12 +656,12 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Escape Screen with Bonus Challenge */}
       {gameState === 'escaped' && (
         <div style={styles.endScreen}>
           <h2 style={styles.successTitle}>🎉 ESCAPE SUCCESSFUL! 🎉</h2>
           <p style={styles.text}>You've solved all puzzles and escaped!</p>
           <p style={styles.text}>Time remaining: {formatTime()}</p>
+          <p style={styles.text}>Play time: {formatPlayTime()}</p>
           
           <div style={styles.bonusChallenge}>
             <h3 style={styles.bonusTitle}>🏆 BONUS CHALLENGE 🏆</h3>
@@ -660,6 +672,16 @@ const EquationEscapeRoom = () => {
               placeholder="Enter product xy"
               id="bonusAnswer"
               style={styles.bonusInput}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  const bonusInput = document.getElementById('bonusAnswer');
+                  if (bonusInput && bonusInput.value === '12') {
+                    alert('🎉 IMPRESSIVE! You solved the bonus challenge! +100 XP 🎉');
+                  } else if (bonusInput) {
+                    alert('Not quite! Hint: (x+y)² = x² + 2xy + y²');
+                  }
+                }
+              }}
             />
             <button 
               style={styles.bonusBtn}
@@ -682,7 +704,6 @@ const EquationEscapeRoom = () => {
         </div>
       )}
 
-      {/* Progress Bar */}
       {gameState !== 'start' && gameState !== 'escaped' && gameState !== 'failed' && (
         <div style={styles.progress}>
           <div style={styles.progressText}>
@@ -744,10 +765,25 @@ const styles = {
     fontSize: 'clamp(20px, 5vw, 28px)',
     marginBottom: '10px',
   },
+  timerContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    flexWrap: 'wrap',
+  },
   timer: {
     fontSize: 'clamp(18px, 4vw, 24px)',
     fontWeight: 'bold',
     color: '#ff6b6b',
+    backgroundColor: '#2a2a4a',
+    padding: '10px 20px',
+    borderRadius: '10px',
+    display: 'inline-block',
+  },
+  playTime: {
+    fontSize: 'clamp(18px, 4vw, 24px)',
+    fontWeight: 'bold',
+    color: '#4caf50',
     backgroundColor: '#2a2a4a',
     padding: '10px 20px',
     borderRadius: '10px',
@@ -1055,7 +1091,6 @@ const styles = {
     height: '100%',
     backgroundColor: '#4CAF50',
   },
-  // New styles for polynomial puzzle
   challengeBadge: {
     textAlign: 'center',
     marginBottom: '20px',
@@ -1157,7 +1192,6 @@ const styles = {
     fontSize: 'clamp(11px, 2.5vw, 13px)',
     lineHeight: '1.6',
   },
-  // Bonus challenge styles
   bonusChallenge: {
     marginTop: '30px',
     padding: '20px',

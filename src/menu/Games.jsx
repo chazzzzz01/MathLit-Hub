@@ -1,11 +1,13 @@
-// src/menu/Games.jsx
 import React, { useState, useEffect } from 'react';
 import { FaPlay, FaArrowLeft, FaTrophy, FaChartLine, FaClock, FaStar, FaGamepad } from 'react-icons/fa';
 import { GiPuzzle, GiSwordsEmblem, GiConsoleController } from 'react-icons/gi';
 import { useNavigate } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 
 function Games() {
   const navigate = useNavigate();
+  const { user, userData, updateUserData, getUserIdentifier } = useOutletContext();
+  
   const [gameStats, setGameStats] = useState({
     totalPlayTime: 0,
     totalGamesPlayed: 0,
@@ -13,7 +15,6 @@ function Games() {
     overallProgress: 0
   });
 
-  // Store individual game progress with default values
   const [gameProgress, setGameProgress] = useState({
     equation: {
       progress: 0,
@@ -52,25 +53,25 @@ function Games() {
     }
   });
 
-  // Load game stats from localStorage with validation
   useEffect(() => {
+    if (!user || !user.email) {
+      console.log('No user found, waiting for user data...');
+      return;
+    }
+
     try {
-      const savedStats = localStorage.getItem('gameStats');
-      if (savedStats) {
-        const parsedStats = JSON.parse(savedStats);
+      if (userData && userData.gameStats) {
+        const savedStats = userData.gameStats;
         setGameStats({
-          totalPlayTime: parsedStats.totalPlayTime || 0,
-          totalGamesPlayed: parsedStats.totalGamesPlayed || 0,
-          totalAchievements: parsedStats.totalAchievements || 0,
-          overallProgress: parsedStats.overallProgress || 0
+          totalPlayTime: savedStats.totalPlayTime || 0,
+          totalGamesPlayed: savedStats.totalGamesPlayed || 0,
+          totalAchievements: savedStats.totalAchievements || 0,
+          overallProgress: savedStats.overallProgress || 0
         });
       }
       
-      const savedProgress = localStorage.getItem('gameProgress');
-      if (savedProgress) {
-        const loadedProgress = JSON.parse(savedProgress);
-        
-        // Merge loaded progress with default structure to ensure all fields exist
+      if (userData && userData.gameProgress) {
+        const loadedProgress = userData.gameProgress;
         const mergedProgress = { ...gameProgress };
         Object.keys(mergedProgress).forEach(gameId => {
           if (loadedProgress[gameId]) {
@@ -82,16 +83,13 @@ function Games() {
         });
         
         setGameProgress(mergedProgress);
-        
-        // Calculate overall stats from loaded progress
         calculateOverallStats(mergedProgress);
       }
     } catch (error) {
       console.error('Error loading game stats:', error);
     }
-  }, []);
+  }, [user, userData]);
 
-  // Calculate overall stats from individual game progress with null checks
   const calculateOverallStats = (progress) => {
     let totalPlayTime = 0;
     let totalGamesPlayed = 0;
@@ -111,7 +109,6 @@ function Games() {
       }
     });
     
-    // Calculate overall progress as average of games that have been started
     const overallProgress = gameCount > 0 ? Math.floor(totalProgress / gameCount) : 0;
     
     setGameStats(prev => ({
@@ -121,15 +118,26 @@ function Games() {
       totalAchievements,
       overallProgress
     }));
+
+    if (updateUserData && user && user.email) {
+      updateUserData({
+        gameStats: {
+          totalPlayTime,
+          totalGamesPlayed,
+          totalAchievements,
+          overallProgress
+        },
+        gameProgress: progress
+      });
+    }
   };
 
-  // Listen for game results from child windows
   useEffect(() => {
     const handleGameResult = (event) => {
+      console.log('Received message event:', event.data);
       if (event.data && event.data.type === 'GAME_RESULT') {
         const result = event.data;
-        console.log('Game result received:', result);
-        
+        console.log(`Game result received for user: ${user?.email}`, result);
         updateGameStats(result);
       }
     };
@@ -139,19 +147,28 @@ function Games() {
     return () => {
       window.removeEventListener('message', handleGameResult);
     };
-  }, []);
+  }, [user, updateUserData]);
 
-  // Function to update game stats based on result with proper null checks
   const updateGameStats = (result) => {
-    if (!result || !result.gameId) return;
+    if (!result || !result.gameId) {
+      console.log('Invalid result:', result);
+      return;
+    }
+    if (!user || !user.email) {
+      console.log('Cannot update stats: No user logged in');
+      return;
+    }
+
+    console.log(`Updating game stats for user: ${user.email}`);
+    console.log('Game result details:', result);
     
-    // Update individual game progress first
     setGameProgress(prev => {
       const updated = { ...prev };
       const gameId = result.gameId;
       
+      console.log(`Processing ${gameId} game result`);
+      
       if (!updated[gameId]) {
-        // Initialize game if it doesn't exist
         updated[gameId] = {
           progress: 0,
           highScore: 0,
@@ -165,22 +182,20 @@ function Games() {
         };
       }
       
-      // Update times played
       updated[gameId].timesPlayed = (updated[gameId].timesPlayed || 0) + 1;
+      console.log(`Times played: ${updated[gameId].timesPlayed}`);
       
-      // Update total time played for this game
-      updated[gameId].totalTimePlayed = (updated[gameId].totalTimePlayed || 0) + (result.timeSpent || 0);
+      const timePlayed = result.playTime || result.timeSpent || 0;
+      updated[gameId].totalTimePlayed = (updated[gameId].totalTimePlayed || 0) + timePlayed;
+      console.log(`Total time played: ${updated[gameId].totalTimePlayed} seconds`);
       
-      // Update progress based on game type
       let newProgress = 0;
       
       if (gameId === 'equation') {
-        // Equation game: 7 puzzles total
         const puzzlesCompleted = result.puzzlesCompleted || 0;
         newProgress = Math.min(100, Math.floor((puzzlesCompleted / 7) * 100));
         updated[gameId].progress = Math.max(updated[gameId].progress || 0, newProgress);
         
-        // Update accuracy for equation game
         if (result.stats) {
           updated[gameId].accuracy = result.stats.accuracy || 0;
           updated[gameId].totalCorrect = result.stats.correctAnswers || 0;
@@ -188,23 +203,21 @@ function Games() {
         }
       } 
       else if (gameId === 'battle') {
-        // Battle game: 3 enemies total
         const enemiesDefeated = result.stats?.enemiesDefeated || 0;
         newProgress = Math.min(100, Math.floor((enemiesDefeated / 3) * 100));
         updated[gameId].progress = Math.max(updated[gameId].progress || 0, newProgress);
+        console.log(`Battle progress: ${newProgress}% (${enemiesDefeated}/3 enemies defeated)`);
         
-        // Update battle-specific stats
         if (result.stats) {
           updated[gameId].accuracy = result.stats.accuracy || 0;
           updated[gameId].totalCorrect = result.stats.correctAnswers || 0;
           updated[gameId].totalAttempts = result.stats.totalAnswers || 0;
           updated[gameId].maxCombo = Math.max(updated[gameId].maxCombo || 0, result.stats.maxCombo || 0);
           updated[gameId].enemiesDefeated = result.stats.enemiesDefeated || 0;
+          console.log(`Battle stats - Accuracy: ${updated[gameId].accuracy}%, Max Combo: x${updated[gameId].maxCombo}`);
         }
       } 
       else if (gameId === 'spaceShooter') {
-        // Space Shooter game: level-based progression
-        // Progress based on highest level reached
         if (result.stats) {
           const highestLevel = result.stats.highestLevel || 1;
           newProgress = Math.min(100, Math.floor((highestLevel / 10) * 100));
@@ -216,68 +229,32 @@ function Games() {
         }
       }
       
-      // Update high score if better
       const score = result.score || 0;
       if (score > (updated[gameId].highScore || 0)) {
         updated[gameId].highScore = score;
+        console.log(`New high score: ${score}`);
       }
       
-      // Update achievements (1 achievement for completing the game)
       if (result.completed && updated[gameId].achievements === 0) {
         updated[gameId].achievements = 1;
-        // Update total achievements in gameStats
-        setGameStats(prevStats => ({
-          ...prevStats,
-          totalAchievements: (prevStats.totalAchievements || 0) + 1
-        }));
+        console.log('Achievement unlocked!');
       }
       
-      // Update best time if completed
       if (result.completed && result.timeSpent) {
         const timeSpent = result.timeSpent;
         if (!updated[gameId].bestTime || timeSpent < updated[gameId].bestTime) {
           updated[gameId].bestTime = timeSpent;
+          console.log(`New best time: ${timeSpent} seconds`);
         }
       }
       
-      setGameStats(prevStats => ({
-        ...prevStats,
-        totalPlayTime: (prevStats.totalPlayTime || 0) + (result.timeSpent || 0),
-        totalGamesPlayed: (prevStats.totalGamesPlayed || 0) + 1
-      }));
-      
-      // Save to localStorage
-      localStorage.setItem('gameProgress', JSON.stringify(updated));
-      
-      // Recalculate overall stats
+      console.log(`Updated progress for ${gameId}:`, updated[gameId]);
       calculateOverallStats(updated);
       
       return updated;
     });
   };
   
-  // Helper function to format time
-  const formatTimeShort = (seconds) => {
-    if (!seconds && seconds !== 0) return '0s';
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
-    return `${seconds}s`;
-  };
-  
-  // Helper function to get game title by ID
-  const getGameTitle = (gameId) => {
-    const games = {
-      equation: "Equation Escape Room",
-      battle: "Math Battle Arena",
-      spaceShooter: "Math Space Shooter"
-    };
-    return games[gameId] || "Unknown Game";
-  };
-
-  // Format time display
   const formatTotalTime = (seconds) => {
     if (!seconds && seconds !== 0) return '0m';
     const minutes = Math.floor(seconds / 60);
@@ -289,7 +266,6 @@ function Games() {
     return `${minutes}m`;
   };
 
-  // Format time for display (seconds to mm:ss)
   const formatTimeDisplay = (seconds) => {
     if (!seconds && seconds !== 0) return '--:--';
     const minutes = Math.floor(seconds / 60);
@@ -341,14 +317,49 @@ function Games() {
 
   const handleStartGame = (gameId) => {
     const gamePath = games[gameId].path;
-    window.open(gamePath, '_blank');
+    console.log(`Opening game: ${gameId} at path: ${gamePath}`);
+    console.log('Current user:', user);
+    
+    const gameWindow = window.open(gamePath, '_blank');
+    
+    if (!gameWindow) {
+      console.log('Popup blocked! Please allow popups for this site.');
+      alert('Please allow popups for this site to play games.');
+      return;
+    }
+    
+    setTimeout(() => {
+      if (gameWindow && !gameWindow.closed) {
+        gameWindow.postMessage({
+          type: 'USER_INFO',
+          user: {
+            email: user?.email,
+            name: user?.name,
+            picture: user?.picture
+          }
+        }, window.location.origin);
+        console.log('User info sent to game window');
+      }
+    }, 1000);
   };
+
+  if (!user || !user.email) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading your gaming profile...</p>
+      </div>
+    );
+  }
 
   const ProgressDashboard = () => (
     <div style={styles.dashboardContainer}>
       <div style={styles.dashboardHeader}>
         <FaGamepad style={styles.dashboardIcon} />
-        <h2 style={styles.dashboardTitle}>Your Gaming Progress</h2>
+        <div>
+          <h2 style={styles.dashboardTitle}>Your Gaming Progress</h2>
+          <p style={styles.userInfoText}>Player: {user?.name?.split(' ')[0] || getUserIdentifier()}</p>
+        </div>
       </div>
       
       <div style={styles.statsGrid}>
@@ -426,6 +437,9 @@ function Games() {
                       {game.id === 'battle' && progress?.maxCombo > 0 && (
                         <span>⚡ Max Combo: x{progress.maxCombo}</span>
                       )}
+                      {game.id === 'battle' && progress?.enemiesDefeated > 0 && (
+                        <span>👾 Enemies: {progress.enemiesDefeated}/3</span>
+                      )}
                     </>
                   ) : (
                     <span style={styles.notPlayedText}>🎮 Play to start tracking your progress!</span>
@@ -436,6 +450,10 @@ function Games() {
           })}
         </div>
       </div>
+      
+      <div style={styles.privacyNote}>
+        <p>🔒 Your game progress is private and only visible to you.</p>
+      </div>
     </div>
   );
 
@@ -444,7 +462,7 @@ function Games() {
     const hasPlayed = progress && progress.timesPlayed > 0;
     
     return (
-      <div style={styles.cardContainer} className="game-card">
+      <div style={styles.cardContainer}>
         <div style={styles.cardContent}>
           <div style={styles.cardLeft}>
             <div style={{
@@ -488,7 +506,6 @@ function Games() {
           <button 
             style={styles.startButton} 
             onClick={() => onStart(game.id)}
-            className="start-button"
           >
             <FaPlay style={styles.playIcon} />
             {game.buttonText}
@@ -505,7 +522,7 @@ function Games() {
           <GiConsoleController style={styles.titleIcon} />
           Math Games 
         </h1>
-        <p style={styles.subtitle}>Choose a game to start your mathematical adventure</p>
+        <p style={styles.subtitle}>Choose a game to start your mathematical adventure, {user?.name?.split(' ')[0] || 'Student'}!</p>
       </header>
 
       <ProgressDashboard />
@@ -531,6 +548,22 @@ const styles = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     backgroundColor: '#f3f4f6',
     minHeight: '100vh',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '400px',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   header: {
     textAlign: 'center',
@@ -572,6 +605,11 @@ const styles = {
     paddingBottom: '15px',
     borderBottom: '2px solid #f3f4f6',
   },
+  userInfoText: {
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: '5px 0 0 0',
+  },
   dashboardIcon: {
     fontSize: '28px',
     color: '#3b82f6',
@@ -595,7 +633,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
-    transition: 'transform 0.2s',
+    transition: 'box-shadow 0.2s',
   },
   statCardIcon: {
     fontSize: '32px',
@@ -671,6 +709,15 @@ const styles = {
     color: '#9ca3af',
     fontStyle: 'italic',
   },
+  privacyNote: {
+    marginTop: '20px',
+    padding: '12px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '8px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#92400e',
+  },
   gamesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(450px, 1fr))',
@@ -681,7 +728,7 @@ const styles = {
     borderRadius: '16px',
     padding: '24px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
+    transition: 'box-shadow 0.2s',
   },
   cardContent: {
     display: 'flex',
@@ -786,21 +833,15 @@ const styles = {
   },
 };
 
-// Add hover effect styles
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  .game-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(0,0,0,0.15) !important;
-  }
-  
-  .start-button:hover {
-    opacity: 0.9;
-    transform: scale(1.02);
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
   
   .stat-card:hover {
-    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
 `;
 document.head.appendChild(styleSheet);

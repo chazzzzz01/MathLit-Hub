@@ -10,9 +10,16 @@ function TeacherHub() {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const { user, setUser } = useUser();
+  const { user, setUser, logout, userData, updateUserData } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Debug: Log user data and current path
+  useEffect(() => {
+    console.log('TeacherHub - User:', user);
+    console.log('TeacherHub - UserData:', userData);
+    console.log('TeacherHub - Current Path:', location.pathname);
+  }, [user, userData, location.pathname]);
 
   // Check screen size for responsive behavior
   useEffect(() => {
@@ -31,6 +38,7 @@ function TeacherHub() {
   // Get user data from navigation state only if user is not already set
   useEffect(() => {
     if (location.state?.user && !user) {
+      console.log('Setting user from location state:', location.state.user);
       setUser(location.state.user);
     }
   }, [location.state, user, setUser]);
@@ -38,6 +46,7 @@ function TeacherHub() {
   // Redirect to dashboard if at exactly /teacherhub
   useEffect(() => {
     if (location.pathname === '/teacherhub') {
+      console.log('Redirecting to dashboard');
       navigate('/teacherhub/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -51,13 +60,14 @@ function TeacherHub() {
   };
 
   const handleLogout = () => {
-    setUser(null);
+    logout();
     navigate("/");
     setOpenDropdown(null);
     setMobileMenuOpen(false);
   };
 
   const handleNavigation = (path) => {
+    console.log('Navigating to:', path);
     navigate(path);
     setOpenDropdown(null);
     if (isMobile) {
@@ -65,12 +75,30 @@ function TeacherHub() {
     }
   };
 
-  // Teacher navigation items - Home removed
+  // Get user identifier for display
+  const getUserIdentifier = () => {
+    if (user && user.email) {
+      return user.email.split('@')[0];
+    }
+    return 'Teacher';
+  };
+
+  // Teacher navigation items
   const navItems = [
     { path: "/teacherhub/dashboard", icon: MdDashboard, label: "Dashboard" },
     { path: "/teacherhub/students", icon: MdPeople, label: "Students" },
     { path: "/teacherhub/progress", icon: MdTrendingUp, label: "Progress" }
   ];
+
+  // If no user, show loading
+  if (!user) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading your teacher dashboard...</p>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.wrapper}>
@@ -83,16 +111,22 @@ function TeacherHub() {
           }}
         >
           <div style={styles.sidebarContent}>
-            {navItems.map((item, index) => (
-              <div 
-                key={index}
-                style={styles.iconWrapper}
-                onClick={() => handleNavigation(item.path)}
-              >
-                <item.icon size={24} color="white" />
-                {!sidebarCollapsed && <span style={styles.iconText}>{item.label}</span>}
-              </div>
-            ))}
+            {navItems.map((item, index) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <div 
+                  key={index}
+                  style={{
+                    ...styles.iconWrapper,
+                    backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                  }}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <item.icon size={24} color="white" />
+                  {!sidebarCollapsed && <span style={styles.iconText}>{item.label}</span>}
+                </div>
+              );
+            })}
           </div>
         </aside>
       )}
@@ -111,16 +145,28 @@ function TeacherHub() {
               </button>
             </div>
             <div style={styles.mobileNavItems}>
-              {navItems.map((item, index) => (
-                <div 
-                  key={index}
-                  style={styles.mobileNavItem}
-                  onClick={() => handleNavigation(item.path)}
-                >
-                  <item.icon size={22} color="#2563EB" />
-                  <span style={styles.mobileNavText}>{item.label}</span>
-                </div>
-              ))}
+              {navItems.map((item, index) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <div 
+                    key={index}
+                    style={{
+                      ...styles.mobileNavItem,
+                      backgroundColor: isActive ? '#f0f7ff' : 'transparent',
+                    }}
+                    onClick={() => handleNavigation(item.path)}
+                  >
+                    <item.icon size={22} color={isActive ? "#2563EB" : "#6b7280"} />
+                    <span style={{
+                      ...styles.mobileNavText,
+                      color: isActive ? '#2563EB' : '#333',
+                      fontWeight: isActive ? '600' : '500'
+                    }}>
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
               <div style={styles.mobileDivider}></div>
               <div 
                 style={styles.mobileNavItem}
@@ -153,7 +199,7 @@ function TeacherHub() {
           {/* Right side - Teacher name and profile icon */}
           <div style={styles.rightSection}>
             <span style={styles.teacherName}>
-              {user ? user.name.split(' ')[0] : 'Teacher'}
+              {getUserIdentifier()}
             </span>
             
             {/* Profile icon with dropdown */}
@@ -182,6 +228,17 @@ function TeacherHub() {
                   {user && (
                     <>
                       <div style={styles.dropdownEmail}>{user.email}</div>
+                      <div style={styles.dropdownUserId}>
+                        Username: {getUserIdentifier()}
+                      </div>
+                      {userData && (
+                        <div style={styles.dropdownStats}>
+                          <div>🎓 Member since: {new Date(userData.createdAt).toLocaleDateString()}</div>
+                          <div>🕒 Last login: {new Date(userData.lastLogin).toLocaleDateString()}</div>
+                          <div>📚 Students: {userData.teacherStats?.studentsCount || 0}</div>
+                          <div>📊 Active Classes: {userData.teacherStats?.activeClasses || 0}</div>
+                        </div>
+                      )}
                       <div style={styles.dropdownDivider}></div>
                     </>
                   )}
@@ -197,7 +254,12 @@ function TeacherHub() {
         {/* Content Area - Uses Outlet for nested routes */}
         <div style={styles.contentWrapper}>
           <div style={styles.content}>
-            <Outlet />
+            <Outlet context={{ 
+              user, 
+              userData, 
+              updateUserData, 
+              getUserIdentifier 
+            }} />
           </div>
         </div>
       </main>
@@ -211,6 +273,22 @@ const styles = {
     minHeight: '100vh',
     position: 'relative',
     backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #2563eb',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   sidebar: {
     position: 'fixed',
@@ -326,11 +404,10 @@ const styles = {
     top: '45px',
     right: 0,
     backgroundColor: 'white',
-    color: 'black',
     borderRadius: '12px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '220px',
+    minWidth: '280px',
     zIndex: 1000,
     animation: 'slideDown 0.2s ease',
   },
@@ -340,6 +417,22 @@ const styles = {
     color: '#333',
     backgroundColor: '#f8f9fa',
     wordBreak: 'break-all',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownUserId: {
+    padding: '8px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownStats: {
+    padding: '10px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+    lineHeight: '1.6',
   },
   dropdownDivider: {
     height: '1px',
@@ -352,6 +445,7 @@ const styles = {
     color: '#dc2626',
     fontSize: '14px',
     fontWeight: '500',
+    textAlign: 'center',
     ':hover': {
       backgroundColor: '#fee2e2',
     },
@@ -459,6 +553,11 @@ const styles = {
 // Add animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
   @keyframes slideInLeft {
     from {
       transform: translateX(-100%);

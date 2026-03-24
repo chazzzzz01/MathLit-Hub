@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useUser } from '../context/UserContext';
+import { useOutletContext } from 'react-router-dom';
 import { 
   MdPeople, 
   MdAssignment, 
@@ -35,7 +35,9 @@ import {
 } from 'recharts';
 
 function Dashboard() {
-  const { user } = useUser();
+  // Get user data from context
+  const { user, userData, updateUserData, getUserIdentifier } = useOutletContext();
+  
   const [stats, setStats] = useState({
     totalStudents: 0,
     activeStudents: 0,
@@ -56,12 +58,39 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
-  // Mock data - replace with actual API calls from your Student Hub
+  // Load teacher dashboard data from userData or initialize
   useEffect(() => {
+    if (!user || !user.email) {
+      console.log('No user found, waiting for user data...');
+      return;
+    }
+
+    console.log('Loading dashboard for teacher:', user.email);
+
+    // Check if userData has teacher dashboard data
+    if (userData && userData.teacherDashboard) {
+      // Load existing data
+      const dashboardData = userData.teacherDashboard;
+      setStats(dashboardData.stats || stats);
+      setRecentActivities(dashboardData.recentActivities || []);
+      setPerformanceData(dashboardData.performanceData || []);
+      setSubjectData(dashboardData.subjectData || []);
+      setMissionsData(dashboardData.missionsData || []);
+      setGamesData(dashboardData.gamesData || []);
+      setAchievementsData(dashboardData.achievementsData || []);
+      setTeacherFeedback(dashboardData.teacherFeedback || []);
+      setLoading(false);
+    } else {
+      // Initialize with mock data (replace with actual API calls later)
+      initializeDashboardData();
+    }
+  }, [user, userData]);
+
+  // Initialize dashboard data and save to userData
+  const initializeDashboardData = () => {
     // Simulate API call to fetch Student Hub data
     setTimeout(() => {
-      // Overall Stats
-      setStats({
+      const newStats = {
         totalStudents: 45,
         activeStudents: 38,
         averageProgress: 76,
@@ -70,10 +99,9 @@ function Dashboard() {
         activeMissions: 8,
         totalGames: 156,
         achievementsEarned: 128
-      });
+      };
 
-      // Recent Activities (from missions, games, achievements)
-      setRecentActivities([
+      const newRecentActivities = [
         { id: 1, student: "Emma Watson", action: "Completed Mission: JavaScript Basics", time: "2 hours ago", type: "completion", points: 500 },
         { id: 2, student: "John Smith", action: "Scored 950 in Code Challenge Game", time: "3 hours ago", type: "game", points: 950 },
         { id: 3, student: "Lisa Johnson", action: "Earned 'Quick Learner' Achievement", time: "5 hours ago", type: "achievement", points: 100 },
@@ -81,55 +109,49 @@ function Dashboard() {
         { id: 5, student: "Sarah Davis", action: "Perfect Score in Quiz Master", time: "1 day ago", type: "game_achievement", points: 100 },
         { id: 6, student: "Tom Wilson", action: "Completed 5 missions in a row", time: "2 days ago", type: "streak", points: 250 },
         { id: 7, student: "Alice Chen", action: "Needs assistance with React Mission", time: "2 days ago", type: "help", points: 0 }
-      ]);
+      ];
 
-      // Performance Trend Data (weekly progress)
-      setPerformanceData([
+      const newPerformanceData = [
         { week: 'Week 1', missions: 65, games: 70, achievements: 45, target: 70 },
         { week: 'Week 2', missions: 68, games: 72, achievements: 52, target: 72 },
         { week: 'Week 3', missions: 72, games: 75, achievements: 58, target: 74 },
         { week: 'Week 4', missions: 75, games: 78, achievements: 65, target: 76 },
         { week: 'Week 5', missions: 78, games: 82, achievements: 72, target: 78 },
         { week: 'Week 6', missions: 82, games: 85, achievements: 78, target: 80 }
-      ]);
+      ];
 
-      // Subject/Mission Performance
-      setSubjectData([
+      const newSubjectData = [
         { name: 'Algebra', students: 38, progress: 72, completionRate: 68 },
         { name: 'Geometry', students: 35, progress: 68, completionRate: 65 },
         { name: 'Calculus', students: 28, progress: 65, completionRate: 62 },
         { name: 'Statistics', students: 32, progress: 70, completionRate: 66 },
         { name: 'JavaScript', students: 30, progress: 75, completionRate: 70 },
         { name: 'React', students: 25, progress: 68, completionRate: 64 }
-      ]);
+      ];
 
-      // Active Missions Data
-      setMissionsData([
+      const newMissionsData = [
         { id: 1, title: "JavaScript Mastery", students: 12, progress: 75, difficulty: "Medium", deadline: "2024-02-15" },
         { id: 2, title: "React Fundamentals", students: 8, progress: 45, difficulty: "Hard", deadline: "2024-02-20" },
         { id: 3, title: "CSS Styling", students: 15, progress: 85, difficulty: "Easy", deadline: "2024-02-10" },
         { id: 4, title: "Python Basics", students: 10, progress: 60, difficulty: "Medium", deadline: "2024-02-18" }
-      ]);
+      ];
 
-      // Games Data
-      setGamesData([
+      const newGamesData = [
         { id: 1, name: "Code Challenge", plays: 245, avgScore: 78, highScore: 950, difficulty: "Advanced" },
         { id: 2, name: "Quiz Master", plays: 189, avgScore: 72, highScore: 100, difficulty: "Intermediate" },
         { id: 3, name: "Algorithm Race", plays: 156, avgScore: 65, highScore: 88, difficulty: "Hard" },
         { id: 4, name: "Bug Hunter", plays: 203, avgScore: 70, highScore: 92, difficulty: "Intermediate" }
-      ]);
+      ];
 
-      // Achievements Data
-      setAchievementsData([
+      const newAchievementsData = [
         { id: 1, name: "Quick Learner", earned: 28, total: 45, progress: 62, icon: "⚡" },
         { id: 2, name: "Perfect Score", earned: 15, total: 45, progress: 33, icon: "🎯" },
         { id: 3, name: "Code Warrior", earned: 12, total: 45, progress: 27, icon: "⚔️" },
         { id: 4, name: "Streak Master", earned: 8, total: 45, progress: 18, icon: "🔥" },
         { id: 5, name: "Game Champion", earned: 20, total: 45, progress: 44, icon: "🏆" }
-      ]);
+      ];
 
-      // Teacher Feedback & Monitoring
-      setTeacherFeedback([
+      const newTeacherFeedback = [
         { 
           id: 1, 
           teacher: "Ms. Smith", 
@@ -166,11 +188,41 @@ function Dashboard() {
           type: "improvement",
           rating: 3
         }
-      ]);
+      ];
+
+      setStats(newStats);
+      setRecentActivities(newRecentActivities);
+      setPerformanceData(newPerformanceData);
+      setSubjectData(newSubjectData);
+      setMissionsData(newMissionsData);
+      setGamesData(newGamesData);
+      setAchievementsData(newAchievementsData);
+      setTeacherFeedback(newTeacherFeedback);
+      
+      // Save to userData for persistence
+      if (updateUserData) {
+        updateUserData({
+          teacherDashboard: {
+            stats: newStats,
+            recentActivities: newRecentActivities,
+            performanceData: newPerformanceData,
+            subjectData: newSubjectData,
+            missionsData: newMissionsData,
+            gamesData: newGamesData,
+            achievementsData: newAchievementsData,
+            teacherFeedback: newTeacherFeedback,
+            teacherStats: {
+              studentsCount: newStats.totalStudents,
+              activeClasses: 8,
+              lastUpdated: new Date().toISOString()
+            }
+          }
+        });
+      }
       
       setLoading(false);
     }, 1000);
-  }, []);
+  };
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -205,11 +257,12 @@ function Dashboard() {
     }
   };
 
-  if (loading) {
+  // Show loading state if no user or still loading
+  if (!user || loading) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.loader}></div>
-        <p>Loading Student Hub Dashboard...</p>
+        <p>Loading your teacher dashboard...</p>
       </div>
     );
   }
@@ -219,7 +272,7 @@ function Dashboard() {
       {/* Welcome Section */}
       <div style={styles.welcomeSection}>
         <h1 style={styles.welcomeTitle}>
-          Welcome back, {user?.name?.split(' ')[0] || 'Teacher'}! 👋
+          Welcome back, {user?.name?.split(' ')[0] || getUserIdentifier()}! 👋
         </h1>
         <p style={styles.welcomeSubtitle}>
           Here's your comprehensive view of missions, games, achievements, and student progress.
