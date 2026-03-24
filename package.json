@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.99.2",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "@supabase/supabase-js": "^2.99.3",
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
     "konva": "^10.2.3",

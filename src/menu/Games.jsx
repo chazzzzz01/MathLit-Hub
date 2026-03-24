@@ -1,22 +1,12 @@
 // src/menu/Games.jsx (or Game.jsx)
-import React, { useState, useEffect } from 'react';
-import { FaPlay, FaArrowLeft, FaClock, FaStar, FaGamepad } from 'react-icons/fa';
+import React from 'react';
+import { FaPlay, FaArrowLeft } from 'react-icons/fa';
 import { GiPuzzle, GiSwordsEmblem, GiConsoleController } from 'react-icons/gi';
 import { useNavigate } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 
 function Games() {
   const navigate = useNavigate();
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [selectedGame, setSelectedGame] = useState(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   const games = {
     equation: {
@@ -43,7 +33,7 @@ function Games() {
       bgColor: "#ede9fe",
       difficulty: "Intermediate to Expert",
       timeEstimate: "20-30 min",
-      features: ["Turn-based Combat", "Math Challenges", "Power-ups", "10 Enemy Waves", "Boss Battles"],
+      features: ["Turn-based Combat", "Math Challenges", "Power-ups", "3 Enemy Waves", "Boss Battles"],
       path: "/game/battle",
       buttonText: "Play Now"
     },
@@ -65,7 +55,11 @@ function Games() {
 
   const handleStartGame = (gameId) => {
     const gamePath = games[gameId].path;
+    // Open in new tab
     window.open(gamePath, '_blank');
+    
+    // Alternative: Open in same tab
+    // navigate(gamePath);
   };
 
   const GameCard = ({ game, onStart }) => (
@@ -84,30 +78,21 @@ function Games() {
               <h2 style={styles.cardTitle}>{game.title}</h2>
               <span style={{
                 ...styles.difficultyBadge,
-                background: `linear-gradient(135deg, ${game.color} 0%, ${game.color}cc 100%)`
+                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
               }}>
                 {game.difficulty}
               </span>
             </div>
-            <p style={styles.cardDescription}>
-              {isMobile ? game.shortDescription : game.description}
-            </p>
+            <p style={styles.cardDescription}>{game.description}</p>
             
             <div style={styles.featuresList}>
-              {game.features.slice(0, isMobile ? 2 : 4).map((feature, index) => (
+              {game.features.map((feature, index) => (
                 <span key={index} style={styles.featureTag}>{feature}</span>
               ))}
             </div>
             
             <div style={styles.cardMeta}>
-              <span style={styles.timeEstimate}>
-                <FaClock style={styles.metaIcon} />
-                {game.timeEstimate}
-              </span>
-              <span style={styles.difficultyTag}>
-                <FaStar style={styles.metaIcon} />
-                {game.difficulty.split(' ')[0]}
-              </span>
+              <span style={styles.timeEstimate}>⏱️ {game.timeEstimate}</span>
             </div>
           </div>
         </div>
@@ -127,14 +112,14 @@ function Games() {
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <div style={styles.headerContent}>
-          <h1 style={styles.title}>
-            <FaGamepad style={styles.titleIcon} />
-            Math Games Arcade
-          </h1>
-          <p style={styles.subtitle}>Choose a game to start your mathematical adventure</p>
-        </div>
+        <h1 style={styles.title}>
+          <GiConsoleController style={styles.titleIcon} />
+          Math Games Arcade
+        </h1>
+        <p style={styles.subtitle}>Choose a game to start your mathematical adventure</p>
       </header>
+
+      <ProgressDashboard />
 
       <div style={styles.gamesGrid}>
         {Object.values(games).map(game => (
@@ -160,10 +145,26 @@ const styles = {
     width: '100%',
     boxSizing: 'border-box',
   },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '400px',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #3b82f6',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+  },
   header: {
     textAlign: 'center',
-    marginBottom: 'clamp(24px, 6vw, 48px)',
-    padding: 'clamp(24px, 8vw, 48px) clamp(16px, 5vw, 32px)',
+    marginBottom: '40px',
+    padding: '40px 20px',
     background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
     borderRadius: 'clamp(12px, 3vw, 24px)',
     color: 'white',
@@ -192,6 +193,134 @@ const styles = {
     margin: 0,
     lineHeight: 1.4,
   },
+  dashboardContainer: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    marginBottom: '30px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+  },
+  dashboardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '20px',
+    paddingBottom: '15px',
+    borderBottom: '2px solid #f3f4f6',
+  },
+  userInfoText: {
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: '5px 0 0 0',
+  },
+  dashboardIcon: {
+    fontSize: '28px',
+    color: '#3b82f6',
+  },
+  dashboardTitle: {
+    fontSize: '24px',
+    fontWeight: '600',
+    color: '#1f2937',
+    margin: 0,
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '15px',
+    marginBottom: '30px',
+  },
+  statCard: {
+    background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+    padding: '20px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    transition: 'box-shadow 0.2s',
+  },
+  statCardIcon: {
+    fontSize: '32px',
+    color: '#3b82f6',
+  },
+  statCardInfo: {
+    flex: 1,
+  },
+  statCardValue: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    lineHeight: 1,
+  },
+  statCardLabel: {
+    fontSize: '13px',
+    color: '#6b7280',
+    marginTop: '5px',
+  },
+  gameProgressSection: {
+    marginBottom: '30px',
+  },
+  sectionTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '15px',
+  },
+  gameProgressList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+  },
+  gameProgressItem: {
+    padding: '12px',
+    background: '#f9fafb',
+    borderRadius: '8px',
+  },
+  gameProgressHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: '8px',
+  },
+  gameProgressName: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+  },
+  gameProgressPercent: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#3b82f6',
+  },
+  progressBarContainer: {
+    height: '8px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    marginBottom: '8px',
+  },
+  progressBar: {
+    height: '100%',
+    transition: 'width 0.3s ease',
+  },
+  gameStats: {
+    display: 'flex',
+    gap: '15px',
+    fontSize: '12px',
+    color: '#6b7280',
+    flexWrap: 'wrap',
+  },
+  notPlayedText: {
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  privacyNote: {
+    marginTop: '20px',
+    padding: '12px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '8px',
+    textAlign: 'center',
+    fontSize: '12px',
+    color: '#92400e',
+  },
   gamesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))',
@@ -200,14 +329,10 @@ const styles = {
   },
   cardContainer: {
     background: 'white',
-    borderRadius: 'clamp(12px, 3vw, 20px)',
-    padding: 'clamp(16px, 4vw, 24px)',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-    transition: 'all 0.3s ease',
-    cursor: 'pointer',
-    height: '100%',
-    display: 'flex',
-    flexDirection: 'column',
+    borderRadius: '16px',
+    padding: '24px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
   },
   cardContent: {
     display: 'flex',
@@ -284,8 +409,7 @@ const styles = {
   cardMeta: {
     display: 'flex',
     alignItems: 'center',
-    gap: 'clamp(12px, 3vw, 16px)',
-    flexWrap: 'wrap',
+    gap: '12px',
   },
   timeEstimate: {
     fontSize: 'clamp(11px, 3vw, 12px)',
@@ -293,17 +417,6 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-  },
-  difficultyTag: {
-    fontSize: 'clamp(11px, 3vw, 12px)',
-    color: '#8b5cf6',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    fontWeight: '500',
-  },
-  metaIcon: {
-    fontSize: 'clamp(10px, 2.5vw, 12px)',
   },
   startButton: {
     width: '100%',
@@ -327,133 +440,17 @@ const styles = {
   },
 };
 
-// Add responsive styles and animations
+// Add hover effect styles
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .game-card {
-    animation: slideUp 0.4s ease forwards;
-    opacity: 0;
-  }
-  
-  .game-card:nth-child(1) { animation-delay: 0.1s; }
-  .game-card:nth-child(2) { animation-delay: 0.2s; }
-  .game-card:nth-child(3) { animation-delay: 0.3s; }
-  
   .game-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 20px 40px rgba(0,0,0,0.12) !important;
-  }
-  
-  .game-card:hover .card-icon {
-    transform: scale(1.05);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.15) !important;
   }
   
   .start-button:hover {
     opacity: 0.9;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(59,130,246,0.3);
-  }
-  
-  .start-button:active {
-    transform: translateY(0);
-  }
-  
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .card-left {
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-    
-    .card-header {
-      justify-content: center;
-    }
-    
-    .features-list {
-      justify-content: center;
-    }
-    
-    .card-meta {
-      justify-content: center;
-    }
-    
-    .card-description {
-      text-align: center;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .games-grid {
-      grid-template-columns: 1fr;
-    }
-    
-    .card-icon {
-      margin-bottom: 8px;
-    }
-    
-    .card-title {
-      font-size: 18px;
-    }
-    
-    .difficulty-badge {
-      font-size: 10px;
-      padding: 3px 8px;
-    }
-    
-    .feature-tag {
-      font-size: 9px;
-      padding: 3px 8px;
-    }
-    
-    .start-button {
-      padding: 10px;
-      font-size: 13px;
-    }
-  }
-  
-  @media (min-width: 1200px) {
-    .games-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-  
-  /* Touch-friendly for mobile */
-  @media (max-width: 768px) {
-    .start-button {
-      min-height: 44px;
-    }
-    
-    .game-card {
-      cursor: default;
-    }
-    
-    .feature-tag {
-      white-space: normal;
-      text-align: center;
-    }
-  }
-  
-  /* Smooth transitions */
-  * {
-    transition: all 0.2s ease-in-out;
-  }
-  
-  /* Better text rendering */
-  body {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    transform: scale(1.02);
   }
 `;
 document.head.appendChild(styleSheet);

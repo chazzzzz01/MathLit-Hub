@@ -1,33 +1,102 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useOutletContext } from 'react-router-dom';
 import { AiFillHome } from 'react-icons/ai';
 
 function Homepage() {
-  const navigate = useNavigate();
+  // Get user data from context
+  const { user, userData, updateUserData, getUserIdentifier } = useOutletContext();
+
+  // This is a personalized message that only the current user can see
+  const getPersonalizedMessage = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
 
   return (
     <div style={styles.container}>
       <div style={styles.content}>
         <AiFillHome size={80} color="#2563eb" style={styles.icon} />
-        <h1 style={styles.title}>Welcome to Home Icon</h1>
-        <p style={styles.subtitle}>You've successfully navigated to the homepage!</p>
         
-        <div style={styles.cardContainer}>
-          <div style={styles.card}>
-            <h3>Dashboard</h3>
-            <p>View your personalized dashboard</p>
-          </div>
-          <div style={styles.card}>
-            <h3>Profile</h3>
-            <p>Manage your account settings</p>
-          </div>
-          <div style={styles.card}>
-            <h3>Settings</h3>
-            <p>Customize your preferences</p>
+        {/* Personalized welcome message */}
+        <h1 style={styles.title}>
+          {getPersonalizedMessage()}, {user?.name?.split(' ')[0] || getUserIdentifier()}! 👋
+        </h1>
+        
+        <p style={styles.subtitle}>
+          Welcome to your personal learning space, {user?.email}
+        </p>
+        
+        {/* User Stats Card - Personal to this user */}
+        <div style={styles.statsCard}>
+          <h3 style={styles.statsTitle}>📊 Your Stats</h3>
+          <div style={styles.statsGrid}>
+            <div style={styles.statItem}>
+              <div style={styles.statValue}>{userData?.gameStats?.gamesPlayed || 0}</div>
+              <div style={styles.statLabel}>Games Played</div>
+            </div>
+            <div style={styles.statItem}>
+              <div style={styles.statValue}>{userData?.achievements?.length || 0}</div>
+              <div style={styles.statLabel}>Achievements</div>
+            </div>
+            <div style={styles.statItem}>
+              <div style={styles.statValue}>{userData?.progress?.missionsCompleted || 0}</div>
+              <div style={styles.statLabel}>Missions Done</div>
+            </div>
+            <div style={styles.statItem}>
+              <div style={styles.statValue}>
+                {new Date(userData?.createdAt).toLocaleDateString() || 'Today'}
+              </div>
+              <div style={styles.statLabel}>Member Since</div>
+            </div>
           </div>
         </div>
 
+        <div style={styles.cardContainer}>
+          <div style={styles.card}>
+            <h3>📚 Recent Activity</h3>
+            <p>Your last login: {new Date(userData?.lastLogin).toLocaleString()}</p>
+            <p style={styles.smallText}>Only you can see this information</p>
+          </div>
+          
+          <div style={styles.card}>
+            <h3>🏆 Your Progress</h3>
+            <p>Keep up the great work, {user?.name?.split(' ')[0] || 'Student'}!</p>
+            <div style={styles.progressBar}>
+              <div style={{
+                ...styles.progressFill,
+                width: `${Math.min(100, ((userData?.achievements?.length || 0) / 10) * 100)}%`
+              }}></div>
+            </div>
+            <p style={styles.smallText}>{userData?.achievements?.length || 0}/10 achievements</p>
+          </div>
+          
+          <div style={styles.card}>
+            <h3>⚙️ Your Settings</h3>
+            <p>Customize your learning experience</p>
+            <button 
+              style={styles.smallButton}
+              onClick={() => {
+                if (updateUserData) {
+                  updateUserData({
+                    settings: {
+                      ...userData?.settings,
+                      lastVisited: new Date().toISOString()
+                    }
+                  });
+                  alert('Settings updated! This is saved only for your account.');
+                }
+              }}
+            >
+              Update Preferences
+            </button>
+          </div>
+        </div>
 
+        <div style={styles.note}>
+          <p>🔒 This is your personal space. Your data is private and only accessible by you.</p>
+        </div>
       </div>
     </div>
   );
@@ -44,7 +113,7 @@ const styles = {
   },
   content: {
     textAlign: 'center',
-    maxWidth: '800px',
+    maxWidth: '1000px',
     width: '100%',
   },
   icon: {
@@ -59,13 +128,46 @@ const styles = {
   subtitle: {
     fontSize: '18px',
     color: '#666',
-    marginBottom: '40px',
+    marginBottom: '30px',
+  },
+  statsCard: {
+    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '30px',
+    color: 'white',
+  },
+  statsTitle: {
+    fontSize: '20px',
+    marginBottom: '15px',
+    textAlign: 'center',
+  },
+  statsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gap: '20px',
+  },
+  statItem: {
+    textAlign: 'center',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
+  },
+  statValue: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    marginBottom: '5px',
+  },
+  statLabel: {
+    fontSize: '12px',
+    opacity: 0.9,
   },
   cardContainer: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
     gap: '20px',
-    marginBottom: '0',
+    marginBottom: '30px',
   },
   card: {
     backgroundColor: 'white',
@@ -73,24 +175,52 @@ const styles = {
     borderRadius: '8px',
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     transition: 'transform 0.2s, box-shadow 0.2s',
-    cursor: 'pointer',
+    textAlign: 'left',
     '&:hover': {
       transform: 'translateY(-2px)',
       boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
     },
   },
-  button: {
+  progressBar: {
+    width: '100%',
+    height: '8px',
+    backgroundColor: '#e0e0e0',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    marginTop: '10px',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2563eb',
+    transition: 'width 0.3s ease',
+  },
+  smallText: {
+    fontSize: '12px',
+    color: '#999',
+    marginTop: '8px',
+  },
+  smallButton: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '12px 24px',
-    fontSize: '16px',
+    padding: '8px 16px',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '4px',
     cursor: 'pointer',
+    marginTop: '10px',
+    fontSize: '12px',
     transition: 'background-color 0.2s',
-    '&:hover': {
+    ':hover': {
       backgroundColor: '#1d4ed8',
     },
+  },
+  note: {
+    marginTop: '30px',
+    padding: '15px',
+    backgroundColor: '#fff3cd',
+    border: '1px solid #ffeaa7',
+    borderRadius: '8px',
+    color: '#856404',
+    fontSize: '14px',
   },
 };
 

@@ -1,7 +1,7 @@
 // src/games/SpaceShooter.jsx
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft } from 'react-icons/fa';
+import { FaArrowLeft, FaArrowRight, FaCrosshairs } from 'react-icons/fa';
 
 const SpaceShooter = () => {
   const navigate = useNavigate();
@@ -15,7 +15,18 @@ const SpaceShooter = () => {
   const [showLevelAnnouncement, setShowLevelAnnouncement] = useState(false);
   const [levelAnnouncement, setLevelAnnouncement] = useState('');
   const [wrongShots, setWrongShots] = useState(0);
-  const [correctShots, setCorrectShots] = useState(0); // Track consecutive correct shots for speed
+  const [correctShots, setCorrectShots] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [touchMove, setTouchMove] = useState({ active: false, x: 0 });
+  
+  // Game tracking stats
+  const [gameStartTime, setGameStartTime] = useState(null);
+  const [gameResultSent, setGameResultSent] = useState(false);
+  const [totalCorrect, setTotalCorrect] = useState(0);
+  const [totalWrong, setTotalWrong] = useState(0);
+  const [highestLevel, setHighestLevel] = useState(1);
+  const [totalShots, setTotalShots] = useState(0);
+  const [timeSpent, setTimeSpent] = useState(0);
 
   const gameRef = useRef({
     player: { x: 380, y: 550, width: 40, height: 40 },
@@ -28,22 +39,89 @@ const SpaceShooter = () => {
     gameActive: false,
     waitingForSpace: false,
     spawnTimer: 0,
-    baseEnemySpeed: 0.8, // Starting speed
-    currentSpeedMultiplier: 1.0, // Speed multiplier that increases with correct answers
+    baseEnemySpeed: 0.8,
+    currentSpeedMultiplier: 1.0,
   });
 
+  // Function to send game result to parent window
+  const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
+    if (gameResultSent) return; // Prevent sending multiple times
+    
+    // Calculate accuracy
+    const accuracy = stats.totalShots > 0 
+      ? Math.round((stats.correctShots / stats.totalShots) * 100) 
+      : 0;
+    
+    const gameResult = {
+      type: 'GAME_RESULT',
+      gameId: 'spaceShooter',
+      completed: completed,
+      score: finalScore,
+      timeSpent: timeSpentSeconds,
+      timestamp: new Date().toISOString(),
+      stats: {
+        correctAnswers: stats.correctShots,
+        totalAnswers: stats.totalShots,
+        accuracy: accuracy,
+        highestLevel: stats.highestLevel,
+        wrongShots: stats.wrongShots,
+        totalShots: stats.totalShots
+      }
+    };
+    
+    // Send to parent window (the games dashboard)
+    if (window.opener) {
+      window.opener.postMessage(gameResult, '*');
+      setGameResultSent(true);
+    }
+    
+    // Also store in localStorage for backup
+    const previousResults = localStorage.getItem('spaceShooterResults');
+    const results = previousResults ? JSON.parse(previousResults) : [];
+    results.push(gameResult);
+    localStorage.setItem('spaceShooterResults', JSON.stringify(results));
+  };
+
   const handleBackToGames = () => {
+    // Send result if game is in progress but not completed
+    if (gameState === 'playing' && !gameResultSent && gameStartTime) {
+      const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+      sendGameResult(false, score, currentTimeSpent, {
+        correctShots: totalCorrect,
+        totalShots: totalShots,
+        highestLevel: level,
+        wrongShots: totalWrong
+      });
+    }
     navigate('/studenthub/games');
   };
 
+  // Update time spent during gameplay
+  useEffect(() => {
+    let timer;
+    if (gameState === 'playing' && gameStartTime && !gameResultSent) {
+      timer = setInterval(() => {
+        setTimeSpent(Math.floor((Date.now() - gameStartTime) / 1000));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [gameState, gameStartTime, gameResultSent]);
+
+  // Detect if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // ------------------ LINEAR EQUATIONS ------------------
   const generateLinearEquation = useCallback(() => {
-    // Generate linear equations in the form: ax + b = c
-    // Solve for x: x = (c - b) / a
-    
-    const a = Math.floor(Math.random() * 5) + 2; // 2-6
-    const b = Math.floor(Math.random() * 10) + 1; // 1-10
-    const x = Math.floor(Math.random() * 10) + 1; // 1-10
+    const a = Math.floor(Math.random() * 5) + 2;
+    const b = Math.floor(Math.random() * 10) + 1;
+    const x = Math.floor(Math.random() * 10) + 1;
     const c = (a * x) + b;
     
     return { 
@@ -67,10 +145,10 @@ const SpaceShooter = () => {
     if (!targetEquation) return null;
 
     const wrong = generateWrongAnswers(targetEquation.answer);
-    const isCorrect = Math.random() < 0.4; // 40% chance for correct answer
+    const isCorrect = Math.random() < 0.4;
     
-    // Calculate current speed based on multiplier
-    const currentSpeed = gameRef.current.baseEnemySpeed * gameRef.current.currentSpeedMultiplier;
+    const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
+    const currentSpeed = levelBaseSpeed * gameRef.current.currentSpeedMultiplier;
 
     return {
       id: Math.random(),
@@ -79,13 +157,13 @@ const SpaceShooter = () => {
       width: 70,
       height: 55,
       speed: currentSpeed,
-      horizontalSpeed: (0.5 + Math.random() * 0.5) * Math.min(2.0, gameRef.current.currentSpeedMultiplier),
+      horizontalSpeed: (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * gameRef.current.currentSpeedMultiplier),
       direction: (Math.random() < 0.5 ? -1 : 1),
       equation: targetEquation.equation,
       answer: isCorrect ? targetEquation.answer : wrong[Math.floor(Math.random() * wrong.length)],
       isCorrect,
     };
-  }, [targetEquation]);
+  }, [targetEquation, level]);
 
   const showLevelStart = (levelNum) => {
     setLevelAnnouncement(`LEVEL ${levelNum}`);
@@ -102,7 +180,6 @@ const SpaceShooter = () => {
     }, 3000);
   };
 
-  // Handle space key for level start
   useEffect(() => {
     const handleSpaceToStart = (e) => {
       if (e.code === 'Space' && showLevelAnnouncement && gameRef.current.waitingForSpace) {
@@ -117,7 +194,42 @@ const SpaceShooter = () => {
     return () => window.removeEventListener('keydown', handleSpaceToStart);
   }, [showLevelAnnouncement]);
 
-  // ------------------ INIT ------------------
+  const advanceToNextLevel = useCallback(() => {
+    setLevel(prevLevel => {
+      const newLevel = prevLevel + 1;
+      setHighestLevel(prevHighest => Math.max(prevHighest, newLevel));
+      
+      gameRef.current.currentSpeedMultiplier = 1.0;
+      gameRef.current.spawnDelay = Math.max(60, 120 - (newLevel - 1) * 8);
+      
+      setLevelAnnouncement(`LEVEL ${newLevel}`);
+      setShowLevelAnnouncement(true);
+      gameRef.current.waitingForSpace = true;
+      gameRef.current.gameActive = false;
+      
+      const eq = generateLinearEquation();
+      setTargetEquation(eq);
+      
+      gameRef.current.enemies = [];
+      gameRef.current.bullets = [];
+      
+      const enemyCount = Math.min(5, 3 + Math.floor(newLevel / 3));
+      for (let i = 0; i < enemyCount; i++) {
+        const e = createEnemy();
+        if (e) {
+          e.y = -60 - (i * 50);
+          gameRef.current.enemies.push(e);
+        }
+      }
+      
+      setFeedback({ message: `🔥 LEVEL UP! Entering Level ${newLevel} 🔥`, type: 'success' });
+      
+      return newLevel;
+    });
+    
+    setCorrectShots(0);
+  }, [generateLinearEquation, createEnemy]);
+
   const initLevel = useCallback(() => {
     const game = gameRef.current;
     
@@ -127,13 +239,19 @@ const SpaceShooter = () => {
     game.spawnTimer = 0;
     game.baseEnemySpeed = 0.8;
     game.currentSpeedMultiplier = 1.0;
+    game.spawnDelay = 120;
     setWrongShots(0);
     setCorrectShots(0);
+    setLevel(1);
+    setHighestLevel(1);
+    setTotalCorrect(0);
+    setTotalWrong(0);
+    setTotalShots(0);
+    setScore(0);
 
     const eq = generateLinearEquation();
     setTargetEquation(eq);
 
-    // Start with 3 enemies
     for (let i = 0; i < 3; i++) {
       const e = createEnemy();
       if (e) {
@@ -158,28 +276,37 @@ const SpaceShooter = () => {
     game.spawnTimer = 0;
     game.baseEnemySpeed = 0.8;
     game.currentSpeedMultiplier = 1.0;
+    game.spawnDelay = 120;
 
     setScore(0);
     setLevel(1);
     setWrongShots(0);
     setCorrectShots(0);
+    setTotalCorrect(0);
+    setTotalWrong(0);
+    setTotalShots(0);
+    setHighestLevel(1);
     setGameState('playing');
     setShowLevelAnnouncement(false);
+    setGameStartTime(Date.now());
+    setGameResultSent(false);
+    setTimeSpent(0);
 
     setTimeout(() => {
       initLevel();
     }, 100);
   };
 
-  // ------------------ SHOOT ------------------
   const shoot = () => {
     const game = gameRef.current;
     const now = Date.now();
 
     if (now - game.lastShot < 300) return;
+    
+    setTotalShots(prev => prev + 1);
 
     game.bullets.push({
-      x: game.player.x + 18,
+      x: game.player.x + 35,
       y: game.player.y - 20,
       width: 4,
       height: 10,
@@ -189,50 +316,74 @@ const SpaceShooter = () => {
     game.lastShot = now;
   };
 
-  // Function to increase game speed
   const increaseSpeed = useCallback(() => {
     const game = gameRef.current;
-    // Increase multiplier by 0.1 each correct answer, max speed 3x
-    game.currentSpeedMultiplier = Math.min(3.0, game.currentSpeedMultiplier + 0.1);
+    game.currentSpeedMultiplier = Math.min(2.5, game.currentSpeedMultiplier + 0.1);
     
-    // Update all existing enemies with new speed
     game.enemies.forEach(enemy => {
-      const newSpeed = game.baseEnemySpeed * game.currentSpeedMultiplier;
+      const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15);
+      const newSpeed = levelBaseSpeed * game.currentSpeedMultiplier;
       enemy.speed = newSpeed;
-      enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.0, game.currentSpeedMultiplier);
+      enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * game.currentSpeedMultiplier);
     });
     
-    // Update spawn rate - spawn faster as speed increases
-    // Spawn timer threshold reduces from 120 to 60 frames as speed increases
-    const newSpawnDelay = Math.max(60, 120 - (game.currentSpeedMultiplier - 1) * 30);
+    const newSpawnDelay = Math.max(50, 120 - (game.currentSpeedMultiplier - 1) * 30 - (level - 1) * 3);
     game.spawnDelay = newSpawnDelay;
-    
-    console.log(`Speed increased! Multiplier: ${game.currentSpeedMultiplier.toFixed(1)}x, Spawn delay: ${newSpawnDelay}`);
-  }, []);
+  }, [level]);
 
-  // ------------------ UPDATE ------------------
+  // Mobile controls
+  const handleTouchStart = (e) => {
+    e.preventDefault();
+    const rect = canvasRef.current.getBoundingClientRect();
+    const touchX = e.touches[0].clientX - rect.left;
+    setTouchMove({ active: true, x: touchX });
+  };
+
+  const handleTouchMove = (e) => {
+    e.preventDefault();
+    if (touchMove.active) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const touchX = e.touches[0].clientX - rect.left;
+      const newX = Math.max(0, Math.min(760, touchX - 20));
+      gameRef.current.player.x = newX;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    setTouchMove({ active: false, x: 0 });
+  };
+
+  const moveLeft = () => {
+    gameRef.current.player.x = Math.max(0, gameRef.current.player.x - 35);
+  };
+
+  const moveRight = () => {
+    gameRef.current.player.x = Math.min(760, gameRef.current.player.x + 35);
+  };
+
+  const handleMobileShoot = () => {
+    shoot();
+  };
+
   const updateGame = useCallback(() => {
     const game = gameRef.current;
     if (!game.gameActive || game.waitingForSpace) return;
 
-    // Player movement
     if (game.keys['ArrowLeft']) game.player.x -= 5;
     if (game.keys['ArrowRight']) game.player.x += 5;
     game.player.x = Math.max(0, Math.min(760, game.player.x));
 
-    // Shooting
     if (game.keys['Space']) shoot();
 
-    // Update bullets
     game.bullets = game.bullets.filter(b => {
       b.y -= b.speed;
       return b.y > -20;
     });
 
-    // Spawn new enemies with dynamic timing based on speed
     game.spawnTimer++;
+    const maxEnemies = Math.min(12, 8 + Math.floor(level / 2));
     const spawnDelay = game.spawnDelay || 120;
-    if (game.spawnTimer > spawnDelay && game.enemies.length < 8) {
+    if (game.spawnTimer > spawnDelay && game.enemies.length < maxEnemies) {
       const newEnemy = createEnemy();
       if (newEnemy) {
         newEnemy.y = -60;
@@ -242,17 +393,14 @@ const SpaceShooter = () => {
       }
     }
 
-    // Update enemies
     game.enemies.forEach(e => {
       e.x += e.horizontalSpeed * e.direction;
       if (e.x <= 0 || e.x >= 730) e.direction *= -1;
       e.y += e.speed;
     });
 
-    // Remove enemies that go off screen
     game.enemies = game.enemies.filter(e => e.y < 650);
 
-    // Collision detection
     for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
       const b = game.bullets[bi];
 
@@ -265,19 +413,18 @@ const SpaceShooter = () => {
           b.y < e.y + e.height &&
           b.y + b.height > e.y
         ) {
-          // Check if answer matches target
           if (e.answer === targetEquation.answer) {
             setScore(s => s + 100);
+            setTotalCorrect(prev => prev + 1);
             setCorrectShots(prev => {
               const newCorrectShots = prev + 1;
               setFeedback({ 
-                message: `+100 Correct! x = ${e.answer} | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x`, 
+                message: `+100 Correct! x = ${e.answer} | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x | Level: ${level}`, 
                 type: 'success' 
               });
               return newCorrectShots;
             });
             
-            // Add particle effect
             for (let i = 0; i < 20; i++) {
               game.particles.push({
                 x: e.x + e.width/2,
@@ -288,19 +435,16 @@ const SpaceShooter = () => {
               });
             }
             
-            // INCREASE GAME SPEED ON CORRECT ANSWER
             increaseSpeed();
             
-            // GENERATE NEW EQUATION AFTER CORRECT ANSWER
             const newEquation = generateLinearEquation();
             setTargetEquation(newEquation);
             
-            // Update all remaining enemies to use the new equation
             game.enemies.forEach(enemy => {
               enemy.equation = newEquation.equation;
             });
           } else {
-            // WRONG ANSWER - Reset speed multiplier on wrong answer
+            setTotalWrong(prev => prev + 1);
             setWrongShots(prev => {
               const newWrongShots = prev + 1;
               setScore(s => Math.max(0, s - 10));
@@ -309,18 +453,16 @@ const SpaceShooter = () => {
                 type: 'error' 
               });
               
-              // Reset speed multiplier on wrong answer
               gameRef.current.currentSpeedMultiplier = 1.0;
-              gameRef.current.spawnDelay = 120;
+              const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
+              gameRef.current.spawnDelay = Math.max(60, 120 - (level - 1) * 8);
               
-              // Update all existing enemies with reset speed
               gameRef.current.enemies.forEach(enemy => {
-                const newSpeed = gameRef.current.baseEnemySpeed * gameRef.current.currentSpeedMultiplier;
+                const newSpeed = levelBaseSpeed * gameRef.current.currentSpeedMultiplier;
                 enemy.speed = newSpeed;
-                enemy.horizontalSpeed = (0.5 + Math.random() * 0.5);
+                enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1));
               });
               
-              // Add particle effect
               for (let i = 0; i < 15; i++) {
                 game.particles.push({
                   x: e.x + e.width/2,
@@ -331,10 +473,16 @@ const SpaceShooter = () => {
                 });
               }
               
-              // Check if player has made 3 wrong shots
               if (newWrongShots >= 3) {
                 game.gameActive = false;
                 game.waitingForSpace = false;
+                const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+                sendGameResult(false, score, finalTimeSpent, {
+                  correctShots: totalCorrect,
+                  totalShots: totalShots,
+                  highestLevel: level,
+                  wrongShots: totalWrong + 1
+                });
                 setGameState('gameOver');
                 setFeedback({ message: 'Game Over! 3 wrong answers!', type: 'error' });
               }
@@ -350,36 +498,45 @@ const SpaceShooter = () => {
       }
     }
     
-    // Update particles
+    const requiredCorrectShots = 5 + Math.floor(level / 2);
+    if (correctShots >= requiredCorrectShots && game.gameActive && !game.waitingForSpace) {
+      advanceToNextLevel();
+    }
+    
     game.particles = game.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
       p.life--;
       return p.life > 0;
     });
-  }, [targetEquation, generateLinearEquation, increaseSpeed]);
+  }, [targetEquation, generateLinearEquation, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong]);
 
-  // ------------------ DRAW ------------------
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
 
-    // Background
+    const intensity = Math.min(0.5, 0.2 + (level - 1) * 0.05);
     const gradient = ctx.createLinearGradient(0, 0, 0, 600);
-    gradient.addColorStop(0, '#0a0a2a');
+    gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`);
     gradient.addColorStop(1, '#000000');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 800, 600);
     
-    // Draw stars
     ctx.fillStyle = 'white';
-    for (let i = 0; i < 150; i++) {
+    const starCount = 150 + Math.floor(level * 5);
+    for (let i = 0; i < starCount; i++) {
       ctx.fillRect((i * 131) % 800, (i * 253) % 600, 1.5, 1.5);
     }
 
-    // Player ship
     ctx.save();
     ctx.shadowBlur = 8;
     ctx.shadowColor = '#00ffff';
+    
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath();
+    ctx.moveTo(game.player.x + 5, game.player.y + 15);
+    ctx.lineTo(game.player.x + 15, game.player.y + 10);
+    ctx.lineTo(game.player.x + 15, game.player.y + 20);
+    ctx.fill();
     
     ctx.fillStyle = '#00ffff';
     ctx.beginPath();
@@ -392,12 +549,19 @@ const SpaceShooter = () => {
     ctx.fillStyle = '#0099ff';
     ctx.fillRect(game.player.x + 15, game.player.y + 12, 10, 15);
     
-    ctx.fillStyle = '#ff6600';
-    ctx.fillRect(game.player.x + 18, game.player.y + 27, 4, 10);
+    ctx.fillStyle = '#ff4400';
+    ctx.fillRect(game.player.x + 32, game.player.y + 27, 6, 10);
+    
+    ctx.fillStyle = '#ffaa44';
+    ctx.beginPath();
+    ctx.moveTo(game.player.x + 8, game.player.y + 18);
+    ctx.lineTo(game.player.x + 3, game.player.y + 18);
+    ctx.lineTo(game.player.x + 5, game.player.y + 15);
+    ctx.lineTo(game.player.x + 8, game.player.y + 18);
+    ctx.fill();
     
     ctx.restore();
 
-    // Bullets
     ctx.fillStyle = '#ffff00';
     ctx.shadowBlur = 5;
     ctx.shadowColor = '#ffff00';
@@ -405,31 +569,27 @@ const SpaceShooter = () => {
       ctx.fillRect(b.x, b.y, b.width, b.height);
     });
 
-    // Particles
     game.particles.forEach(p => {
       ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`;
       ctx.fillRect(p.x, p.y, 4, 4);
     });
 
-    // Draw enemies
     game.enemies.forEach(e => {
       ctx.shadowBlur = 5;
       
-      // Enemy body - color changes with speed (more red as speed increases)
       const speedFactor = Math.min(1, (game.currentSpeedMultiplier - 1) / 2);
-      const intensity = 255 - Math.floor(100 * speedFactor);
+      const levelFactor = Math.min(0.7, (level - 1) * 0.1);
+      const intensity = 255 - Math.floor(100 * speedFactor) - Math.floor(50 * levelFactor);
       const gradient = ctx.createLinearGradient(e.x, e.y, e.x + e.width, e.y + e.height);
-      gradient.addColorStop(0, `rgb(255, ${intensity}, ${intensity})`);
+      gradient.addColorStop(0, `rgb(255, ${Math.max(100, intensity)}, ${Math.max(100, intensity)})`);
       gradient.addColorStop(1, `rgb(170, ${Math.floor(intensity * 0.6)}, ${Math.floor(intensity * 0.6)})`);
       ctx.fillStyle = gradient;
       ctx.fillRect(e.x, e.y, e.width, e.height);
       
-      // Enemy details
       ctx.fillStyle = '#882222';
       ctx.fillRect(e.x + 10, e.y + 12, e.width - 20, 6);
       ctx.fillRect(e.x + 10, e.y + 30, e.width - 20, 6);
       
-      // Eyes
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(e.x + 12, e.y + 8, 10, 6);
       ctx.fillRect(e.x + e.width - 22, e.y + 8, 10, 6);
@@ -437,22 +597,19 @@ const SpaceShooter = () => {
       ctx.fillRect(e.x + 14, e.y + 9, 6, 4);
       ctx.fillRect(e.x + e.width - 20, e.y + 9, 6, 4);
       
-      // NUMBER DISPLAY
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 28px "Courier New", monospace';
       ctx.shadowBlur = 3;
       ctx.shadowColor = '#000000';
       ctx.fillText(e.answer, e.x + 27, e.y + 45);
       
-      // Simple border - all enemies have same border
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = level > 3 ? '#ffaa44' : '#ffffff';
       ctx.lineWidth = 2;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
     });
 
     ctx.shadowBlur = 0;
 
-    // Show feedback message
     if (feedback.message) {
       ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336';
       ctx.font = 'bold 24px Arial';
@@ -465,7 +622,6 @@ const SpaceShooter = () => {
       }, 1500);
     }
 
-    // Level Announcement
     if (showLevelAnnouncement) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillRect(0, 0, 800, 600);
@@ -485,19 +641,38 @@ const SpaceShooter = () => {
       ctx.shadowBlur = 0;
     }
 
-    // UI Text
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 22px Arial';
     ctx.fillText(`Score: ${score}`, 20, 40);
     ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 70);
     
-    // Speed indicator
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 28px Arial';
+    ctx.fillText(`LEVEL ${level}`, 20, 120);
+    
     const speedColor = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
     ctx.fillStyle = speedColor;
     ctx.font = 'bold 18px Arial';
-    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 100);
+    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 155);
     
-    // Target linear equation
+    const requiredCorrect = 5 + Math.floor(level / 2);
+    const progress = (correctShots / requiredCorrect) * 100;
+    ctx.fillStyle = '#666666';
+    ctx.fillRect(20, 175, 150, 12);
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(20, 175, (progress / 100) * 150, 12);
+    ctx.fillStyle = '#cccccc';
+    ctx.font = '12px Arial';
+    ctx.fillText(`${correctShots}/${requiredCorrect} correct to level up`, 20, 170);
+    
+    // Display accuracy stats
+    if (totalShots > 0) {
+      const accuracy = Math.round((totalCorrect / totalShots) * 100);
+      ctx.fillStyle = '#88ff88';
+      ctx.font = '12px Arial';
+      ctx.fillText(`Accuracy: ${accuracy}% (${totalCorrect}/${totalShots})`, 20, 205);
+    }
+    
     if (targetEquation && !showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ffd700';
       ctx.font = 'bold 28px Arial';
@@ -507,23 +682,34 @@ const SpaceShooter = () => {
       ctx.fillText('Find x = ?', 360, 85);
     }
     
-    // Controls
     ctx.fillStyle = '#888888';
     ctx.font = '16px Arial';
-    ctx.fillText('← →  Move', 20, 575);
-    ctx.fillText('SPACE  Shoot', 20, 595);
+    if (!isMobile) {
+      ctx.fillText('← →  Move', 20, 575);
+      ctx.fillText('SPACE  Shoot', 20, 595);
+    } else {
+      ctx.fillText('Use buttons below', 20, 575);
+      ctx.fillText('←  →  🔫', 20, 595);
+    }
     
-    // Enemy counter
     if (!showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ff8888';
       ctx.font = '18px Arial';
       ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40);
     }
     
+    // Display timer
+    if (gameState === 'playing' && !showLevelAnnouncement) {
+      ctx.fillStyle = '#aaaaaa';
+      ctx.font = '14px Arial';
+      const minutes = Math.floor(timeSpent / 60);
+      const seconds = timeSpent % 60;
+      ctx.fillText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`, 700, 70);
+    }
+    
     game.frame++;
-  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots]);
+  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent]);
 
-  // ------------------ LOOP ------------------
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -539,7 +725,6 @@ const SpaceShooter = () => {
     return () => cancelAnimationFrame(id);
   }, [gameState, updateGame, drawGame]);
 
-  // ------------------ KEY HANDLERS ------------------
   useEffect(() => {
     const down = (e) => {
       if (e.code === 'Space') {
@@ -569,6 +754,7 @@ const SpaceShooter = () => {
 
   return (
     <div style={styles.container}>
+      {/* Back button - always visible */}
       <button onClick={handleBackToGames} style={styles.backButton}>
         <FaArrowLeft style={styles.backIcon} />
         Back to Games
@@ -580,39 +766,83 @@ const SpaceShooter = () => {
           width={800} 
           height={600} 
           style={styles.canvas}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
 
         {gameState === 'menu' && (
           <div style={styles.menuOverlay}>
-            <h1 style={styles.gameTitle}>🚀 Linear Equation Shooter 🚀</h1>
-            <p style={styles.gameSubtitle}>Solve linear equations by shooting the correct x value!</p>
-            <div style={styles.features}>
-              <p>📐 <strong style={{color: '#ffd700'}}>Linear Equations:</strong> ax + b = c</p>
-              <p>🎯 Example: <strong style={{color: '#88ff88'}}>3x + 5 = 14</strong> → Solve for x (x = 3)</p>
-              <p>💡 Shoot enemies with the <strong style={{color: '#ffff00'}}>correct x value</strong> to earn points!</p>
-              <p>⚠️ Shooting wrong answers loses 10 points AND counts as a mistake!</p>
-              <p>💀 Make 3 mistakes and the game is over!</p>
-              <p>⚡ <strong style={{color: '#ffaa44'}}>SPEED MECHANIC:</strong> Each correct answer increases enemy speed by 10%!</p>
-              <p>🔥 Make a mistake and speed resets to normal!</p>
-              <p>🔄 New enemies spawn faster as speed increases!</p>
+            <div style={styles.menuContent}>
+              <h1 style={styles.gameTitle}>🚀 Linear Equation Shooter 🚀</h1>
+              <p style={styles.gameSubtitle}>Solve linear equations by shooting the correct x value!</p>
+              <div style={styles.features}>
+                <p>📐 <strong style={{color: '#ffd700'}}>Linear Equations:</strong> ax + b = c</p>
+                <p>🎯 Example: <strong style={{color: '#88ff88'}}>3x + 5 = 14</strong> → Solve for x (x = 3)</p>
+                <p>💡 Shoot enemies with the <strong style={{color: '#ffff00'}}>correct x value</strong> to earn points!</p>
+                <p>⚠️ Shooting wrong answers loses 10 points AND counts as a mistake!</p>
+                <p>💀 Make 3 mistakes and the game is over!</p>
+                <p>⭐ <strong style={{color: '#ffaa44'}}>LEVEL SYSTEM:</strong> Each level is faster than the last!</p>
+                <p>⚡ <strong style={{color: '#ffaa44'}}>SPEED MECHANIC:</strong> Each correct answer increases enemy speed by 10%!</p>
+                <p>🔥 Make a mistake and speed resets to normal!</p>
+                <p>🔄 New enemies spawn faster as speed increases!</p>
+                <p>🏆 <strong style={{color: '#ffd700'}}>LEVEL UP:</strong> Get 5+ correct answers to advance to the next level!</p>
+                <p>📊 <strong style={{color: '#88ff88'}}>PROGRESS TRACKING:</strong> Your accuracy and stats are saved!</p>
+              </div>
+              <button onClick={startGame} style={styles.startButton}>
+                Start Game
+              </button>
             </div>
-            <button onClick={startGame} style={styles.startButton}>
-              Start Game
-            </button>
           </div>
         )}
 
         {gameState === 'gameOver' && (
           <div style={styles.gameOverOverlay}>
-            <h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2>
-            <p style={styles.finalScore}>Final Score: {score}</p>
-            <p style={styles.finalScore}>You made 3 mistakes!</p>
-            <button onClick={startGame} style={styles.retryButton}>
-              Play Again
-            </button>
+            <div style={styles.gameOverContent}>
+              <h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2>
+              <p style={styles.finalScore}>Final Score: {score}</p>
+              <p style={styles.finalScore}>You reached Level {highestLevel}</p>
+              <p style={styles.finalScore}>Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}% ({totalCorrect}/{totalShots})</p>
+              <p style={styles.finalScore}>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
+              <p style={styles.finalScore}>You made 3 mistakes!</p>
+              <button onClick={startGame} style={styles.retryButton}>
+                Play Again
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Mobile Controls - Fixed layout: arrows on left, shoot button on right */}
+      {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
+        <div style={styles.mobileControls}>
+          <div style={styles.leftControls}>
+            <button 
+              onTouchStart={moveLeft} 
+              onMouseDown={moveLeft}
+              style={styles.mobileButton}
+            >
+              <FaArrowLeft size={32} />
+            </button>
+            <button 
+              onTouchStart={moveRight} 
+              onMouseDown={moveRight}
+              style={styles.mobileButton}
+            >
+              <FaArrowRight size={32} />
+            </button>
+          </div>
+          <div style={styles.rightControls}>
+            <button 
+              onTouchStart={handleMobileShoot} 
+              onMouseDown={handleMobileShoot}
+              style={{...styles.mobileButton, ...styles.shootButton}}
+            >
+              <FaCrosshairs size={32} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -628,14 +858,15 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative',
   },
   backButton: {
     position: 'fixed',
     top: '20px',
     left: '20px',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.85)',
     color: 'white',
-    border: 'none',
+    border: '2px solid rgba(255,255,255,0.3)',
     padding: '12px 20px',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -647,10 +878,7 @@ const styles = {
     zIndex: 1000,
     transition: 'all 0.3s',
     backdropFilter: 'blur(10px)',
-    ':hover': {
-      backgroundColor: 'rgba(0,0,0,0.9)',
-      transform: 'scale(1.05)',
-    }
+    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
   },
   backIcon: {
     fontSize: '16px',
@@ -662,14 +890,16 @@ const styles = {
     boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
     borderRadius: '10px',
     overflow: 'hidden',
+    width: '100%',
+    maxWidth: '800px',
   },
   canvas: {
     display: 'block',
     width: '100%',
     height: 'auto',
-    maxWidth: '800px',
     border: '3px solid rgba(255,255,255,0.2)',
     borderRadius: '10px',
+    touchAction: 'none',
   },
   menuOverlay: {
     position: 'absolute',
@@ -677,47 +907,65 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0,0,0,0.9)',
+    background: 'rgba(0,0,0,0.92)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    backdropFilter: 'blur(8px)',
+    zIndex: 10,
+    overflow: 'auto',
+  },
+  menuContent: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '20px',
-    color: 'white',
-    backdropFilter: 'blur(5px)',
+    padding: '30px 20px',
+    textAlign: 'center',
+    width: '100%',
+    maxWidth: '600px',
+    margin: 'auto',
   },
   gameTitle: {
-    fontSize: 'clamp(24px, 5vw, 36px)',
+    fontSize: 'clamp(20px, 6vw, 36px)',
     marginBottom: '10px',
     textAlign: 'center',
     color: '#ffd700',
   },
   gameSubtitle: {
-    fontSize: 'clamp(14px, 3vw, 18px)',
+    fontSize: 'clamp(12px, 3vw, 18px)',
     textAlign: 'center',
     marginBottom: '10px',
   },
   features: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: '20px 30px',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: '15px 20px',
     borderRadius: '10px',
     marginTop: '10px',
     textAlign: 'left',
-    lineHeight: '1.8',
+    lineHeight: '1.6',
+    width: '100%',
+    fontSize: 'clamp(11px, 2.5vw, 16px)',
+    border: '1px solid rgba(255,255,255,0.2)',
+    maxHeight: '60vh',
+    overflow: 'auto',
   },
   startButton: {
-    padding: '12px 30px',
-    fontSize: '18px',
-    background: '#4CAF50',
+    padding: '14px 40px',
+    fontSize: 'clamp(18px, 5vw, 20px)',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #4CAF50, #45a049)',
     color: 'white',
     border: 'none',
-    borderRadius: '25px',
+    borderRadius: '50px',
     cursor: 'pointer',
-    transition: 'transform 0.2s',
+    transition: 'transform 0.2s, box-shadow 0.2s',
     marginTop: '20px',
-    ':hover': {
-      transform: 'scale(1.05)',
-    }
+    boxShadow: '0 4px 15px rgba(76,175,80,0.3)',
+    minWidth: '200px',
+    width: 'auto',
   },
   gameOverOverlay: {
     position: 'absolute',
@@ -727,33 +975,108 @@ const styles = {
     bottom: 0,
     background: 'rgba(0,0,0,0.95)',
     display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    textAlign: 'center',
+    padding: '20px',
+    zIndex: 10,
+  },
+  gameOverContent: {
+    display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '20px',
-    color: 'white',
+    padding: '20px',
   },
   gameOverTitle: {
-    fontSize: 'clamp(28px, 6vw, 42px)',
+    fontSize: 'clamp(24px, 6vw, 42px)',
     color: '#ff6b6b',
+    marginBottom: '10px',
   },
   finalScore: {
-    fontSize: 'clamp(18px, 4vw, 24px)',
+    fontSize: 'clamp(16px, 4vw, 24px)',
+    margin: '5px 0',
   },
   retryButton: {
-    padding: '12px 30px',
-    fontSize: '18px',
-    background: '#2196F3',
+    padding: '12px 35px',
+    fontSize: 'clamp(16px, 4vw, 18px)',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #2196F3, #1976D2)',
     color: 'white',
     border: 'none',
-    borderRadius: '25px',
+    borderRadius: '50px',
     cursor: 'pointer',
     transition: 'transform 0.2s',
     marginTop: '20px',
-    ':hover': {
-      transform: 'scale(1.05)',
-    }
+    boxShadow: '0 4px 15px rgba(33,150,243,0.3)',
+    minWidth: '160px',
+  },
+  mobileControls: {
+    position: 'fixed',
+    bottom: '20px',
+    left: 0,
+    right: 0,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '15px 30px',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    backdropFilter: 'blur(15px)',
+    zIndex: 100,
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+    boxShadow: '0 -5px 20px rgba(0,0,0,0.3)',
+  },
+  leftControls: {
+    display: 'flex',
+    gap: '20px',
+  },
+  rightControls: {
+    display: 'flex',
+  },
+  mobileButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    border: '2px solid rgba(255,255,255,0.6)',
+    borderRadius: '60px',
+    width: 'clamp(60px, 15vw, 80px)',
+    height: 'clamp(60px, 15vw, 80px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    cursor: 'pointer',
+    transition: 'all 0.1s ease',
+    fontSize: '24px',
+    touchAction: 'manipulation',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+  },
+  shootButton: {
+    backgroundColor: 'rgba(255,80,80,0.8)',
+    borderColor: '#ffaa44',
+    boxShadow: '0 0 15px rgba(255,80,80,0.5)',
   }
 };
+
+// Add hover effects with CSS (since inline styles don't support :hover)
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  button:hover {
+    transform: scale(1.05);
+  }
+  button:active {
+    transform: scale(0.95);
+  }
+  
+  @media (max-width: 768px) {
+    button:hover {
+      transform: none;
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default SpaceShooter;

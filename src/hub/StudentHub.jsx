@@ -11,29 +11,14 @@ import { useUser } from '../context/UserContext';
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const { user, setUser } = useUser();
+  const { user, setUser } = useUser(); // Use context instead of local state
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Check screen size for responsive behavior
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth <= 768;
-      setIsMobile(mobile);
-      if (!mobile) {
-        setMobileMenuOpen(false);
-      }
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   // Get user data from navigation state only if user is not already set
   useEffect(() => {
     if (location.state?.user && !user) {
+      console.log('Setting user from location state:', location.state.user);
       setUser(location.state.user);
     }
   }, [location.state, user, setUser]);
@@ -41,6 +26,7 @@ function StudentHub() {
   // Redirect to homepage if at exactly /studenthub
   useEffect(() => {
     if (location.pathname === '/studenthub') {
+      console.log('Redirecting to homepage');
       navigate('/studenthub/homepage', { replace: true });
     }
   }, [location.pathname, navigate]);
@@ -54,88 +40,77 @@ function StudentHub() {
   };
 
   const handleLogout = () => {
-    setUser(null);
+    setUser(null); // Clear user data on logout
     navigate("/");
     setOpenDropdown(null);
     setMobileMenuOpen(false);
   };
 
-  const handleNavigation = (path) => {
-    navigate(path);
+  const handleHomeClick = () => {
+    navigate("/studenthub/homepage");
     setOpenDropdown(null);
-    if (isMobile) {
-      setMobileMenuOpen(false);
-    }
   };
 
-  const navItems = [
-    { path: "/studenthub/homepage", icon: AiFillHome, label: "Home" },
-    { path: "/studenthub/missions", icon: MdAssignment, label: "Missions" },
-    { path: "/studenthub/games", icon: IoGameController, label: "Games" },
-    { path: "/studenthub/achievement", icon: GiAchievement, label: "Achievement" }
-  ];
+  const handleMissionsClick = () => {
+    navigate("/studenthub/missions");
+    setOpenDropdown(null);
+  };
+
+  const handleGamesClick = () => {
+    navigate("/studenthub/games");
+    setOpenDropdown(null);
+  };
+
+  const handleAchievementClick = () => {
+    navigate("/studenthub/achievement");
+    setOpenDropdown(null);
+  };
 
   return (
     <div style={styles.wrapper}>
-      {/* Sidebar - Desktop */}
-      {!isMobile && (
-        <aside
-          style={{
-            ...styles.sidebar,
-            width: sidebarCollapsed ? '70px' : '260px',
-          }}
+      {/* Sidebar */}
+      
+        style={{
+          ...styles.sidebar,
+          width: sidebarCollapsed ? '60px' : '220px',
+        }}
+      
+        {/* Home Icon */}
+        <div 
+          style={styles.iconWrapper}
+          onClick={handleHomeClick}
         >
-          <div style={styles.sidebarContent}>
-            {navItems.map((item, index) => (
-              <div 
-                key={index}
-                style={styles.iconWrapper}
-                onClick={() => handleNavigation(item.path)}
-              >
-                <item.icon size={24} color="white" />
-                {!sidebarCollapsed && <span style={styles.iconText}>{item.label}</span>}
-              </div>
-            ))}
-          </div>
-        </aside>
-      )}
-
-      {/* Mobile Menu Overlay */}
-      {isMobile && mobileMenuOpen && (
-        <div style={styles.mobileOverlay} onClick={() => setMobileMenuOpen(false)}>
-          <div style={styles.mobileSidebar} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.mobileSidebarHeader}>
-              <div style={styles.mobileLogo}>MathLit Hub</div>
-              <button 
-                style={styles.mobileCloseButton}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <FiX size={24} color="#2563EB" />
-              </button>
-            </div>
-            <div style={styles.mobileNavItems}>
-              {navItems.map((item, index) => (
-                <div 
-                  key={index}
-                  style={styles.mobileNavItem}
-                  onClick={() => handleNavigation(item.path)}
-                >
-                  <item.icon size={22} color="#2563EB" />
-                  <span style={styles.mobileNavText}>{item.label}</span>
-                </div>
-              ))}
-              <div style={styles.mobileDivider}></div>
-              <div 
-                style={styles.mobileNavItem}
-                onClick={handleLogout}
-              >
-                <FiUser size={22} color="#dc2626" />
-                <span style={{...styles.mobileNavText, color: '#dc2626'}}>Logout</span>
-              </div>
-            </div>
-          </div>
+          <AiFillHome size={24} color="white" />
+          {!sidebarCollapsed && <span style={styles.iconText}>Home</span>}
         </div>
-      )}
+
+        {/* Missions Icon */}
+        <div 
+          style={styles.iconWrapper}
+          onClick={handleMissionsClick}
+        >
+          <MdAssignment size={24} color="white" />
+          {!sidebarCollapsed && <span style={styles.iconText}>Missions</span>}
+        </div>
+
+        {/* Games Icon */}
+        <div 
+          style={styles.iconWrapper}
+          onClick={handleGamesClick}
+        >
+          <IoGameController size={24} color="white" />
+          {!sidebarCollapsed && <span style={styles.iconText}>Games</span>}
+        </div>
+
+        {/* Achievement Icon */}
+        <div 
+          style={styles.iconWrapper}
+          onClick={handleAchievementClick}
+        >
+          <GiAchievement size={24} color="white" />
+          {!sidebarCollapsed && <span style={styles.iconText}>Achievement</span>}
+        </div>
+      
 
       {/* Main content */}
       <main
@@ -148,18 +123,18 @@ function StudentHub() {
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger Menu Button */}
-          <button style={styles.hamburgerButton} onClick={toggleSidebar}>
-            <FiMenu size={24} color="white" />
-          </button>
+          {/* Hamburger fixed top-left */}
+          <div style={styles.hamburger} onClick={toggleSidebar}>
+            <div style={styles.bar}></div>
+            <div style={styles.bar}></div>
+            <div style={styles.bar}></div>
+          </div>
 
-          {/* Right side - Student name and profile icon */}
           <div style={styles.rightSection}>
             <span style={styles.studentName}>
-              {user ? user.name.split(' ')[0] : 'Student'}
+              {getUserIdentifier()}
             </span>
             
-            {/* Profile icon with dropdown */}
             <div style={{ position: 'relative' }}>
               {user?.picture ? (
                 <img 
@@ -185,6 +160,17 @@ function StudentHub() {
                   {user && (
                     <>
                       <div style={styles.dropdownEmail}>{user.email}</div>
+                      <div style={styles.dropdownUserId}>
+                        Username: {getUserIdentifier()}
+                      </div>
+                      {userData && (
+                        <div style={styles.dropdownStats}>
+                          <div>🎓 Member since: {new Date(userData.createdAt).toLocaleDateString()}</div>
+                          <div>🕒 Last login: {new Date(userData.lastLogin).toLocaleDateString()}</div>
+                          <div>🏆 XP: {userData.totalXP || 0}</div>
+                          <div>💰 Coins: {userData.totalCoins || 0}</div>
+                        </div>
+                      )}
                       <div style={styles.dropdownDivider}></div>
                     </>
                   )}
@@ -197,10 +183,15 @@ function StudentHub() {
           </div>
         </header>
 
-        {/* Content Area - Uses Outlet for nested routes */}
+        {/* Content Area - Pass user data to child routes */}
         <div style={styles.contentWrapper}>
           <div style={styles.content}>
-            <Outlet />
+            <Outlet context={{ 
+              user, 
+              userData, 
+              updateUserData, 
+              getUserIdentifier 
+            }} />
           </div>
         </div>
       </main>
@@ -214,6 +205,22 @@ const styles = {
     minHeight: '100vh',
     position: 'relative',
     backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #2563eb',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
   },
   sidebar: {
     position: 'fixed',
@@ -244,7 +251,7 @@ const styles = {
     width: '100%',
     marginBottom: '8px',
     borderRadius: '0 20px 20px 0',
-    transition: 'all 0.2s',
+    transition: 'background-color 0.2s',
     ':hover': {
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
       transform: 'translateX(4px)',
@@ -330,10 +337,10 @@ const styles = {
     right: 0,
     backgroundColor: 'white',
     color: 'black',
-    borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '220px',
+    minWidth: '200px',
     zIndex: 1000,
     animation: 'slideDown 0.2s ease',
   },
@@ -343,6 +350,22 @@ const styles = {
     color: '#333',
     backgroundColor: '#f8f9fa',
     wordBreak: 'break-all',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownUserId: {
+    padding: '8px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  dropdownStats: {
+    padding: '10px 16px',
+    fontSize: '12px',
+    color: '#666',
+    backgroundColor: '#f8f9fa',
+    borderBottom: '1px solid #e0e0e0',
+    lineHeight: '1.6',
   },
   dropdownDivider: {
     height: '1px',
@@ -355,6 +378,7 @@ const styles = {
     color: '#dc2626',
     fontSize: '14px',
     fontWeight: '500',
+    textAlign: 'center',
     ':hover': {
       backgroundColor: '#fee2e2',
     },
@@ -374,152 +398,30 @@ const styles = {
     backgroundColor: '#f5f5f5',
     display: 'flex',
     flexDirection: 'column',
-    boxSizing: 'border-box',
   },
-  
-  // Mobile Menu Styles
-  mobileOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-    animation: 'fadeIn 0.3s ease',
-  },
-  mobileSidebar: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '280px',
-    height: '100vh',
-    backgroundColor: 'white',
-    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
-    animation: 'slideInLeft 0.3s ease',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  mobileSidebarHeader: {
-    padding: '20px',
-    borderBottom: '1px solid #e0e0e0',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-  },
-  mobileLogo: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#2563EB',
-  },
-  mobileCloseButton: {
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#f0f0f0',
-    },
-  },
-  mobileNavItems: {
+  pageContainer: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
     padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
   },
-  mobileNavItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 16px',
+  cardContainer: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '20px',
+    marginTop: '30px',
+  },
+  card: {
+    backgroundColor: 'white',
+    padding: '20px',
     borderRadius: '8px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'transform 0.2s, box-shadow 0.2s',
     ':hover': {
-      backgroundColor: '#f0f7ff',
-      transform: 'translateX(4px)',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
     },
-  },
-  mobileNavText: {
-    fontSize: '16px',
-    fontWeight: '500',
-    color: '#333',
-  },
-  mobileDivider: {
-    height: '1px',
-    backgroundColor: '#e0e0e0',
-    margin: '12px 0',
   },
 };
-
-// Add animations
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes slideInLeft {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(0);
-    }
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .student-name {
-      font-size: 14px;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .student-name {
-      display: none;
-    }
-    
-    .content {
-      padding: 12px;
-    }
-  }
-  
-  /* Better touch targets for mobile */
-  @media (max-width: 768px) {
-    button, [role="button"], .mobile-nav-item {
-      min-height: 44px;
-    }
-  }
-  
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default StudentHub;
