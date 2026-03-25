@@ -43,6 +43,39 @@ const SpaceShooter = () => {
     currentSpeedMultiplier: 1.0,
   });
 
+  // ✅ Send real-time score updates to parent
+  const sendScoreUpdate = useCallback((currentScore, currentStats) => {
+    if (window.parent !== window) {
+      const scoreUpdate = {
+        type: 'SCORE_UPDATE',
+        gameId: 'spaceShooter',
+        score: currentScore,
+        stats: {
+          level: level,
+          correctShots: totalCorrect,
+          totalShots: totalShots,
+          accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
+          wrongShots: totalWrong,
+          timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0
+        }
+      };
+      window.parent.postMessage(scoreUpdate, '*');
+      console.log('Sent score update to parent:', currentScore);
+    }
+  }, [level, totalCorrect, totalShots, totalWrong, gameStartTime]);
+
+  // ✅ Send score update whenever score changes
+  useEffect(() => {
+    if (gameState === 'playing' && !showLevelAnnouncement) {
+      sendScoreUpdate(score, {
+        level,
+        correctShots: totalCorrect,
+        totalShots: totalShots,
+        wrongShots: totalWrong
+      });
+    }
+  }, [score, gameState, showLevelAnnouncement, level, totalCorrect, totalShots, totalWrong, sendScoreUpdate]);
+
   // Function to send game result to parent window
   const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
     if (gameResultSent) return; // Prevent sending multiple times
@@ -69,11 +102,24 @@ const SpaceShooter = () => {
       }
     };
     
-    // Send to parent window (the games dashboard)
+    console.log('=== SENDING SPACE SHOOTER GAME RESULT ===');
+    console.log('Final Score:', finalScore);
+    console.log('Completed:', completed);
+    console.log('Game Result:', gameResult);
+    
+    // Send to parent window (for iframe)
+    if (window.parent !== window) {
+      window.parent.postMessage(gameResult, '*');
+      console.log('Sent to parent window');
+    }
+    
+    // Send to opener (for popup)
     if (window.opener) {
       window.opener.postMessage(gameResult, '*');
-      setGameResultSent(true);
+      console.log('Sent to opener');
     }
+    
+    setGameResultSent(true);
     
     // Also store in localStorage for backup
     const previousResults = localStorage.getItem('spaceShooterResults');
@@ -81,6 +127,37 @@ const SpaceShooter = () => {
     results.push(gameResult);
     localStorage.setItem('spaceShooterResults', JSON.stringify(results));
   };
+
+  // ✅ Handle messages from parent (like score requests)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      console.log('SpaceShooter received message:', event.data);
+      
+      if (event.data && event.data.type === 'REQUEST_SCORE') {
+        // Send current score back to parent
+        const scoreUpdate = {
+          type: 'SCORE_UPDATE',
+          gameId: 'spaceShooter',
+          score: score,
+          stats: {
+            level: level,
+            correctShots: totalCorrect,
+            totalShots: totalShots,
+            accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
+            wrongShots: totalWrong,
+            timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0
+          }
+        };
+        if (window.parent !== window) {
+          window.parent.postMessage(scoreUpdate, '*');
+        }
+        console.log('Sent score response to parent:', score);
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [score, level, totalCorrect, totalShots, totalWrong, gameStartTime]);
 
   const handleBackToGames = () => {
     // Send result if game is in progress but not completed

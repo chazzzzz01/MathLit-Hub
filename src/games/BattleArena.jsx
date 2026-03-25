@@ -1,859 +1,1041 @@
+// src/games/BattleArena.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft } from 'react-icons/fa';
 
-const BattleArena = () => {
-  const navigate = useNavigate();
-  
-  // Game state
-  const [gameState, setGameState] = useState('menu'); // menu, playing, gameOver, victory
-  const [playerHP, setPlayerHP] = useState(100);
-  const [enemyHP, setEnemyHP] = useState(100);
-  const [playerMana, setPlayerMana] = useState(50);
-  const [currentEquation, setCurrentEquation] = useState(null);
-  const [userAnswer, setUserAnswer] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [score, setScore] = useState(0);
-  const [turn, setTurn] = useState('player'); // player, enemy
-  const [combo, setCombo] = useState(0);
-  const [selectedEnemy, setSelectedEnemy] = useState(0);
-  const [showTutorial, setShowTutorial] = useState(true);
-  const [battleLog, setBattleLog] = useState([]);
-  const [gameStartTime, setGameStartTime] = useState(null);
-  const [gameResultSent, setGameResultSent] = useState(false);
-  const [correctAnswers, setCorrectAnswers] = useState(0);
-  const [totalAnswers, setTotalAnswers] = useState(0);
-  const [enemiesDefeated, setEnemiesDefeated] = useState(0);
-  const [maxCombo, setMaxCombo] = useState(0);
-  const [timeSpent, setTimeSpent] = useState(0);
-  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(0);
-  const [isWaitingForNext, setIsWaitingForNext] = useState(false);
-
-  // Enemy types
+const BattleArena = ({ 
+  onComplete, 
+  onScore, 
+  challengeScore, 
+  sendGameResult,
+  onGameStateUpdate,
+  savedGameState,
+  clearSavedState
+}) => {
+  // Enemy types with different difficulty levels
   const enemies = [
-    {
-      name: 'Goblin Mathler',
-      hp: 100,
-      maxHp: 100,
-      avatar: '👺',
-      difficulty: 'easy',
-      attacks: ['Quick Subtract', 'Division Dash'],
-      equationTypes: ['addition', 'subtraction']
-    },
-    {
-      name: 'Algebra Knight',
-      hp: 120,
-      maxHp: 120,
-      avatar: '⚔️',
-      difficulty: 'medium',
-      attacks: ['Multiplication Strike', 'Equation Slash'],
-      equationTypes: ['multiplication', 'division']
-    },
-    {
-      name: 'Calculus Dragon',
-      hp: 150,
-      maxHp: 150,
-      avatar: '🐉',
-      difficulty: 'hard',
-      attacks: ['Quadratic Fire', 'Variable Breath'],
-      equationTypes: ['algebra', 'quadratic']
-    }
+    { name: "Slime", health: 50, maxHealth: 50, attack: 10, defense: 2, difficulty: "Basic", points: 100, color: "#8bc34a" },
+    { name: "Goblin", health: 80, maxHealth: 80, attack: 15, defense: 5, difficulty: "Basic", points: 150, color: "#cddc39" },
+    { name: "Orc", health: 120, maxHealth: 120, attack: 20, defense: 8, difficulty: "Intermediate", points: 200, color: "#ff9800" },
+    { name: "Troll", health: 150, maxHealth: 150, attack: 25, defense: 10, difficulty: "Intermediate", points: 250, color: "#f44336" },
+    { name: "Dark Knight", health: 200, maxHealth: 200, attack: 30, defense: 15, difficulty: "Advanced", points: 350, color: "#9c27b0" },
+    { name: "Dragon", health: 300, maxHealth: 300, attack: 40, defense: 20, difficulty: "Advanced", points: 500, color: "#e91e63" },
+    { name: "Math Wizard", health: 250, maxHealth: 250, attack: 35, defense: 18, difficulty: "Expert", points: 450, color: "#3f51b5" },
+    { name: "Equation Lord", health: 400, maxHealth: 400, attack: 50, defense: 25, difficulty: "Boss", points: 800, color: "#d32f2f" }
   ];
 
-  // Player character
-  const player = {
-    name: 'Math Wizard',
-    avatar: '🧙',
-    level: 1,
-    attacks: [
-      { name: 'Basic Math', damage: 10, manaCost: 0, equationType: 'basic' },
-      { name: 'Algebra Blast', damage: 20, manaCost: 15, equationType: 'algebra' },
-      { name: 'Geometry Shield', damage: 15, manaCost: 10, equationType: 'geometry' },
-      { name: 'Calculus Fury', damage: 30, manaCost: 25, equationType: 'calculus' }
-    ]
+  // ✅ FIXED: Proper equation solver
+  const solveEquation = (equation) => {
+    try {
+      equation = equation.replace(/\s/g, '');
+      const sides = equation.split('=');
+      if (sides.length !== 2) return null;
+      
+      let left = sides[0];
+      let right = sides[1];
+      
+      while (left.includes('(') || right.includes('(')) {
+        const expandParentheses = (expr) => {
+          const match = expr.match(/(\d*)\(([^)]+)\)/);
+          if (match) {
+            const multiplier = match[1] === '' ? 1 : parseInt(match[1]);
+            const inner = match[2];
+            const terms = inner.split(/([+-])/);
+            let expanded = '';
+            let currentSign = '+';
+            
+            for (let i = 0; i < terms.length; i++) {
+              const term = terms[i];
+              if (term === '+' || term === '-') {
+                currentSign = term;
+              } else if (term.trim()) {
+                const multiplied = multiplier * parseInt(term) || term;
+                expanded += `${currentSign}${multiplied}`;
+              }
+            }
+            return expr.replace(match[0], expanded.replace(/^\+/, ''));
+          }
+          return expr;
+        };
+        
+        left = expandParentheses(left);
+        right = expandParentheses(right);
+      }
+      
+      let leftCoeff = 0;
+      let rightConst = 0;
+      
+      const leftTerms = left.split(/([+-])/);
+      let currentSign = '+';
+      for (let i = 0; i < leftTerms.length; i++) {
+        const term = leftTerms[i];
+        if (term === '+' || term === '-') {
+          currentSign = term;
+        } else if (term && term !== '') {
+          const sign = currentSign === '+' ? 1 : -1;
+          if (term.includes('x')) {
+            const coeff = term === 'x' ? 1 : parseInt(term.replace('x', '')) || 1;
+            leftCoeff += sign * coeff;
+          } else {
+            rightConst -= sign * parseInt(term);
+          }
+        }
+      }
+      
+      const rightTerms = right.split(/([+-])/);
+      currentSign = '+';
+      for (let i = 0; i < rightTerms.length; i++) {
+        const term = rightTerms[i];
+        if (term === '+' || term === '-') {
+          currentSign = term;
+        } else if (term && term !== '') {
+          const sign = currentSign === '+' ? 1 : -1;
+          if (term.includes('x')) {
+            const coeff = term === 'x' ? 1 : parseInt(term.replace('x', '')) || 1;
+            leftCoeff -= sign * coeff;
+          } else {
+            rightConst += sign * parseInt(term);
+          }
+        }
+      }
+      
+      if (leftCoeff === 0) return null;
+      const answer = rightConst / leftCoeff;
+      return Math.round(answer * 10) / 10;
+      
+    } catch (error) {
+      console.error('Error solving equation:', error);
+      return null;
+    }
+  };
+  
+  // ✅ FIXED: Reliable equation generator
+  const generateEquation = (difficulty) => {
+    const generateBasic = () => {
+      const a = Math.floor(Math.random() * 5) + 2;
+      const b = Math.floor(Math.random() * 20) + 1;
+      const c = a * Math.floor(Math.random() * 10) + b + Math.floor(Math.random() * 10);
+      return `${a}x + ${b} = ${c}`;
+    };
+    
+    const generateIntermediate = () => {
+      const a = Math.floor(Math.random() * 5) + 2;
+      const b = Math.floor(Math.random() * 15) + 5;
+      const c = Math.floor(Math.random() * 40) + 20;
+      return `${a}x + ${b} = ${c}`;
+    };
+    
+    const generateAdvanced = () => {
+      const a = Math.floor(Math.random() * 5) + 2;
+      const b = Math.floor(Math.random() * 10) + 3;
+      const c = Math.floor(Math.random() * 4) + 2;
+      const d = Math.floor(Math.random() * 20) + 10;
+      return `${a}x + ${b} = ${c}x + ${d}`;
+    };
+    
+    const generateExpert = () => {
+      const a = Math.floor(Math.random() * 10) + 5;
+      const b = Math.floor(Math.random() * 5) + 2;
+      const c = Math.floor(Math.random() * 50) + 30;
+      return `${a}(x + ${b}) = ${c}`;
+    };
+    
+    const generateBoss = () => {
+      const a = Math.floor(Math.random() * 15) + 8;
+      const b = Math.floor(Math.random() * 25) + 10;
+      const c = Math.floor(Math.random() * 10) + 5;
+      const d = Math.floor(Math.random() * 40) + 20;
+      return `${a}x + ${b} = ${c}x + ${d}`;
+    };
+    
+    let equation;
+    switch(difficulty) {
+      case 'Basic':
+        equation = generateBasic();
+        break;
+      case 'Intermediate':
+        equation = generateIntermediate();
+        break;
+      case 'Advanced':
+        equation = generateAdvanced();
+        break;
+      case 'Expert':
+        equation = generateExpert();
+        break;
+      case 'Boss':
+        equation = generateBoss();
+        break;
+      default:
+        equation = generateBasic();
+    }
+    
+    const answer = solveEquation(equation);
+    
+    if (answer === null || isNaN(answer)) {
+      const x = Math.floor(Math.random() * 20) + 1;
+      const a = Math.floor(Math.random() * 5) + 2;
+      const b = Math.floor(Math.random() * 20) + 1;
+      equation = `${a}x + ${b} = ${a * x + b}`;
+      return { equation, answer: x };
+    }
+    
+    return { equation, answer };
   };
 
-  // Function to send game result to parent window
-  const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
-    if (gameResultSent) return;
+  // Game state
+  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(() => {
+    if (savedGameState && savedGameState.currentEnemyIndex !== undefined) {
+      return savedGameState.currentEnemyIndex;
+    }
+    return 0;
+  });
+  
+  const [enemyHealth, setEnemyHealth] = useState(() => {
+    if (savedGameState && savedGameState.enemyHealth !== undefined) {
+      return savedGameState.enemyHealth;
+    }
+    return enemies[0].health;
+  });
+  
+  const [playerHealth, setPlayerHealth] = useState(() => {
+    if (savedGameState && savedGameState.playerHealth !== undefined) {
+      return savedGameState.playerHealth;
+    }
+    return 200;
+  });
+  
+  const [score, setScore] = useState(() => {
+    if (savedGameState && savedGameState.challengeScore !== undefined) {
+      return savedGameState.challengeScore;
+    }
+    return challengeScore || 0;
+  });
+  
+  const [currentEquation, setCurrentEquation] = useState(() => {
+    if (savedGameState && savedGameState.currentEquation) {
+      return savedGameState.currentEquation;
+    }
+    const enemy = enemies[currentEnemyIndex];
+    const { equation, answer } = generateEquation(enemy.difficulty);
+    return { equation, answer, userAnswer: '' };
+  });
+  
+  const [feedback, setFeedback] = useState(() => {
+    if (savedGameState && savedGameState.feedback) {
+      return savedGameState.feedback;
+    }
+    return '';
+  });
+  
+  const [gameActive, setGameActive] = useState(() => {
+    if (savedGameState && savedGameState.gameActive !== undefined) {
+      return savedGameState.gameActive;
+    }
+    return true;
+  });
+  
+  const [showCongratulations, setShowCongratulations] = useState(false);
+  const [attacksCount, setAttacksCount] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [defenseMode, setDefenseMode] = useState(false);
+  const [powerUps, setPowerUps] = useState(() => {
+    if (savedGameState && savedGameState.powerUps !== undefined) {
+      return savedGameState.powerUps;
+    }
+    return { heal: 2, doubleDamage: 1, shield: 1 };
+  });
+
+  const currentEnemy = enemies[currentEnemyIndex];
+  const isBoss = currentEnemy.difficulty === 'Boss';
+  const isLastEnemy = currentEnemyIndex === enemies.length - 1;
+
+  // Save game state
+  useEffect(() => {
+    if (onGameStateUpdate && gameActive && !showCongratulations) {
+      onGameStateUpdate({
+        currentEnemyIndex,
+        enemyHealth,
+        playerHealth,
+        challengeScore: score,
+        currentEquation,
+        feedback,
+        gameActive,
+        powerUps,
+        attacksCount,
+        correctAnswers,
+        defenseMode
+      });
+    }
+  }, [currentEnemyIndex, enemyHealth, playerHealth, score, currentEquation, feedback, gameActive, powerUps, attacksCount, correctAnswers, defenseMode, onGameStateUpdate]);
+
+  // ✅ Send real-time score updates to parent
+  useEffect(() => {
+    if (window.parent !== window) {
+      const scoreUpdate = {
+        type: 'SCORE_UPDATE',
+        gameId: 'battle',
+        score: score,
+        stats: {
+          currentEnemy: currentEnemyIndex,
+          playerHealth: playerHealth,
+          enemyHealth: enemyHealth,
+          attacksMade: attacksCount,
+          correctAnswers: correctAnswers,
+          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
+        }
+      };
+      window.parent.postMessage(scoreUpdate, '*');
+      console.log('Sent score update to parent:', score);
+    }
+  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers]);
+
+  // ✅ Handle messages from parent
+  useEffect(() => {
+    const handleMessage = (event) => {
+      console.log('BattleArena received message:', event.data);
+      
+      if (event.data && event.data.type === 'REQUEST_SCORE') {
+        const scoreUpdate = {
+          type: 'SCORE_UPDATE',
+          gameId: 'battle',
+          score: score,
+          stats: {
+            currentEnemy: currentEnemyIndex,
+            playerHealth: playerHealth,
+            enemyHealth: enemyHealth,
+            attacksMade: attacksCount,
+            correctAnswers: correctAnswers,
+            accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
+          }
+        };
+        window.parent.postMessage(scoreUpdate, '*');
+        console.log('Sent score response to parent:', score);
+      }
+    };
     
-    const accuracy = stats.totalAnswers > 0 
-      ? Math.round((stats.correctAnswers / stats.totalAnswers) * 100) 
-      : 0;
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers]);
+
+  // Send game result
+  const sendResultToParent = useCallback((completed, finalScore) => {
+    const totalEnemies = enemies.length;
+    const accuracy = attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0;
     
     const gameResult = {
       type: 'GAME_RESULT',
       gameId: 'battle',
       completed: completed,
       score: finalScore,
-      timeSpent: timeSpentSeconds,
-      timestamp: new Date().toISOString(),
+      timeSpent: 0,
       stats: {
-        correctAnswers: stats.correctAnswers,
-        totalAnswers: stats.totalAnswers,
+        finalScore: finalScore,
+        totalEnemies: totalEnemies,
+        enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0),
         accuracy: accuracy,
-        maxCombo: stats.maxCombo,
-        enemiesDefeated: stats.enemiesDefeated,
-        enemyType: enemies[selectedEnemy]?.name || 'Unknown',
-        totalEnemies: enemies.length
+        attacksMade: attacksCount,
+        correctAnswers: correctAnswers,
+        powerUpsUsed: {
+          heals: 2 - powerUps.heal,
+          doubleDamage: 1 - powerUps.doubleDamage,
+          shield: 1 - powerUps.shield
+        }
       }
     };
+
+    console.log('=== SENDING BATTLE GAME RESULT ===');
+    console.log('Final Score:', finalScore);
+    console.log('Completed:', completed);
     
-    console.log('Sending game result:', gameResult);
+    if (window.parent !== window) {
+      window.parent.postMessage(gameResult, '*');
+      console.log('Sent to parent window');
+    }
     
     if (window.opener) {
       window.opener.postMessage(gameResult, '*');
-      setGameResultSent(true);
-      console.log('Game result sent to parent window');
+      console.log('Sent to opener');
+    }
+    
+    if (sendGameResult) {
+      sendGameResult(completed, finalScore, 0, currentEnemyIndex + (completed ? 1 : 0), gameResult.stats);
+      console.log('Called sendGameResult prop');
+    }
+  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, powerUps, sendGameResult]);
+
+  // Save progress to localStorage
+  const saveProgressToLocalStorage = useCallback((completed, finalScore) => {
+    try {
+      console.log('=== SAVING BATTLE PROGRESS ===');
+      console.log('Final Score:', finalScore);
+      console.log('Completed:', completed);
+      
+      const existingProgress = localStorage.getItem('gameProgress');
+      let progress = existingProgress ? JSON.parse(existingProgress) : {
+        equation: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
+        battle: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
+        spaceShooter: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 }
+      };
+      
+      const currentBattle = progress.battle || {
+        completed: false,
+        highScore: 0,
+        attempts: 0,
+        bestTime: null,
+        lastPlayed: null,
+        lastScore: 0
+      };
+      
+      const newHighScore = Math.max(currentBattle.highScore || 0, finalScore || 0);
+      const newAttempts = (currentBattle.attempts || 0) + 1;
+      
+      progress.battle = {
+        ...currentBattle,
+        completed: completed || currentBattle.completed,
+        highScore: newHighScore,
+        lastScore: finalScore,
+        attempts: newAttempts,
+        bestTime: currentBattle.bestTime,
+        lastPlayed: new Date().toISOString(),
+        lastGameStats: {
+          enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0),
+          totalEnemies: enemies.length,
+          finalScore: finalScore,
+          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
+        }
+      };
+      
+      localStorage.setItem('gameProgress', JSON.stringify(progress));
+      console.log('Battle progress saved to localStorage:', progress.battle);
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers]);
+
+  const usePowerUp = (type) => {
+    if (powerUps[type] > 0) {
+      setPowerUps(prev => ({ ...prev, [type]: prev[type] - 1 }));
+      
+      switch(type) {
+        case 'heal':
+          setPlayerHealth(prev => Math.min(prev + 50, 200));
+          setFeedback("💚 You used a healing potion! +50 HP");
+          break;
+        case 'doubleDamage':
+          setDefenseMode(false);
+          setFeedback("⚡ Double damage activated! Your next attack will deal 2x damage!");
+          break;
+        case 'shield':
+          setDefenseMode(true);
+          setFeedback("🛡️ Shield activated! Next enemy attack will be reduced by 50%!");
+          break;
+        default:
+          break;
+      }
     } else {
-      console.log('No opener window found');
+      setFeedback(`No ${type} power-ups left!`);
     }
-    
-    const previousResults = localStorage.getItem('battleGameResults');
-    const results = previousResults ? JSON.parse(previousResults) : [];
-    results.push(gameResult);
-    localStorage.setItem('battleGameResults', JSON.stringify(results));
-  };
-
-  const handleBackToGames = () => {
-    if (gameState === 'playing' && !gameResultSent && gameStartTime) {
-      const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-      sendGameResult(false, score, currentTimeSpent, {
-        correctAnswers,
-        totalAnswers,
-        maxCombo,
-        enemiesDefeated
-      });
-    }
-    navigate('/studenthub/games');
-  };
-
-  useEffect(() => {
-    let timer;
-    if (gameState === 'playing' && gameStartTime && !gameResultSent) {
-      timer = setInterval(() => {
-        setTimeSpent(Math.floor((Date.now() - gameStartTime) / 1000));
-      }, 1000);
-    }
-    return () => clearInterval(timer);
-  }, [gameState, gameStartTime, gameResultSent]);
-
-  const generateEquation = (type = 'random') => {
-    const types = ['addition', 'subtraction', 'multiplication', 'division', 'algebra'];
-    const selectedType = type === 'random' ? types[Math.floor(Math.random() * types.length)] : type;
-    
-    let equation, answer;
-    
-    switch(selectedType) {
-      case 'addition':
-        const a = Math.floor(Math.random() * 20) + 1;
-        const b = Math.floor(Math.random() * 20) + 1;
-        equation = `${a} + ${b} = ?`;
-        answer = a + b;
-        break;
-      case 'subtraction':
-        const x = Math.floor(Math.random() * 30) + 10;
-        const y = Math.floor(Math.random() * x);
-        equation = `${x} - ${y} = ?`;
-        answer = x - y;
-        break;
-      case 'multiplication':
-        const m = Math.floor(Math.random() * 12) + 1;
-        const n = Math.floor(Math.random() * 12) + 1;
-        equation = `${m} × ${n} = ?`;
-        answer = m * n;
-        break;
-      case 'division':
-        const divisor = Math.floor(Math.random() * 10) + 1;
-        const quotient = Math.floor(Math.random() * 10) + 1;
-        const dividend = divisor * quotient;
-        equation = `${dividend} ÷ ${divisor} = ?`;
-        answer = quotient;
-        break;
-      case 'algebra':
-        const coeff = Math.floor(Math.random() * 5) + 2;
-        const const_ = Math.floor(Math.random() * 10) + 1;
-        const sol = Math.floor(Math.random() * 10) + 1;
-        equation = `${coeff}x + ${const_} = ${coeff * sol + const_}`;
-        answer = sol;
-        break;
-      default:
-        equation = '2 + 2 = ?';
-        answer = 4;
-    }
-    
-    return { text: equation, answer, type: selectedType };
-  };
-
-  const startGame = () => {
-    setGameState('playing');
-    setPlayerHP(100);
-    setEnemyHP(enemies[selectedEnemy].hp);
-    setPlayerMana(50);
-    setScore(0);
-    setCombo(0);
-    setCorrectAnswers(0);
-    setTotalAnswers(0);
-    setMaxCombo(0);
-    setEnemiesDefeated(0);
-    setCurrentEnemyIndex(selectedEnemy);
-    setIsWaitingForNext(false);
-    setBattleLog(['Battle started! Solve equations to attack!']);
-    setCurrentEquation(generateEquation());
-    setTurn('player');
-    setGameStartTime(Date.now());
-    setGameResultSent(false);
-    setTimeSpent(0);
-    setUserAnswer('');
-    setFeedback('');
   };
 
   const handleAttack = () => {
-    if (!currentEquation || turn !== 'player' || isWaitingForNext) return;
+    if (!gameActive) return;
     
-    const numAnswer = parseFloat(userAnswer);
-    setTotalAnswers(prev => prev + 1);
-    setIsWaitingForNext(true);
+    const userAnswer = parseFloat(currentEquation.userAnswer);
     
-    if (isNaN(numAnswer)) {
-      setFeedback('❌ Enter a number!');
-      setIsWaitingForNext(false);
+    if (isNaN(userAnswer)) {
+      setFeedback("⚠️ Please enter a valid answer!");
       return;
     }
     
-    if (numAnswer === currentEquation.answer) {
+    const isCorrect = Math.abs(userAnswer - currentEquation.answer) < 0.01;
+    setAttacksCount(prev => prev + 1);
+    
+    if (isCorrect) {
       setCorrectAnswers(prev => prev + 1);
-      const damage = 15 + (combo * 5);
-      const manaGain = 5;
-      const newEnemyHP = Math.max(0, enemyHP - damage);
-      const newMana = Math.min(100, playerMana + manaGain);
       
-      setEnemyHP(newEnemyHP);
-      setPlayerMana(newMana);
-      const newCombo = combo + 1;
-      setCombo(newCombo);
-      if (newCombo > maxCombo) setMaxCombo(newCombo);
-      const newScore = score + 10 * newCombo;
+      let damage = currentEnemy.attack;
+      const doubleDamageActive = powerUps.doubleDamage === 0;
+      
+      if (doubleDamageActive) {
+        damage *= 2;
+        setFeedback(`🔥 CRITICAL HIT! ${damage} damage!`);
+        setPowerUps(prev => ({ ...prev, doubleDamage: 1 }));
+      } else {
+        setFeedback(`⚔️ You hit the ${currentEnemy.name} for ${damage} damage!`);
+      }
+      
+      const newEnemyHealth = Math.max(0, enemyHealth - damage);
+      setEnemyHealth(newEnemyHealth);
+      
+      const pointsEarned = currentEnemy.points * (doubleDamageActive ? 2 : 1);
+      const newScore = score + pointsEarned;
       setScore(newScore);
+      if (onScore) onScore(newScore);
       
-      addBattleLog(`🎯 Correct! Dealt ${damage} damage! Combo x${newCombo}!`);
-      
-      if (newEnemyHP <= 0) {
-        const newEnemiesDefeated = enemiesDefeated + 1;
-        setEnemiesDefeated(newEnemiesDefeated);
-        const bonusScore = 500;
-        setScore(prevScore => prevScore + bonusScore);
-        addBattleLog(`🎉 Victory! ${enemies[currentEnemyIndex].name} defeated! +${bonusScore} bonus!`);
+      if (newEnemyHealth <= 0) {
+        setFeedback(`🎉 Victory! You defeated the ${currentEnemy.name}! +${pointsEarned} points!`);
         
-        if (currentEnemyIndex === enemies.length - 1) {
-          const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-          const finalScore = newScore + bonusScore;
-          sendGameResult(true, finalScore, finalTimeSpent, {
-            correctAnswers: correctAnswers + 1,
-            totalAnswers: totalAnswers + 1,
-            maxCombo: newCombo,
-            enemiesDefeated: newEnemiesDefeated
-          });
-          setGameState('victory');
+        if (isLastEnemy) {
+          setGameActive(false);
+          setShowCongratulations(true);
+          
+          const finalScore = newScore;
+          saveProgressToLocalStorage(true, finalScore);
+          sendResultToParent(true, finalScore);
+          
+          if (onComplete) onComplete(true);
+          if (clearSavedState) clearSavedState();
         } else {
-          const nextEnemyIndex = currentEnemyIndex + 1;
-          setCurrentEnemyIndex(nextEnemyIndex);
-          setEnemyHP(enemies[nextEnemyIndex].hp);
-          addBattleLog(`⚔️ New challenger appears: ${enemies[nextEnemyIndex].name}!`);
-          setTurn('enemy');
           setTimeout(() => {
-            setIsWaitingForNext(false);
-          }, 1000);
+            const nextIndex = currentEnemyIndex + 1;
+            setCurrentEnemyIndex(nextIndex);
+            setEnemyHealth(enemies[nextIndex].health);
+            
+            const { equation, answer } = generateEquation(enemies[nextIndex].difficulty);
+            setCurrentEquation({ equation, answer, userAnswer: '' });
+            setFeedback(`New enemy appears: ${enemies[nextIndex].name}!`);
+          }, 1500);
         }
       } else {
-        setTurn('enemy');
-        setFeedback('✅ Correct! Enemy takes damage!');
         setTimeout(() => {
-          setIsWaitingForNext(false);
-        }, 1000);
+          let enemyDamage = Math.max(5, currentEnemy.attack - currentEnemy.defense);
+          
+          if (defenseMode) {
+            enemyDamage = Math.floor(enemyDamage / 2);
+            setFeedback(`🛡️ Shield reduced damage to ${enemyDamage}!`);
+            setDefenseMode(false);
+          }
+          
+          const newPlayerHealth = Math.max(0, playerHealth - enemyDamage);
+          setPlayerHealth(newPlayerHealth);
+          
+          setFeedback(prev => prev + `\n💔 ${currentEnemy.name} counter-attacks for ${enemyDamage} damage!`);
+          
+          if (newPlayerHealth <= 0) {
+            setGameActive(false);
+            setFeedback("💀 Game Over! You have been defeated!");
+            saveProgressToLocalStorage(false, score);
+            sendResultToParent(false, score);
+            if (onComplete) onComplete(false);
+          }
+        }, 500);
+        
+        const { equation, answer } = generateEquation(currentEnemy.difficulty);
+        setCurrentEquation({ equation, answer, userAnswer: '' });
       }
     } else {
-      const missDamage = 5;
-      const newPlayerHP = Math.max(0, playerHP - missDamage);
-      setPlayerHP(newPlayerHP);
-      setCombo(0);
+      setFeedback(`❌ Incorrect! The correct answer was ${currentEquation.answer}. The enemy counter-attacks!`);
       
-      addBattleLog(`❌ Wrong answer! Took ${missDamage} damage!`);
-      
-      if (newPlayerHP <= 0) {
-        const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-        sendGameResult(false, score, finalTimeSpent, {
-          correctAnswers,
-          totalAnswers: totalAnswers + 1,
-          maxCombo,
-          enemiesDefeated
-        });
-        setGameState('gameOver');
-        addBattleLog('💀 Game Over...');
-      } else {
-        setFeedback(`❌ Wrong! The answer was ${currentEquation.answer}`);
-        setTimeout(() => {
-          setIsWaitingForNext(false);
-        }, 1500);
+      let enemyDamage = Math.max(8, currentEnemy.attack);
+      if (defenseMode) {
+        enemyDamage = Math.floor(enemyDamage / 2);
+        setDefenseMode(false);
       }
+      
+      const newPlayerHealth = Math.max(0, playerHealth - enemyDamage);
+      setPlayerHealth(newPlayerHealth);
+      
+      if (newPlayerHealth <= 0) {
+        setGameActive(false);
+        setFeedback("💀 Game Over! You have been defeated!");
+        saveProgressToLocalStorage(false, score);
+        sendResultToParent(false, score);
+        if (onComplete) onComplete(false);
+      }
+      
+      setCurrentEquation(prev => ({ ...prev, userAnswer: '' }));
     }
-    
-    setUserAnswer('');
-    
-    setTimeout(() => {
-      if (gameState === 'playing' && turn !== 'player') {
-        setCurrentEquation(generateEquation());
-      }
-    }, 1000);
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && turn === 'player' && !isWaitingForNext) {
-      handleAttack();
-    }
+    if (e.key === 'Enter') handleAttack();
   };
 
-  useEffect(() => {
-    if (turn === 'enemy' && gameState === 'playing' && enemyHP > 0 && playerHP > 0 && !isWaitingForNext) {
-      const timer = setTimeout(() => {
-        const enemyAttack = Math.floor(Math.random() * 15) + 5;
-        const newPlayerHP = Math.max(0, playerHP - enemyAttack);
-        setPlayerHP(newPlayerHP);
-        
-        addBattleLog(`👾 ${enemies[currentEnemyIndex].name} attacks for ${enemyAttack} damage!`);
-        
-        if (newPlayerHP <= 0) {
-          const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
-          sendGameResult(false, score, finalTimeSpent, {
-            correctAnswers,
-            totalAnswers,
-            maxCombo,
-            enemiesDefeated
-          });
-          setGameState('gameOver');
-          addBattleLog('💀 Game Over...');
-        } else {
-          setTurn('player');
-          setCurrentEquation(generateEquation());
-          setFeedback('');
-        }
-      }, 1500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [turn, gameState, enemyHP, playerHP, currentEnemyIndex, isWaitingForNext]);
-
-  const addBattleLog = (message) => {
-    setBattleLog(prev => [message, ...prev].slice(0, 5));
+  const getHealthBarColor = (health, maxHealth) => {
+    const percentage = (health / maxHealth) * 100;
+    if (percentage > 60) return '#4caf50';
+    if (percentage > 30) return '#ff9800';
+    return '#f44336';
   };
 
-  const useSpecialAttack = (attack) => {
-    if (playerMana < attack.manaCost || turn !== 'player' || isWaitingForNext) {
-      setFeedback('❌ Not enough mana or not your turn!');
-      return;
-    }
-    
-    setPlayerMana(playerMana - attack.manaCost);
-    setCurrentEquation(generateEquation(attack.equationType));
-    setFeedback(`⚡ ${attack.name} activated! Solve to unleash!`);
-  };
-
-  const GameMenu = () => (
-    <div style={styles.menuContainer}>
-      <h1 style={styles.title}>📐 Math Battle Arena 🧮</h1>
-      <p style={styles.subtitle}>Defeat enemies using your math skills!</p>
-      
-      <div style={styles.characterSelect}>
-        <h3>Select Enemy:</h3>
-        <div style={styles.enemyGrid}>
-          {enemies.map((enemy, index) => (
-            <button
-              key={index}
-              style={{
-                ...styles.enemyCard,
-                ...(selectedEnemy === index ? styles.selectedEnemy : {})
-              }}
-              onClick={() => setSelectedEnemy(index)}
-            >
-              <span style={styles.enemyAvatar}>{enemy.avatar}</span>
-              <div>
-                <strong>{enemy.name}</strong>
-                <div>HP: {enemy.hp}</div>
-                <div style={styles.difficulty[enemy.difficulty]}>
-                  {enemy.difficulty.toUpperCase()}
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      <button style={styles.startButton} onClick={startGame}>
-        ⚔️ Start Battle ⚔️
-      </button>
-      
-      {showTutorial && (
-        <div style={styles.tutorial}>
-          <h3>📚 How to Play:</h3>
-          <p>🟢 Solve the equation correctly to attack!</p>
-          <p>🔵 Build combos for more damage!</p>
-          <p>🟡 Use special attacks with mana!</p>
-          <p>🟠 Watch out for enemy counterattacks!</p>
-          <button onClick={() => setShowTutorial(false)}>Got it!</button>
-        </div>
-      )}
-    </div>
-  );
-
-  const GameOver = () => {
-    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 0;
-    
+  if (showCongratulations) {
     return (
-      <div style={styles.endScreen}>
-        <h1 style={styles.failedTitle}>💀 GAME OVER 💀</h1>
-        <p style={styles.text}>Final Score: {score}</p>
-        <p style={styles.text}>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
-        <p style={styles.text}>Accuracy: {accuracy}% ({correctAnswers}/{totalAnswers})</p>
-        <p style={styles.text}>Max Combo: x{maxCombo}</p>
-        <p style={styles.text}>Enemies Defeated: {enemiesDefeated}/{enemies.length}</p>
-        <button style={styles.menuButton} onClick={() => setGameState('menu')}>
-          Back to Menu
-        </button>
-      </div>
-    );
-  };
-
-  const VictoryScreen = () => {
-    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
-    const minutes = Math.floor(timeSpent / 60);
-    const seconds = timeSpent % 60;
-    
-    return (
-      <div style={styles.endScreen}>
-        <h1 style={styles.successTitle}>🎉 VICTORY! 🎉</h1>
-        <p style={styles.text}>You defeated all enemies!</p>
-        <p style={styles.text}>Final Score: {score}</p>
-        <p style={styles.text}>Time: {minutes}:{seconds.toString().padStart(2, '0')}</p>
-        <p style={styles.text}>Accuracy: {accuracy}% ({correctAnswers}/{totalAnswers})</p>
-        <p style={styles.text}>Max Combo: x{maxCombo}</p>
-        <p style={styles.text}>Enemies Defeated: {enemiesDefeated}/{enemies.length}</p>
-        <button style={styles.menuButton} onClick={() => setGameState('menu')}>
-          Play Again
-        </button>
-      </div>
-    );
-  };
-
-  const GamePlay = () => {
-    const accuracy = totalAnswers > 0 ? Math.round((correctAnswers / totalAnswers) * 100) : 100;
-    const progress = ((currentEnemyIndex) / enemies.length) * 100 + ((enemies[currentEnemyIndex].maxHp - enemyHP) / enemies[currentEnemyIndex].maxHp) * (100 / enemies.length);
-    
-    return (
-      <div style={styles.gameContainer}>
-        <div style={styles.progressBarContainer}>
-          <div style={styles.progressText}>
-            Progress: {Math.floor(progress)}% - Enemy {currentEnemyIndex + 1}/{enemies.length}
+      <div style={styles.completionContainer}>
+        <div style={styles.completionCard}>
+          <div style={styles.trophyIcon}>🏆</div>
+          <h2 style={styles.completionTitle}>Victory!</h2>
+          <p style={styles.completionText}>You have conquered all enemies in the Math Battle Arena!</p>
+          <div style={styles.finalScore}>
+            <div>Final Score: {score}</div>
+            <div>Enemies Defeated: {enemies.length}/{enemies.length}</div>
+            <div>Attacks Made: {attacksCount}</div>
+            <div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
           </div>
-          <div style={styles.progressBar}>
-            <div 
-              style={{
-                ...styles.progressFill,
-                width: `${Math.min(100, progress)}%`
-              }}
-            />
-          </div>
-        </div>
-
-        <div style={styles.battlefield}>
-          <div style={styles.characterCard}>
-            <div style={styles.characterHeader}>
-              <span style={styles.avatar}>{player.avatar}</span>
-              <div>
-                <h3>{player.name}</h3>
-                <div style={styles.stats}>
-                  <div>❤️ HP: {playerHP}</div>
-                  <div>💙 MP: {playerMana}</div>
-                  <div>✨ Combo: x{combo}</div>
-                </div>
-              </div>
-            </div>
-            <div style={styles.hpBar}>
-              <div style={{...styles.hpFill, width: `${Math.max(0, playerHP)}%`}} />
-            </div>
-          </div>
-
-          <div style={styles.vs}>VS</div>
-
-          <div style={styles.characterCard}>
-            <div style={styles.characterHeader}>
-              <span style={styles.avatar}>{enemies[currentEnemyIndex].avatar}</span>
-              <div>
-                <h3>{enemies[currentEnemyIndex].name}</h3>
-                <div>❤️ HP: {Math.max(0, enemyHP)}</div>
-                <div style={styles.difficulty[enemies[currentEnemyIndex].difficulty]}>
-                  {enemies[currentEnemyIndex].difficulty.toUpperCase()}
-                </div>
-              </div>
-            </div>
-            <div style={styles.hpBar}>
-              <div style={{...styles.hpFill, width: `${(Math.max(0, enemyHP)/enemies[currentEnemyIndex].maxHp)*100}%`, background: '#f44336'}} />
-            </div>
-          </div>
-        </div>
-
-        <div style={styles.statsSummary}>
-          <div>⏱️ Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</div>
-          <div>📊 Accuracy: {accuracy}%</div>
-          <div>🎯 Correct: {correctAnswers}</div>
-          <div>❌ Wrong: {totalAnswers - correctAnswers}</div>
-          <div>⚡ Max Combo: x{maxCombo}</div>
-          <div>🏆 Score: {score}</div>
-        </div>
-
-        <div style={styles.battleLog}>
-          {battleLog.map((log, i) => (
-            <div key={i} style={styles.logEntry}>{log}</div>
-          ))}
-        </div>
-
-        <div style={styles.equationArena}>
-          <div style={styles.equationBox}>
-            <h2>Solve to Attack!</h2>
-            <div style={styles.equation}>{currentEquation?.text}</div>
-            <div style={styles.inputArea}>
-              <input
-                type="number"
-                value={userAnswer}
-                onChange={(e) => setUserAnswer(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Enter answer"
-                style={styles.input}
-                disabled={turn !== 'player' || isWaitingForNext}
-                autoFocus
-              />
-              <button 
-                onClick={handleAttack}
-                style={styles.attackButton}
-                disabled={turn !== 'player' || isWaitingForNext}
-              >
-                ⚔️ Attack
-              </button>
-            </div>
-            {feedback && <div style={styles.feedback}>{feedback}</div>}
-          </div>
-
-          <div style={styles.specialAttacks}>
-            <h3>Special Attacks:</h3>
-            <div style={styles.attackGrid}>
-              {player.attacks.map((attack, index) => (
-                <button
-                  key={index}
-                  style={styles.specialButton}
-                  onClick={() => useSpecialAttack(attack)}
-                  disabled={turn !== 'player' || playerMana < attack.manaCost || isWaitingForNext}
-                >
-                  <div>{attack.name}</div>
-                  <small>{attack.manaCost} MP</small>
-                </button>
-              ))}
-            </div>
-          </div>
+          <button onClick={() => onComplete && onComplete(true)} style={styles.continueButton}>
+            Return to Menu
+          </button>
         </div>
       </div>
     );
-  };
+  }
+
+  if (!gameActive) {
+    return (
+      <div style={styles.completionContainer}>
+        <div style={styles.completionCard}>
+          <div style={styles.sadIcon}>💀</div>
+          <h2 style={styles.completionTitle}>Game Over</h2>
+          <p style={styles.completionText}>You were defeated in battle. Try again!</p>
+          <div style={styles.finalScore}>
+            <div>Final Score: {score}</div>
+            <div>Enemies Defeated: {currentEnemyIndex}/{enemies.length}</div>
+            <div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+          </div>
+          <button onClick={() => {
+            clearSavedState?.();
+            onComplete && onComplete(false);
+          }} style={styles.continueButton}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const playerHealthPercent = (playerHealth / 200) * 100;
+  const enemyHealthPercent = (enemyHealth / currentEnemy.maxHealth) * 100;
 
   return (
     <div style={styles.container}>
-      <button onClick={handleBackToGames} style={styles.backButton}>
-        <FaArrowLeft style={styles.backIcon} />
-        Back to Games
-      </button>
+      <div style={styles.header}>
+        <div style={styles.scoreDisplay}>⭐ Score: {score}</div>
+        <div style={styles.enemyCount}>
+          Enemy: {currentEnemyIndex + 1} / {enemies.length}
+          {isBoss && <span style={styles.bossBadge}>BOSS</span>}
+        </div>
+      </div>
+
+      <div style={styles.battleArena}>
+        <div style={styles.enemySection}>
+          <div style={{...styles.enemyCard, backgroundColor: currentEnemy.color}}>
+            <div style={styles.enemyName}>{currentEnemy.name}</div>
+            <div style={styles.enemyDifficulty}>{currentEnemy.difficulty}</div>
+            <div style={styles.healthBarContainer}>
+              <div style={styles.healthBarLabel}>Health: {enemyHealth}/{currentEnemy.maxHealth}</div>
+              <div style={styles.healthBar}>
+                <div style={{
+                  ...styles.healthFill,
+                  width: `${enemyHealthPercent}%`,
+                  backgroundColor: getHealthBarColor(enemyHealth, currentEnemy.maxHealth)
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.vsDivider}>⚔️ VS ⚔️</div>
+
+        <div style={styles.playerSection}>
+          <div style={styles.playerCard}>
+            <div style={styles.playerName}>You</div>
+            <div style={styles.healthBarContainer}>
+              <div style={styles.healthBarLabel}>Health: {playerHealth}/200</div>
+              <div style={styles.healthBar}>
+                <div style={{
+                  ...styles.healthFill,
+                  width: `${playerHealthPercent}%`,
+                  backgroundColor: getHealthBarColor(playerHealth, 200)
+                }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.mathChallenge}>
+        <div style={styles.equationBox}>
+          <div style={styles.equationText}>{currentEquation.equation}</div>
+          <div style={styles.inputArea}>
+            <input
+              type="number"
+              step="0.1"
+              value={currentEquation.userAnswer}
+              onChange={(e) => setCurrentEquation(prev => ({ ...prev, userAnswer: e.target.value }))}
+              onKeyPress={handleKeyPress}
+              placeholder="Enter your answer..."
+              style={styles.answerInput}
+              autoFocus
+            />
+            <button onClick={handleAttack} style={styles.attackButton}>
+              ⚔️ ATTACK!
+            </button>
+          </div>
+          {feedback && <div style={styles.feedback}>{feedback}</div>}
+        </div>
+      </div>
+
+      <div style={styles.powerUpsSection}>
+        <h3 style={styles.powerUpsTitle}>💪 POWER-UPS</h3>
+        <div style={styles.powerUpsContainer}>
+          <button 
+            onClick={() => usePowerUp('heal')} 
+            style={{...styles.powerUpButton, backgroundColor: '#4caf50'}}
+            disabled={powerUps.heal === 0}
+          >
+            💚 Heal (+50 HP) {powerUps.heal > 0 ? `(${powerUps.heal})` : '(Used)'}
+          </button>
+          <button 
+            onClick={() => usePowerUp('doubleDamage')} 
+            style={{...styles.powerUpButton, backgroundColor: '#ff9800'}}
+            disabled={powerUps.doubleDamage === 0}
+          >
+            ⚡ Double Damage {powerUps.doubleDamage > 0 ? `(${powerUps.doubleDamage})` : '(Used)'}
+          </button>
+          <button 
+            onClick={() => usePowerUp('shield')} 
+            style={{...styles.powerUpButton, backgroundColor: '#2196f3'}}
+            disabled={powerUps.shield === 0}
+          >
+            🛡️ Shield (50% reduction) {powerUps.shield > 0 ? `(${powerUps.shield})` : '(Used)'}
+          </button>
+        </div>
+      </div>
       
-      {gameState === 'menu' && <GameMenu />}
-      {gameState === 'playing' && <GamePlay />}
-      {gameState === 'gameOver' && <GameOver />}
-      {gameState === 'victory' && <VictoryScreen />}
+      <div style={styles.statsDisplay}>
+        <div>⚔️ Attacks: {attacksCount}</div>
+        <div>✅ Correct: {correctAnswers}</div>
+        <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+      </div>
     </div>
   );
 };
 
 const styles = {
   container: {
-    width: '100%',
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
+    maxWidth: '1200px',
+    width: '95%',
+    margin: '20px auto',
     padding: '20px',
-    fontFamily: 'Arial, sans-serif',
-    boxSizing: 'border-box',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '20px',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    color: '#fff',
   },
-  backButton: {
-    position: 'fixed',
-    top: '20px',
-    left: '20px',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    color: 'white',
-    border: 'none',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    cursor: 'pointer',
+  header: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '8px',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    zIndex: 1000,
-    transition: 'background-color 0.3s',
+    padding: '15px 20px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '12px',
+    marginBottom: '20px',
     backdropFilter: 'blur(10px)',
   },
-  backIcon: {
+  scoreDisplay: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#ffd700',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  },
+  enemyCount: {
     fontSize: '16px',
-  },
-  menuContainer: {
-    textAlign: 'center',
-    padding: 'clamp(30px, 8vw, 60px) clamp(20px, 5vw, 40px)',
-    maxWidth: '800px',
-    margin: '40px auto 0 auto',
-  },
-  title: {
-    fontSize: 'clamp(28px, 8vw, 48px)',
-    marginBottom: '20px',
-    textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
-  },
-  subtitle: {
-    fontSize: 'clamp(14px, 4vw, 18px)',
-    marginBottom: '40px'
-  },
-  characterSelect: {
-    marginBottom: '30px'
-  },
-  enemyGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-    gap: '15px',
-    marginTop: '20px'
-  },
-  enemyCard: {
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
-    gap: '15px',
-    padding: '15px',
-    background: 'rgba(255,255,255,0.1)',
-    border: '2px solid transparent',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    transition: 'all 0.3s'
+    gap: '10px',
   },
-  selectedEnemy: {
-    border: '2px solid gold',
-    background: 'rgba(255,215,0,0.2)'
+  bossBadge: {
+    backgroundColor: '#f44336',
+    padding: '3px 8px',
+    borderRadius: '12px',
+    fontSize: '12px',
+    fontWeight: 'bold',
   },
-  enemyAvatar: {
-    fontSize: '2.5em'
-  },
-  difficulty: {
-    easy: { color: '#4caf50' },
-    medium: { color: '#ff9800' },
-    hard: { color: '#f44336' }
-  },
-  startButton: {
-    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
-    fontSize: 'clamp(18px, 4vw, 24px)',
-    background: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '50px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-    transition: 'transform 0.2s',
-  },
-  tutorial: {
-    marginTop: '40px',
-    padding: '20px',
-    background: 'rgba(255,255,255,0.2)',
-    borderRadius: '10px',
-    textAlign: 'left'
-  },
-  gameContainer: {
-    padding: 'clamp(15px, 4vw, 20px)',
-    maxWidth: '1000px',
-    margin: '40px auto 0 auto',
-  },
-  progressBarContainer: {
-    marginBottom: '20px',
-  },
-  progressText: {
-    fontSize: 'clamp(12px, 3vw, 14px)',
-    marginBottom: '5px',
-    textAlign: 'center',
-  },
-  progressBar: {
-    height: '10px',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: '5px',
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-    transition: 'width 0.3s ease',
-  },
-  battlefield: {
+  battleArena: {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
     gap: '20px',
+    marginBottom: '30px',
     alignItems: 'center',
-    marginBottom: '20px'
   },
-  characterCard: {
-    background: 'rgba(255,255,255,0.1)',
-    padding: 'clamp(15px, 4vw, 20px)',
-    borderRadius: '10px',
-    backdropFilter: 'blur(10px)'
+  enemySection: {
+    textAlign: 'center',
   },
-  characterHeader: {
+  enemyCard: {
+    padding: '20px',
+    borderRadius: '16px',
+    boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+    transition: 'transform 0.3s ease',
+  },
+  enemyName: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    marginBottom: '8px',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  },
+  enemyDifficulty: {
+    fontSize: '14px',
+    marginBottom: '15px',
+    opacity: 0.9,
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+  },
+  playerSection: {
+    textAlign: 'center',
+  },
+  playerCard: {
+    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+    padding: '20px',
+    borderRadius: '16px',
+    boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
+  },
+  playerName: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    marginBottom: '15px',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+  },
+  vsDivider: {
+    fontSize: '48px',
+    fontWeight: 'bold',
+    color: '#ffd700',
+    textShadow: '0 0 10px rgba(255,215,0,0.5)',
+    animation: 'pulse 1.5s ease-in-out infinite',
+  },
+  healthBarContainer: {
+    width: '100%',
+  },
+  healthBarLabel: {
+    fontSize: '14px',
+    marginBottom: '5px',
+    fontWeight: 'bold',
+  },
+  healthBar: {
+    width: '100%',
+    height: '25px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)',
+  },
+  healthFill: {
+    height: '100%',
+    transition: 'width 0.3s ease',
+    borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
-    gap: '15px',
-    marginBottom: '10px'
+    justifyContent: 'center',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    color: '#fff',
   },
-  avatar: {
-    fontSize: 'clamp(2em, 8vw, 3em)'
-  },
-  stats: {
-    fontSize: 'clamp(12px, 3vw, 14px)',
-    marginTop: '5px'
-  },
-  statsSummary: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
-    gap: '10px',
-    background: 'rgba(0,0,0,0.3)',
-    padding: '10px',
-    borderRadius: '8px',
-    marginBottom: '15px',
-    textAlign: 'center',
-    fontSize: 'clamp(12px, 3vw, 14px)'
-  },
-  hpBar: {
-    width: '100%',
-    height: '10px',
-    background: 'rgba(255,255,255,0.2)',
-    borderRadius: '5px',
-    overflow: 'hidden'
-  },
-  hpFill: {
-    height: '100%',
-    background: 'linear-gradient(90deg, #4CAF50, #8BC34A)',
-    transition: 'width 0.3s'
-  },
-  vs: {
-    fontSize: 'clamp(1.5em, 6vw, 2em)',
-    fontWeight: 'bold'
-  },
-  battleLog: {
-    background: 'rgba(0,0,0,0.3)',
-    padding: '10px',
-    borderRadius: '5px',
-    marginBottom: '20px',
-    minHeight: '100px'
-  },
-  logEntry: {
-    padding: '5px',
-    borderBottom: '1px solid rgba(255,255,255,0.1)',
-    fontSize: 'clamp(12px, 3vw, 14px)'
-  },
-  equationArena: {
-    background: 'rgba(255,255,255,0.1)',
-    padding: 'clamp(20px, 5vw, 30px)',
-    borderRadius: '10px',
-    marginBottom: '20px'
+  mathChallenge: {
+    marginBottom: '30px',
   },
   equationBox: {
-    textAlign: 'center'
+    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
+    backdropFilter: 'blur(10px)',
+    padding: '30px',
+    borderRadius: '16px',
+    textAlign: 'center',
+    border: '1px solid rgba(255,255,255,0.2)',
   },
-  equation: {
-    fontSize: 'clamp(2em, 8vw, 3em)',
-    margin: '20px 0',
-    fontFamily: 'monospace'
+  equationText: {
+    fontSize: '48px',
+    fontWeight: 'bold',
+    marginBottom: '25px',
+    fontFamily: 'monospace',
+    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
+    letterSpacing: '2px',
   },
   inputArea: {
     display: 'flex',
-    gap: '10px',
+    gap: '15px',
     justifyContent: 'center',
-    marginBottom: '15px',
     flexWrap: 'wrap',
   },
-  input: {
-    padding: 'clamp(8px, 2.5vw, 10px) clamp(12px, 3vw, 15px)',
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    border: 'none',
-    borderRadius: '5px',
-    width: 'clamp(120px, 30vw, 150px)'
+  answerInput: {
+    flex: 2,
+    maxWidth: '300px',
+    padding: '15px 20px',
+    fontSize: '18px',
+    border: '2px solid #ffd700',
+    borderRadius: '12px',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    color: '#333',
+    outline: 'none',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    transition: 'all 0.3s',
   },
   attackButton: {
-    padding: 'clamp(8px, 2.5vw, 10px) clamp(20px, 5vw, 30px)',
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    background: '#f44336',
+    padding: '15px 40px',
+    fontSize: '18px',
+    backgroundColor: '#ff4757',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer'
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'all 0.3s',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
   },
   feedback: {
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    marginTop: '10px'
+    marginTop: '20px',
+    padding: '12px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '8px',
+    fontSize: '14px',
+    color: '#ffd700',
+    whiteSpace: 'pre-line',
+    fontWeight: 'bold',
   },
-  specialAttacks: {
-    marginTop: '20px'
-  },
-  attackGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-    gap: '10px',
-    marginTop: '10px'
-  },
-  specialButton: {
-    padding: 'clamp(8px, 2.5vw, 10px)',
-    background: '#2196F3',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    transition: 'transform 0.2s',
-    fontSize: 'clamp(12px, 3vw, 14px)',
-  },
-  endScreen: {
-    textAlign: 'center',
-    padding: 'clamp(40px, 10vw, 80px) clamp(20px, 5vw, 40px)',
-    maxWidth: '800px',
-    margin: '40px auto 0 auto',
-  },
-  failedTitle: {
-    fontSize: 'clamp(32px, 8vw, 48px)',
-    color: '#ff6b6b',
-    marginBottom: '20px',
-  },
-  successTitle: {
-    fontSize: 'clamp(32px, 8vw, 48px)',
-    color: '#4CAF50',
-    marginBottom: '20px',
-  },
-  text: {
-    fontSize: 'clamp(16px, 4vw, 20px)',
+  powerUpsSection: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: '20px',
+    borderRadius: '12px',
     marginBottom: '15px',
+    backdropFilter: 'blur(10px)',
   },
-  menuButton: {
-    padding: 'clamp(12px, 3vw, 15px) clamp(30px, 8vw, 40px)',
-    fontSize: 'clamp(14px, 3.5vw, 18px)',
-    background: '#4CAF50',
+  powerUpsTitle: {
+    fontSize: '18px',
+    marginBottom: '15px',
+    color: '#ffd700',
+    textAlign: 'center',
+  },
+  powerUpsContainer: {
+    display: 'flex',
+    gap: '15px',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  powerUpButton: {
+    padding: '10px 20px',
+    fontSize: '14px',
+    fontWeight: 'bold',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    marginTop: '20px'
-  }
+    transition: 'all 0.2s',
+  },
+  statsDisplay: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '12px 20px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '12px',
+    color: '#fff',
+    fontSize: '14px',
+    backdropFilter: 'blur(10px)',
+  },
+  completionContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '500px',
+    padding: '20px',
+  },
+  completionCard: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '20px',
+    padding: '40px',
+    textAlign: 'center',
+    maxWidth: '450px',
+    width: '90%',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+  },
+  trophyIcon: {
+    fontSize: '80px',
+    marginBottom: '20px',
+    animation: 'bounce 0.5s ease',
+  },
+  sadIcon: {
+    fontSize: '80px',
+    marginBottom: '20px',
+  },
+  completionTitle: {
+    fontSize: '36px',
+    marginBottom: '15px',
+    color: '#ffd700',
+  },
+  completionText: {
+    fontSize: '16px',
+    marginBottom: '20px',
+    color: '#fff',
+  },
+  finalScore: {
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: '15px',
+    borderRadius: '10px',
+    marginBottom: '20px',
+    fontSize: '14px',
+    lineHeight: '1.8',
+    color: '#fff',
+  },
+  continueButton: {
+    padding: '12px 30px',
+    fontSize: '16px',
+    backgroundColor: '#ffd700',
+    color: '#333',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    transition: 'all 0.3s',
+  },
 };
+
+// Add CSS animations
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.9;
+    }
+  }
+  
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+  
+  .attack-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+  }
+  
+  .attack-button:active {
+    transform: scale(0.95);
+  }
+  
+  .answer-input:focus {
+    border-color: #ff4757;
+    box-shadow: 0 0 10px rgba(255,71,87,0.5);
+  }
+  
+  button {
+    transition: all 0.2s ease;
+  }
+  
+  button:hover {
+    transform: scale(1.02);
+  }
+  
+  button:active {
+    transform: scale(0.98);
+  }
+`;
+document.head.appendChild(styleSheet);
 
 export default BattleArena;
