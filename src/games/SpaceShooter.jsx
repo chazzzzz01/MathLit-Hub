@@ -27,6 +27,10 @@ const SpaceShooter = () => {
   const [highestLevel, setHighestLevel] = useState(1);
   const [totalShots, setTotalShots] = useState(0);
   const [timeSpent, setTimeSpent] = useState(0);
+  
+  // ✅ XP tracking (matches other games)
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [wrongAnswers, setWrongAnswers] = useState(0);
 
   const gameRef = useRef({
     player: { x: 380, y: 550, width: 40, height: 40 },
@@ -43,6 +47,27 @@ const SpaceShooter = () => {
     currentSpeedMultiplier: 1.0,
   });
 
+  // ✅ Calculate XP earned so far
+  const xpSoFar = (correctAnswers * 10) - (wrongAnswers * 5);
+
+  // ✅ Send XP_UPDATE to parent (consistent with other games)
+  const sendXPUpdate = useCallback((isCorrect, userAnswer, correctAnswer, equation) => {
+    if (window.parent !== window) {
+      const xpUpdate = {
+        type: 'XP_UPDATE',
+        gameId: 'spaceShooter',
+        xpChange: isCorrect ? 10 : -5,
+        isCorrect: isCorrect,
+        correctAnswer: correctAnswer,
+        userAnswer: userAnswer,
+        equation: equation,
+        timestamp: new Date().toISOString()
+      };
+      window.parent.postMessage(xpUpdate, '*');
+      console.log('Sent XP_UPDATE from Space Shooter:', xpUpdate);
+    }
+  }, []);
+
   // ✅ Send real-time score updates to parent
   const sendScoreUpdate = useCallback((currentScore, currentStats) => {
     if (window.parent !== window) {
@@ -56,13 +81,16 @@ const SpaceShooter = () => {
           totalShots: totalShots,
           accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
           wrongShots: totalWrong,
-          timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0
+          timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0,
+          xpEarned: xpSoFar,
+          correctAnswers: correctAnswers,
+          wrongAnswers: wrongAnswers
         }
       };
       window.parent.postMessage(scoreUpdate, '*');
       console.log('Sent score update to parent:', currentScore);
     }
-  }, [level, totalCorrect, totalShots, totalWrong, gameStartTime]);
+  }, [level, totalCorrect, totalShots, totalWrong, gameStartTime, xpSoFar, correctAnswers, wrongAnswers]);
 
   // ✅ Send score update whenever score changes
   useEffect(() => {
@@ -71,10 +99,11 @@ const SpaceShooter = () => {
         level,
         correctShots: totalCorrect,
         totalShots: totalShots,
-        wrongShots: totalWrong
+        wrongShots: totalWrong,
+        xpEarned: xpSoFar
       });
     }
-  }, [score, gameState, showLevelAnnouncement, level, totalCorrect, totalShots, totalWrong, sendScoreUpdate]);
+  }, [score, gameState, showLevelAnnouncement, level, totalCorrect, totalShots, totalWrong, sendScoreUpdate, xpSoFar]);
 
   // Function to send game result to parent window
   const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
@@ -85,6 +114,8 @@ const SpaceShooter = () => {
       ? Math.round((stats.correctShots / stats.totalShots) * 100) 
       : 0;
     
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+    
     const gameResult = {
       type: 'GAME_RESULT',
       gameId: 'spaceShooter',
@@ -93,18 +124,25 @@ const SpaceShooter = () => {
       timeSpent: timeSpentSeconds,
       timestamp: new Date().toISOString(),
       stats: {
-        correctAnswers: stats.correctShots,
-        totalAnswers: stats.totalShots,
+        finalScore: finalScore,
+        correctAnswers: correctAnswers,
+        wrongAnswers: wrongAnswers,
+        totalAnswers: totalShots,
         accuracy: accuracy,
         highestLevel: stats.highestLevel,
-        wrongShots: stats.wrongShots,
-        totalShots: stats.totalShots
+        totalShots: totalShots,
+        xpEarned: xpEarned,
+        correctShots: stats.correctShots,
+        wrongShots: stats.wrongShots
       }
     };
     
     console.log('=== SENDING SPACE SHOOTER GAME RESULT ===');
     console.log('Final Score:', finalScore);
     console.log('Completed:', completed);
+    console.log('Correct Answers:', correctAnswers);
+    console.log('Wrong Answers:', wrongAnswers);
+    console.log('XP Earned:', xpEarned);
     console.log('Game Result:', gameResult);
     
     // Send to parent window (for iframe)
@@ -145,7 +183,10 @@ const SpaceShooter = () => {
             totalShots: totalShots,
             accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
             wrongShots: totalWrong,
-            timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0
+            timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0,
+            xpEarned: xpSoFar,
+            correctAnswers: correctAnswers,
+            wrongAnswers: wrongAnswers
           }
         };
         if (window.parent !== window) {
@@ -157,7 +198,7 @@ const SpaceShooter = () => {
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [score, level, totalCorrect, totalShots, totalWrong, gameStartTime]);
+  }, [score, level, totalCorrect, totalShots, totalWrong, gameStartTime, xpSoFar, correctAnswers, wrongAnswers]);
 
   const handleBackToGames = () => {
     // Send result if game is in progress but not completed
@@ -325,6 +366,8 @@ const SpaceShooter = () => {
     setTotalWrong(0);
     setTotalShots(0);
     setScore(0);
+    setCorrectAnswers(0);
+    setWrongAnswers(0);
 
     const eq = generateLinearEquation();
     setTargetEquation(eq);
@@ -363,6 +406,8 @@ const SpaceShooter = () => {
     setTotalWrong(0);
     setTotalShots(0);
     setHighestLevel(1);
+    setCorrectAnswers(0);
+    setWrongAnswers(0);
     setGameState('playing');
     setShowLevelAnnouncement(false);
     setGameStartTime(Date.now());
@@ -490,13 +535,20 @@ const SpaceShooter = () => {
           b.y < e.y + e.height &&
           b.y + b.height > e.y
         ) {
-          if (e.answer === targetEquation.answer) {
+          const isCorrectHit = e.answer === targetEquation.answer;
+          
+          // ✅ Send XP_UPDATE for consistent tracking
+          sendXPUpdate(isCorrectHit, e.answer, targetEquation.answer, targetEquation.equation);
+          
+          if (isCorrectHit) {
+            // ✅ Update XP tracking variables
+            setCorrectAnswers(prev => prev + 1);
             setScore(s => s + 100);
             setTotalCorrect(prev => prev + 1);
             setCorrectShots(prev => {
               const newCorrectShots = prev + 1;
               setFeedback({ 
-                message: `+100 Correct! x = ${e.answer} | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x | Level: ${level}`, 
+                message: `+100 Correct! x = ${e.answer} | +10 XP! | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x | Level: ${level}`, 
                 type: 'success' 
               });
               return newCorrectShots;
@@ -521,12 +573,14 @@ const SpaceShooter = () => {
               enemy.equation = newEquation.equation;
             });
           } else {
+            // ✅ Update XP tracking variables
+            setWrongAnswers(prev => prev + 1);
             setTotalWrong(prev => prev + 1);
             setWrongShots(prev => {
               const newWrongShots = prev + 1;
               setScore(s => Math.max(0, s - 10));
               setFeedback({ 
-                message: `-10 Wrong! Answer was ${targetEquation.answer} (${newWrongShots}/3 mistakes) | Speed reset!`, 
+                message: `-10 Wrong! Answer was ${targetEquation.answer} (-5 XP!) (${newWrongShots}/3 mistakes) | Speed reset!`, 
                 type: 'error' 
               });
               
@@ -586,7 +640,7 @@ const SpaceShooter = () => {
       p.life--;
       return p.life > 0;
     });
-  }, [targetEquation, generateLinearEquation, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong]);
+  }, [targetEquation, generateLinearEquation, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate]);
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
@@ -727,28 +781,39 @@ const SpaceShooter = () => {
     ctx.font = 'bold 28px Arial';
     ctx.fillText(`LEVEL ${level}`, 20, 120);
     
+    // ✅ Display XP earned (consistent with other games)
+    ctx.fillStyle = '#aaffaa';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
+    
     const speedColor = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
     ctx.fillStyle = speedColor;
     ctx.font = 'bold 18px Arial';
-    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 155);
+    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 180);
     
     const requiredCorrect = 5 + Math.floor(level / 2);
     const progress = (correctShots / requiredCorrect) * 100;
     ctx.fillStyle = '#666666';
-    ctx.fillRect(20, 175, 150, 12);
+    ctx.fillRect(20, 200, 150, 12);
     ctx.fillStyle = '#4caf50';
-    ctx.fillRect(20, 175, (progress / 100) * 150, 12);
+    ctx.fillRect(20, 200, (progress / 100) * 150, 12);
     ctx.fillStyle = '#cccccc';
     ctx.font = '12px Arial';
-    ctx.fillText(`${correctShots}/${requiredCorrect} correct to level up`, 20, 170);
+    ctx.fillText(`${correctShots}/${requiredCorrect} correct to level up`, 20, 195);
     
     // Display accuracy stats
     if (totalShots > 0) {
       const accuracy = Math.round((totalCorrect / totalShots) * 100);
       ctx.fillStyle = '#88ff88';
       ctx.font = '12px Arial';
-      ctx.fillText(`Accuracy: ${accuracy}% (${totalCorrect}/${totalShots})`, 20, 205);
+      ctx.fillText(`Accuracy: ${accuracy}% (${totalCorrect}/${totalShots})`, 20, 230);
     }
+    
+    // ✅ Display XP breakdown (consistent with other games)
+    ctx.fillStyle = '#ffaa88';
+    ctx.font = '10px Arial';
+    ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
+    ctx.fillText(`✅ Correct: ${correctAnswers} | ❌ Wrong: ${wrongAnswers}`, 20, 265);
     
     if (targetEquation && !showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ffd700';
@@ -785,7 +850,7 @@ const SpaceShooter = () => {
     }
     
     game.frame++;
-  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent]);
+  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -829,6 +894,9 @@ const SpaceShooter = () => {
     };
   }, []);
 
+  const totalXPEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+  const completionBonus = gameState === 'gameOver' ? 0 : (level >= 5 ? 100 : 0);
+
   return (
     <div style={styles.container}>
       {/* Back button - always visible */}
@@ -858,13 +926,14 @@ const SpaceShooter = () => {
                 <p>🎯 Example: <strong style={{color: '#88ff88'}}>3x + 5 = 14</strong> → Solve for x (x = 3)</p>
                 <p>💡 Shoot enemies with the <strong style={{color: '#ffff00'}}>correct x value</strong> to earn points!</p>
                 <p>⚠️ Shooting wrong answers loses 10 points AND counts as a mistake!</p>
+                <p>⭐ <strong style={{color: '#aaffaa'}}>XP SYSTEM:</strong> +10 XP per correct answer, -5 XP per wrong answer!</p>
                 <p>💀 Make 3 mistakes and the game is over!</p>
                 <p>⭐ <strong style={{color: '#ffaa44'}}>LEVEL SYSTEM:</strong> Each level is faster than the last!</p>
                 <p>⚡ <strong style={{color: '#ffaa44'}}>SPEED MECHANIC:</strong> Each correct answer increases enemy speed by 10%!</p>
                 <p>🔥 Make a mistake and speed resets to normal!</p>
                 <p>🔄 New enemies spawn faster as speed increases!</p>
                 <p>🏆 <strong style={{color: '#ffd700'}}>LEVEL UP:</strong> Get 5+ correct answers to advance to the next level!</p>
-                <p>📊 <strong style={{color: '#88ff88'}}>PROGRESS TRACKING:</strong> Your accuracy and stats are saved!</p>
+                <p>📊 <strong style={{color: '#88ff88'}}>PROGRESS TRACKING:</strong> Your XP and stats are saved!</p>
               </div>
               <button onClick={startGame} style={styles.startButton}>
                 Start Game
@@ -879,6 +948,9 @@ const SpaceShooter = () => {
               <h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2>
               <p style={styles.finalScore}>Final Score: {score}</p>
               <p style={styles.finalScore}>You reached Level {highestLevel}</p>
+              <p style={styles.finalScore}>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</p>
+              <p style={styles.finalScore}>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</p>
+              <p style={styles.finalScore}>⭐ Total XP Earned: {totalXPEarned}</p>
               <p style={styles.finalScore}>Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}% ({totalCorrect}/{totalShots})</p>
               <p style={styles.finalScore}>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
               <p style={styles.finalScore}>You made 3 mistakes!</p>

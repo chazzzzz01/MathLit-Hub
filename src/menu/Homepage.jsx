@@ -1,101 +1,102 @@
-import React from 'react';
+// src/menu/Homepage.jsx
+import React, { useState, useEffect } from 'react';
 import { useOutletContext } from 'react-router-dom';
-import { AiFillHome } from 'react-icons/ai';
+import { getGameTotalScores } from './Games';
 
 function Homepage() {
-  // Get user data from context
-  const { user, userData, updateUserData, getUserIdentifier } = useOutletContext();
+  const { user, userData } = useOutletContext() || {};
+  const [totalScores, setTotalScores] = useState({
+    totalHighScore: 0,
+    totalLastScores: 0,
+    equationScore: 0,
+    battleScore: 0,
+    spaceShooterScore: 0
+  });
 
-  // This is a personalized message that only the current user can see
-  const getPersonalizedMessage = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
+  useEffect(() => {
+    // Get total scores from userData or localStorage
+    const gameProgress = userData?.gameProgress || JSON.parse(localStorage.getItem('gameProgress')) || null;
+    if (gameProgress) {
+      const scores = getGameTotalScores(gameProgress);
+      setTotalScores(scores);
+    }
+  }, [userData]);
+
+  const userName = user?.name || user?.email?.split('@')[0] || 'Student';
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
 
   return (
     <div style={styles.container}>
-      <div style={styles.content}>
-        <AiFillHome size={80} color="#2563eb" style={styles.icon} />
-        
-        {/* Personalized welcome message */}
-        <h1 style={styles.title}>
-          {getPersonalizedMessage()}, {user?.name?.split(' ')[0] || getUserIdentifier()}! 👋
-        </h1>
-        
-        <p style={styles.subtitle}>
-          Welcome to your personal learning space, {user?.email}
+      <div style={styles.welcomeCard}>
+        <div style={styles.welcomeHeader}>
+          <div style={styles.welcomeIcon}>🎮</div>
+          <div>
+            <h1 style={styles.welcomeTitle}>Welcome back, {userName}!</h1>
+            <p style={styles.welcomeDate}>{currentDate}</p>
+          </div>
+        </div>
+        <p style={styles.welcomeMessage}>
+          Ready to continue your learning journey? Check out your progress below and start playing to earn more points!
         </p>
+      </div>
+
+      <div style={styles.statsGrid}>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}>🏆</div>
+          <div style={styles.statInfo}>
+            <div style={styles.statValue}>{totalScores.totalHighScore}</div>
+            <div style={styles.statLabel}>Total High Score</div>
+          </div>
+        </div>
         
-        {/* User Stats Card - Personal to this user */}
-        <div style={styles.statsCard}>
-          <h3 style={styles.statsTitle}>📊 Your Stats</h3>
-          <div style={styles.statsGrid}>
-            <div style={styles.statItem}>
-              <div style={styles.statValue}>{userData?.gameStats?.gamesPlayed || 0}</div>
-              <div style={styles.statLabel}>Games Played</div>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}>🎯</div>
+          <div style={styles.statInfo}>
+            <div style={styles.statValue}>{totalScores.totalLastScores}</div>
+            <div style={styles.statLabel}>Recent Total Score</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.scoresSection}>
+        <h2 style={styles.sectionTitle}>Game High Scores</h2>
+        <div style={styles.scoresGrid}>
+          <div style={styles.scoreCard}>
+            <div style={styles.scoreCardIcon}>🧩</div>
+            <div>
+              <div style={styles.scoreCardTitle}>Equation Escape</div>
+              <div style={styles.scoreCardValue}>{totalScores.equationScore} points</div>
             </div>
-            <div style={styles.statItem}>
-              <div style={styles.statValue}>{userData?.achievements?.length || 0}</div>
-              <div style={styles.statLabel}>Achievements</div>
+          </div>
+          
+          <div style={styles.scoreCard}>
+            <div style={styles.scoreCardIcon}>⚔️</div>
+            <div>
+              <div style={styles.scoreCardTitle}>Math Battle</div>
+              <div style={styles.scoreCardValue}>{totalScores.battleScore} points</div>
             </div>
-            <div style={styles.statItem}>
-              <div style={styles.statValue}>{userData?.progress?.missionsCompleted || 0}</div>
-              <div style={styles.statLabel}>Missions Done</div>
-            </div>
-            <div style={styles.statItem}>
-              <div style={styles.statValue}>
-                {new Date(userData?.createdAt).toLocaleDateString() || 'Today'}
-              </div>
-              <div style={styles.statLabel}>Member Since</div>
+          </div>
+          
+          <div style={styles.scoreCard}>
+            <div style={styles.scoreCardIcon}>🚀</div>
+            <div>
+              <div style={styles.scoreCardTitle}>Space Shooter</div>
+              <div style={styles.scoreCardValue}>{totalScores.spaceShooterScore} points</div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div style={styles.cardContainer}>
-          <div style={styles.card}>
-            <h3>📚 Recent Activity</h3>
-            <p>Your last login: {new Date(userData?.lastLogin).toLocaleString()}</p>
-            <p style={styles.smallText}>Only you can see this information</p>
-          </div>
-          
-          <div style={styles.card}>
-            <h3>🏆 Your Progress</h3>
-            <p>Keep up the great work, {user?.name?.split(' ')[0] || 'Student'}!</p>
-            <div style={styles.progressBar}>
-              <div style={{
-                ...styles.progressFill,
-                width: `${Math.min(100, ((userData?.achievements?.length || 0) / 10) * 100)}%`
-              }}></div>
-            </div>
-            <p style={styles.smallText}>{userData?.achievements?.length || 0}/10 achievements</p>
-          </div>
-          
-          <div style={styles.card}>
-            <h3>⚙️ Your Settings</h3>
-            <p>Customize your learning experience</p>
-            <button 
-              style={styles.smallButton}
-              onClick={() => {
-                if (updateUserData) {
-                  updateUserData({
-                    settings: {
-                      ...userData?.settings,
-                      lastVisited: new Date().toISOString()
-                    }
-                  });
-                  alert('Settings updated! This is saved only for your account.');
-                }
-              }}
-            >
-              Update Preferences
-            </button>
-          </div>
-        </div>
-
-        <div style={styles.note}>
-          <p>🔒 This is your personal space. Your data is private and only accessible by you.</p>
+      <div style={styles.achievementSection}>
+        <h2 style={styles.sectionTitle}>Recent Achievements</h2>
+        <div style={styles.achievementMessage}>
+          <p>🎯 Keep playing to unlock more achievements!</p>
+          <p style={styles.achievementSubtext}>Complete all games to earn special badges</p>
         </div>
       </div>
     </div>
@@ -104,138 +105,141 @@ function Homepage() {
 
 const styles = {
   container: {
-    minHeight: '10vh',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: '20px',
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '24px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
   },
-  content: {
-    textAlign: 'center',
-    maxWidth: '1000px',
-    width: '100%',
-  },
-  icon: {
-    marginBottom: '20px',
-    animation: 'bounce 2s infinite',
-  },
-  title: {
-    fontSize: '36px',
-    color: '#333',
-    marginBottom: '10px',
-  },
-  subtitle: {
-    fontSize: '18px',
-    color: '#666',
-    marginBottom: '30px',
-  },
-  statsCard: {
-    backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  welcomeCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '20px',
-    borderRadius: '12px',
-    marginBottom: '30px',
+    borderRadius: '20px',
+    padding: '32px',
+    marginBottom: '32px',
     color: 'white',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
   },
-  statsTitle: {
-    fontSize: '20px',
-    marginBottom: '15px',
-    textAlign: 'center',
+  welcomeHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  welcomeIcon: {
+    fontSize: '48px',
+  },
+  welcomeTitle: {
+    fontSize: '28px',
+    fontWeight: 'bold',
+    margin: 0,
+  },
+  welcomeDate: {
+    fontSize: '14px',
+    opacity: 0.9,
+    margin: '8px 0 0 0',
+  },
+  welcomeMessage: {
+    fontSize: '16px',
+    opacity: 0.95,
+    margin: 0,
+    lineHeight: 1.5,
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
     gap: '20px',
+    marginBottom: '32px',
   },
-  statItem: {
-    textAlign: 'center',
-    padding: '10px',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: '8px',
+  statCard: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '20px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    cursor: 'pointer',
+    ':hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+    },
+  },
+  statIcon: {
+    fontSize: '48px',
+  },
+  statInfo: {
+    flex: 1,
   },
   statValue: {
-    fontSize: '28px',
+    fontSize: '32px',
     fontWeight: 'bold',
-    marginBottom: '5px',
+    color: '#1f2937',
+    lineHeight: 1,
   },
   statLabel: {
-    fontSize: '12px',
-    opacity: 0.9,
-  },
-  cardContainer: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px',
-    marginBottom: '30px',
-  },
-  card: {
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    textAlign: 'left',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 4px 8px rgba(0,0,0,0.15)',
-    },
-  },
-  progressBar: {
-    width: '100%',
-    height: '8px',
-    backgroundColor: '#e0e0e0',
-    borderRadius: '4px',
-    overflow: 'hidden',
-    marginTop: '10px',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#2563eb',
-    transition: 'width 0.3s ease',
-  },
-  smallText: {
-    fontSize: '12px',
-    color: '#999',
+    fontSize: '14px',
+    color: '#6b7280',
     marginTop: '8px',
   },
-  smallButton: {
-    backgroundColor: '#2563eb',
-    color: 'white',
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    marginTop: '10px',
-    fontSize: '12px',
-    transition: 'background-color 0.2s',
+  scoresSection: {
+    background: 'white',
+    borderRadius: '16px',
+    padding: '24px',
+    marginBottom: '32px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  },
+  sectionTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    margin: '0 0 20px 0',
+  },
+  scoresGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: '16px',
+  },
+  scoreCard: {
+    background: '#f9fafb',
+    borderRadius: '12px',
+    padding: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    transition: 'all 0.2s',
     ':hover': {
-      backgroundColor: '#1d4ed8',
+      background: '#f3f4f6',
+      transform: 'translateX(4px)',
     },
   },
-  note: {
-    marginTop: '30px',
-    padding: '15px',
-    backgroundColor: '#fff3cd',
-    border: '1px solid #ffeaa7',
-    borderRadius: '8px',
-    color: '#856404',
+  scoreCardIcon: {
+    fontSize: '36px',
+  },
+  scoreCardTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '8px',
+  },
+  scoreCardValue: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#3b82f6',
+  },
+  achievementSection: {
+    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+    borderRadius: '16px',
+    padding: '24px',
+    textAlign: 'center',
+  },
+  achievementMessage: {
+    marginTop: '8px',
+  },
+  achievementSubtext: {
     fontSize: '14px',
+    color: '#92400e',
+    marginTop: '8px',
   },
 };
-
-// Add keyframes for bounce animation
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes bounce {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-10px);
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
 
 export default Homepage;

@@ -235,6 +235,7 @@ const BattleArena = ({
   const [showCongratulations, setShowCongratulations] = useState(false);
   const [attacksCount, setAttacksCount] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [wrongAnswers, setWrongAnswers] = useState(0);
   const [defenseMode, setDefenseMode] = useState(false);
   const [powerUps, setPowerUps] = useState(() => {
     if (savedGameState && savedGameState.powerUps !== undefined) {
@@ -261,10 +262,11 @@ const BattleArena = ({
         powerUps,
         attacksCount,
         correctAnswers,
+        wrongAnswers,
         defenseMode
       });
     }
-  }, [currentEnemyIndex, enemyHealth, playerHealth, score, currentEquation, feedback, gameActive, powerUps, attacksCount, correctAnswers, defenseMode, onGameStateUpdate]);
+  }, [currentEnemyIndex, enemyHealth, playerHealth, score, currentEquation, feedback, gameActive, powerUps, attacksCount, correctAnswers, wrongAnswers, defenseMode, onGameStateUpdate]);
 
   // ✅ Send real-time score updates to parent
   useEffect(() => {
@@ -279,13 +281,14 @@ const BattleArena = ({
           enemyHealth: enemyHealth,
           attacksMade: attacksCount,
           correctAnswers: correctAnswers,
+          wrongAnswers: wrongAnswers,
           accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
         }
       };
       window.parent.postMessage(scoreUpdate, '*');
       console.log('Sent score update to parent:', score);
     }
-  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers]);
+  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers, wrongAnswers]);
 
   // ✅ Handle messages from parent
   useEffect(() => {
@@ -303,6 +306,7 @@ const BattleArena = ({
             enemyHealth: enemyHealth,
             attacksMade: attacksCount,
             correctAnswers: correctAnswers,
+            wrongAnswers: wrongAnswers,
             accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
           }
         };
@@ -313,7 +317,7 @@ const BattleArena = ({
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers]);
+  }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers, wrongAnswers]);
 
   // Send game result
   const sendResultToParent = useCallback((completed, finalScore) => {
@@ -333,6 +337,7 @@ const BattleArena = ({
         accuracy: accuracy,
         attacksMade: attacksCount,
         correctAnswers: correctAnswers,
+        wrongAnswers: wrongAnswers,
         powerUpsUsed: {
           heals: 2 - powerUps.heal,
           doubleDamage: 1 - powerUps.doubleDamage,
@@ -344,6 +349,8 @@ const BattleArena = ({
     console.log('=== SENDING BATTLE GAME RESULT ===');
     console.log('Final Score:', finalScore);
     console.log('Completed:', completed);
+    console.log('Correct Answers:', correctAnswers);
+    console.log('Wrong Answers:', wrongAnswers);
     
     if (window.parent !== window) {
       window.parent.postMessage(gameResult, '*');
@@ -359,7 +366,7 @@ const BattleArena = ({
       sendGameResult(completed, finalScore, 0, currentEnemyIndex + (completed ? 1 : 0), gameResult.stats);
       console.log('Called sendGameResult prop');
     }
-  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, powerUps, sendGameResult]);
+  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, wrongAnswers, powerUps, sendGameResult]);
 
   // Save progress to localStorage
   const saveProgressToLocalStorage = useCallback((completed, finalScore) => {
@@ -399,7 +406,9 @@ const BattleArena = ({
           enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0),
           totalEnemies: enemies.length,
           finalScore: finalScore,
-          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
+          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0,
+          correctAnswers: correctAnswers,
+          wrongAnswers: wrongAnswers
         }
       };
       
@@ -408,7 +417,7 @@ const BattleArena = ({
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
-  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers]);
+  }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, wrongAnswers]);
 
   const usePowerUp = (type) => {
     if (powerUps[type] > 0) {
@@ -435,6 +444,7 @@ const BattleArena = ({
     }
   };
 
+  // ✅ FIXED: Send XP updates consistently
   const handleAttack = () => {
     if (!gameActive) return;
     
@@ -448,6 +458,22 @@ const BattleArena = ({
     const isCorrect = Math.abs(userAnswer - currentEquation.answer) < 0.01;
     setAttacksCount(prev => prev + 1);
     
+    // ✅ SEND XP UPDATE TO PARENT (CORRECT = +10 XP, WRONG = -5 XP)
+    if (window.parent !== window) {
+      const xpUpdate = {
+        type: 'XP_UPDATE',
+        gameId: 'battle',
+        xpChange: isCorrect ? 10 : -5,
+        isCorrect: isCorrect,
+        correctAnswer: currentEquation.answer,
+        userAnswer: userAnswer,
+        equation: currentEquation.equation,
+        timestamp: new Date().toISOString()
+      };
+      window.parent.postMessage(xpUpdate, '*');
+      console.log('Sent XP_UPDATE from Battle Arena:', xpUpdate);
+    }
+    
     if (isCorrect) {
       setCorrectAnswers(prev => prev + 1);
       
@@ -456,10 +482,10 @@ const BattleArena = ({
       
       if (doubleDamageActive) {
         damage *= 2;
-        setFeedback(`🔥 CRITICAL HIT! ${damage} damage!`);
+        setFeedback(`🔥 CRITICAL HIT! ${damage} damage! +10 XP!`);
         setPowerUps(prev => ({ ...prev, doubleDamage: 1 }));
       } else {
-        setFeedback(`⚔️ You hit the ${currentEnemy.name} for ${damage} damage!`);
+        setFeedback(`⚔️ You hit the ${currentEnemy.name} for ${damage} damage! +10 XP!`);
       }
       
       const newEnemyHealth = Math.max(0, enemyHealth - damage);
@@ -522,7 +548,8 @@ const BattleArena = ({
         setCurrentEquation({ equation, answer, userAnswer: '' });
       }
     } else {
-      setFeedback(`❌ Incorrect! The correct answer was ${currentEquation.answer}. The enemy counter-attacks!`);
+      setWrongAnswers(prev => prev + 1);
+      setFeedback(`❌ Incorrect! The correct answer was ${currentEquation.answer}. -5 XP! The enemy counter-attacks!`);
       
       let enemyDamage = Math.max(8, currentEnemy.attack);
       if (defenseMode) {
@@ -557,6 +584,10 @@ const BattleArena = ({
   };
 
   if (showCongratulations) {
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+    const bonusCompletionXP = 100; // Bonus for completing all enemies
+    const totalXP = xpEarned + bonusCompletionXP;
+    
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
@@ -567,7 +598,14 @@ const BattleArena = ({
             <div>Final Score: {score}</div>
             <div>Enemies Defeated: {enemies.length}/{enemies.length}</div>
             <div>Attacks Made: {attacksCount}</div>
-            <div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
+            <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+            <div>⭐ XP Earned: {xpEarned}</div>
+            <div>🎉 Completion Bonus: +{bonusCompletionXP} XP</div>
+            <div style={{marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '8px', fontWeight: 'bold', color: '#ffd700'}}>
+              Total XP: {totalXP}
+            </div>
           </div>
           <button onClick={() => onComplete && onComplete(true)} style={styles.continueButton}>
             Return to Menu
@@ -578,6 +616,7 @@ const BattleArena = ({
   }
 
   if (!gameActive) {
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
@@ -587,7 +626,10 @@ const BattleArena = ({
           <div style={styles.finalScore}>
             <div>Final Score: {score}</div>
             <div>Enemies Defeated: {currentEnemyIndex}/{enemies.length}</div>
-            <div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
+            <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+            <div>⭐ XP Earned: {xpEarned}</div>
           </div>
           <button onClick={() => {
             clearSavedState?.();
@@ -660,7 +702,7 @@ const BattleArena = ({
               value={currentEquation.userAnswer}
               onChange={(e) => setCurrentEquation(prev => ({ ...prev, userAnswer: e.target.value }))}
               onKeyPress={handleKeyPress}
-              placeholder="Enter your answer..."
+              placeholder="Enter your answer... (+10 XP if correct, -5 XP if wrong)"
               style={styles.answerInput}
               autoFocus
             />
@@ -701,8 +743,10 @@ const BattleArena = ({
       
       <div style={styles.statsDisplay}>
         <div>⚔️ Attacks: {attacksCount}</div>
-        <div>✅ Correct: {correctAnswers}</div>
+        <div>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+        <div>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
         <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
+        <div>⭐ Total XP: {(correctAnswers * 10) - (wrongAnswers * 5)}</div>
       </div>
     </div>
   );
@@ -929,6 +973,8 @@ const styles = {
     color: '#fff',
     fontSize: '14px',
     backdropFilter: 'blur(10px)',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   completionContainer: {
     display: 'flex',

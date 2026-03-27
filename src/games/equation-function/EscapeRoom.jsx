@@ -103,7 +103,22 @@ const EscapeRoom = ({
     return 0;
   });
 
+  // Track XP-related stats
+  const [correctAnswers, setCorrectAnswers] = useState(() => {
+    if (savedGameState && savedGameState.correctAnswers !== undefined) {
+      return savedGameState.correctAnswers;
+    }
+    return 0;
+  });
+  const [wrongAnswers, setWrongAnswers] = useState(() => {
+    if (savedGameState && savedGameState.wrongAnswers !== undefined) {
+      return savedGameState.wrongAnswers;
+    }
+    return 0;
+  });
+
   const totalPuzzles = puzzles.length;
+  const xpSoFar = (correctAnswers * 10) - (wrongAnswers * 5);
 
   // ✅ Send real-time score updates to parent
   const sendScoreUpdate = useCallback(() => {
@@ -120,13 +135,16 @@ const EscapeRoom = ({
           currentPuzzle: currentPuzzle + 1,
           timeLeft: timeLeft,
           attempts: attempts,
-          accuracy: ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1)
+          accuracy: ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1),
+          correctAnswers: correctAnswers,
+          wrongAnswers: wrongAnswers,
+          xpEarned: xpSoFar
         }
       };
       window.parent.postMessage(scoreUpdate, '*');
       console.log('Sent score update to parent:', score);
     }
-  }, [score, puzzlesCompleted, currentPuzzle, totalPuzzles, timeLeft, attempts]);
+  }, [score, puzzlesCompleted, currentPuzzle, totalPuzzles, timeLeft, attempts, correctAnswers, wrongAnswers, xpSoFar]);
 
   // ✅ Send score update whenever score changes
   useEffect(() => {
@@ -153,7 +171,10 @@ const EscapeRoom = ({
             currentPuzzle: currentPuzzle + 1,
             timeLeft: timeLeft,
             attempts: attempts,
-            accuracy: ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1)
+            accuracy: ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1),
+            correctAnswers: correctAnswers,
+            wrongAnswers: wrongAnswers,
+            xpEarned: xpSoFar
           }
         };
         if (window.parent !== window) {
@@ -165,10 +186,11 @@ const EscapeRoom = ({
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [score, puzzlesCompleted, currentPuzzle, totalPuzzles, timeLeft, attempts]);
+  }, [score, puzzlesCompleted, currentPuzzle, totalPuzzles, timeLeft, attempts, correctAnswers, wrongAnswers, xpSoFar]);
 
-  // Helper function to send game result to parent (works for both iframe and new window)
+  // Helper function to send game result to parent
   const sendResultToParent = useCallback((completed, finalScore, timeSpent, puzzlesCompletedCount, accuracy, bonusPoints = 0) => {
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
     const gameResult = {
       type: 'GAME_RESULT',
       gameId: 'equation',
@@ -183,16 +205,21 @@ const EscapeRoom = ({
         timeRemaining: timeLeft,
         accuracy: accuracy,
         baseScore: completed ? finalScore - bonusPoints : finalScore,
-        progress: `${puzzlesCompletedCount}/${totalPuzzles}`
+        progress: `${puzzlesCompletedCount}/${totalPuzzles}`,
+        correctAnswers: correctAnswers,
+        wrongAnswers: wrongAnswers,
+        xpEarned: xpEarned
       }
     };
 
     console.log('=== SENDING EQUATION GAME RESULT ===');
     console.log('Final Score:', finalScore);
     console.log('Completed:', completed);
+    console.log('Correct Answers:', correctAnswers);
+    console.log('Wrong Answers:', wrongAnswers);
+    console.log('XP Earned:', xpEarned);
     console.log('Game Result:', gameResult);
     
-    // Try to send to parent window (for iframe)
     if (window.parent !== window) {
       try {
         window.parent.postMessage(gameResult, '*');
@@ -202,7 +229,6 @@ const EscapeRoom = ({
       }
     }
     
-    // Also try to send to opener (for new window/tab)
     if (window.opener) {
       try {
         window.opener.postMessage(gameResult, '*');
@@ -212,36 +238,40 @@ const EscapeRoom = ({
       }
     }
     
-    // Call the sendGameResult prop if provided
     if (sendGameResult) {
       sendGameResult(completed, finalScore, timeSpent, puzzlesCompletedCount, gameResult.stats);
     }
-  }, [totalPuzzles, timeLeft, sendGameResult]);
+  }, [totalPuzzles, timeLeft, correctAnswers, wrongAnswers, sendGameResult]);
 
   // Helper function to save progress to localStorage
   const saveProgressToLocalStorage = useCallback((completed, finalScore, timeSpent, puzzlesCompletedCount, accuracy, bonusPoints = 0) => {
     try {
-      // Get existing progress
       const existingProgress = localStorage.getItem('gameProgress');
       let progress = existingProgress ? JSON.parse(existingProgress) : {
-        equation: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
-        battle: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
-        spaceShooter: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 }
+        equation: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0, totalXPEarned: 0 },
+        battle: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0, totalXPEarned: 0 },
+        spaceShooter: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0, totalXPEarned: 0 }
       };
       
-      // Get current equation progress
+      const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+      const xpBreakdown = [];
+      if (correctAnswers > 0) xpBreakdown.push(`${correctAnswers} correct: +${correctAnswers * 10} XP`);
+      if (wrongAnswers > 0) xpBreakdown.push(`${wrongAnswers} wrong: -${wrongAnswers * 5} XP`);
+      if (completed && !progress.equation?.completed) xpBreakdown.push(`Completion bonus: +50 XP`);
+      
       const currentEquation = progress.equation || {
         completed: false,
         highScore: 0,
         attempts: 0,
         bestTime: null,
         lastPlayed: null,
-        lastScore: 0
+        lastScore: 0,
+        totalXPEarned: 0
       };
       
-      // Calculate new values
       const newHighScore = Math.max(currentEquation.highScore || 0, finalScore || 0);
       const newAttempts = (currentEquation.attempts || 0) + 1;
+      const newTotalXPEarned = (currentEquation.totalXPEarned || 0) + Math.max(0, xpEarned);
       
       let newBestTime = currentEquation.bestTime;
       if (completed && timeSpent) {
@@ -250,12 +280,12 @@ const EscapeRoom = ({
           : timeSpent;
       }
       
-      // Update equation progress
       progress.equation = {
         ...currentEquation,
         completed: completed || currentEquation.completed,
         highScore: newHighScore,
         lastScore: finalScore,
+        totalXPEarned: newTotalXPEarned,
         attempts: newAttempts,
         bestTime: newBestTime,
         lastPlayed: new Date().toISOString(),
@@ -266,15 +296,17 @@ const EscapeRoom = ({
           accuracy: accuracy,
           bonusPoints: bonusPoints,
           finalScore: finalScore,
-          timeSpent: timeSpent
+          timeSpent: timeSpent,
+          correctAnswers: correctAnswers,
+          wrongAnswers: wrongAnswers,
+          xpEarned: xpEarned,
+          xpBreakdown: xpBreakdown
         }
       };
       
-      // Save to localStorage
       localStorage.setItem('gameProgress', JSON.stringify(progress));
       console.log('Progress saved to localStorage:', progress.equation);
       
-      // Dispatch storage event to notify other tabs
       window.dispatchEvent(new StorageEvent('storage', {
         key: 'gameProgress',
         newValue: JSON.stringify(progress),
@@ -285,7 +317,7 @@ const EscapeRoom = ({
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
-  }, [totalPuzzles]);
+  }, [totalPuzzles, correctAnswers, wrongAnswers]);
 
   useEffect(() => {
     if (onGameStateUpdate && gameActive && !showCongratulations) {
@@ -298,10 +330,12 @@ const EscapeRoom = ({
         feedback, 
         showHint, 
         gameActive,
-        shuffledPuzzles: puzzles
+        shuffledPuzzles: puzzles,
+        correctAnswers,
+        wrongAnswers
       });
     }
-  }, [currentPuzzle, puzzlesCompleted, score, timeLeft, attempts, feedback, showHint, gameActive, puzzles, onGameStateUpdate]);
+  }, [currentPuzzle, puzzlesCompleted, score, timeLeft, attempts, feedback, showHint, gameActive, puzzles, onGameStateUpdate, correctAnswers, wrongAnswers]);
 
   useEffect(() => {
     if (gameActive && timeLeft > 0 && currentPuzzle < totalPuzzles) {
@@ -315,10 +349,7 @@ const EscapeRoom = ({
             const timeSpent = 360;
             const accuracy = ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1);
             
-            // Save to localStorage
             saveProgressToLocalStorage(false, score, timeSpent, puzzlesCompleted, accuracy);
-            
-            // Send result to parent
             sendResultToParent(false, score, timeSpent, puzzlesCompleted, accuracy);
             
             if (onComplete) {
@@ -344,7 +375,27 @@ const EscapeRoom = ({
       return;
     }
     
-    if (Math.abs(answer - currentPuzzleData.answer) < 0.01) {
+    const isCorrect = Math.abs(answer - currentPuzzleData.answer) < 0.01;
+    
+    // ✅ SEND XP UPDATE TO PARENT (CORRECT = +10 XP, WRONG = -5 XP)
+    if (window.parent !== window) {
+      const xpUpdate = {
+        type: 'XP_UPDATE',
+        gameId: 'equation',
+        xpChange: isCorrect ? 10 : -5,
+        isCorrect: isCorrect,
+        correctAnswer: currentPuzzleData.answer,
+        userAnswer: answer,
+        equation: currentPuzzleData.equation,
+        timestamp: new Date().toISOString()
+      };
+      window.parent.postMessage(xpUpdate, '*');
+      console.log('Sent XP_UPDATE from Escape Room:', xpUpdate);
+    }
+    
+    if (isCorrect) {
+      setCorrectAnswers(prev => prev + 1);
+      
       const pointsEarned = 100;
       const newScore = score + pointsEarned;
       setScore(newScore);
@@ -353,7 +404,7 @@ const EscapeRoom = ({
       const newPuzzlesCompleted = puzzlesCompleted + 1;
       setPuzzlesCompleted(newPuzzlesCompleted);
       
-      setFeedback(`✅ Correct! ${currentPuzzleData.explanation}`);
+      setFeedback(`✅ Correct! ${currentPuzzleData.explanation} (+10 XP!)`);
       setShowHint(false);
       setUserAnswer('');
       setAttempts(0);
@@ -361,7 +412,6 @@ const EscapeRoom = ({
       if (currentPuzzle + 1 < totalPuzzles) {
         setCurrentPuzzle(currentPuzzle + 1);
       } else {
-        // Game completed successfully!
         setGameActive(false);
         setShowCongratulations(true);
         
@@ -375,10 +425,7 @@ const EscapeRoom = ({
         
         setFeedback(`🎉 Congratulations! Bonus: +${bonusPoints} points!`);
         
-        // Save to localStorage
         saveProgressToLocalStorage(true, finalScore, timeSpent, newPuzzlesCompleted, accuracy, bonusPoints);
-        
-        // Send result to parent
         sendResultToParent(true, finalScore, timeSpent, newPuzzlesCompleted, accuracy, bonusPoints);
         
         if (onComplete) {
@@ -387,14 +434,16 @@ const EscapeRoom = ({
         if (clearSavedState) clearSavedState();
       }
     } else {
+      setWrongAnswers(prev => prev + 1);
+      
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
       
       if (newAttempts >= 2) {
-        setFeedback(`❌ Incorrect. Answer: ${currentPuzzleData.answer}. ${currentPuzzleData.explanation}`);
+        setFeedback(`❌ Incorrect. Answer: ${currentPuzzleData.answer}. ${currentPuzzleData.explanation} (-5 XP!)`);
         setShowHint(true);
       } else {
-        setFeedback(`❌ Incorrect. ${currentPuzzleData.hint}`);
+        setFeedback(`❌ Incorrect. ${currentPuzzleData.hint} (-5 XP!)`);
       }
       setUserAnswer('');
     }
@@ -420,6 +469,10 @@ const EscapeRoom = ({
   };
 
   if (showCongratulations) {
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+    const bonusCompletionXP = 50;
+    const totalXP = xpEarned + (puzzlesCompleted === totalPuzzles ? bonusCompletionXP : 0);
+    
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
@@ -431,6 +484,15 @@ const EscapeRoom = ({
             <div>Time Remaining: {formatTime(timeLeft)}</div>
             <div>Puzzles Completed: {puzzlesCompleted}/{totalPuzzles}</div>
             <div>Accuracy: {((puzzlesCompleted / totalPuzzles) * 100).toFixed(1)}%</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
+            <div>⭐ XP Earned This Game: {xpEarned}</div>
+            {puzzlesCompleted === totalPuzzles && (
+              <div>🎉 Completion Bonus: +{bonusCompletionXP} XP</div>
+            )}
+            <div style={{marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '8px', fontWeight: 'bold', color: '#ffd700'}}>
+              Total XP: {totalXP}
+            </div>
           </div>
           <button onClick={() => onComplete && onComplete(true)} style={styles.continueButton}>Return to Menu</button>
         </div>
@@ -439,6 +501,7 @@ const EscapeRoom = ({
   }
 
   if (!gameActive && !showCongratulations) {
+    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
@@ -449,6 +512,9 @@ const EscapeRoom = ({
             <div>Final Score: {score}</div>
             <div>Puzzles Completed: {puzzlesCompleted}/{totalPuzzles}</div>
             <div>Accuracy: {((puzzlesCompleted / totalPuzzles) * 100).toFixed(1)}%</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
+            <div>⭐ XP Earned This Game: {xpEarned}</div>
           </div>
           <button onClick={() => { 
             clearSavedState?.(); 
@@ -468,6 +534,12 @@ const EscapeRoom = ({
         <div style={styles.scoreTimeContainer}>
           <div style={styles.score}>⭐ Score: {score}</div>
           <div style={styles.timer}>⏱️ {formatTime(timeLeft)}</div>
+        </div>
+        <div style={styles.xpDisplay}>
+          <span>⭐ XP This Game: {xpSoFar}</span>
+          <span style={styles.xpBreakdown}>
+            (+{correctAnswers * 10} / -{wrongAnswers * 5})
+          </span>
         </div>
         <div style={styles.progressBar}>
           <div style={{...styles.progressFill, width: `${progress}%`}} />
@@ -494,7 +566,7 @@ const EscapeRoom = ({
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type your answer here..."
+                placeholder="Type your answer here... (+10 XP if correct, -5 XP if wrong)"
                 style={styles.answerInput}
                 autoFocus
               />
@@ -514,6 +586,7 @@ const EscapeRoom = ({
 
           <div style={styles.stats}>
             <div style={styles.attempts}>📝 Attempts: {attempts}</div>
+            <div style={styles.xpStats}>✅ {correctAnswers} correct | ❌ {wrongAnswers} wrong</div>
             <button onClick={() => setShowHint(!showHint)} style={styles.hintButton}>
               {showHint ? "Hide Hint" : "Show Hint"}
             </button>
@@ -526,6 +599,7 @@ const EscapeRoom = ({
             <li>✓ Isolate the variable (x) on one side</li>
             <li>✓ Perform the same operation on both sides</li>
             <li>✓ Check your answer by plugging it back in</li>
+            <li>⭐ +10 XP per correct answer, -5 XP per wrong answer</li>
             {currentPuzzleData.difficulty === 'Basic' && <li>✓ Use inverse operations</li>}
             {currentPuzzleData.difficulty === 'Intermediate' && <li>✓ Combine like terms first</li>}
             {currentPuzzleData.difficulty === 'Advanced' && <li>✓ Get all x terms on one side</li>}
@@ -552,7 +626,7 @@ const styles = {
   scoreTimeContainer: {
     display: 'flex',
     justifyContent: 'space-between',
-    marginBottom: '15px',
+    marginBottom: '10px',
     fontSize: '18px',
     fontWeight: 'bold',
   },
@@ -567,6 +641,23 @@ const styles = {
     background: 'rgba(0,0,0,0.3)',
     padding: '5px 12px',
     borderRadius: '20px',
+  },
+  xpDisplay: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '10px',
+    padding: '8px',
+    backgroundColor: 'rgba(255,215,0,0.2)',
+    borderRadius: '20px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#ffd93d',
+  },
+  xpBreakdown: {
+    fontSize: '11px',
+    color: '#aaa',
   },
   progressBar: {
     width: '100%',
@@ -707,10 +798,17 @@ const styles = {
     marginTop: '15px',
     paddingTop: '15px',
     borderTop: '1px solid #3a3a5a',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   attempts: {
     fontSize: '13px',
     color: '#aaa',
+  },
+  xpStats: {
+    fontSize: '13px',
+    color: '#ffd93d',
+    fontWeight: 'bold',
   },
   hintButton: {
     padding: '6px 14px',

@@ -35,6 +35,7 @@ export const UserProvider = ({ children }) => {
       } else {
         // Initialize empty user data structure
         const initialData = {
+          username: user.username || user.email.split('@')[0], // Add username
           progress: {
             missionsCompleted: 0,
             mathProblemsCompleted: 0,
@@ -89,6 +90,27 @@ export const UserProvider = ({ children }) => {
     return false;
   };
 
+  // Update username
+  const updateUsername = (newUsername) => {
+    if (user && user.email) {
+      // Update user object
+      const updatedUser = { ...user, username: newUsername };
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Update userData
+      if (userData) {
+        const updatedUserData = { ...userData, username: newUsername };
+        setUserData(updatedUserData);
+        const storageKey = `user_data_${user.email}`;
+        localStorage.setItem(storageKey, JSON.stringify(updatedUserData));
+      }
+      
+      return true;
+    }
+    return false;
+  };
+
   // Clear user data (logout)
   const logout = () => {
     if (user && user.email) {
@@ -111,6 +133,7 @@ export const UserProvider = ({ children }) => {
       setUser, 
       userData, 
       updateUserData,
+      updateUsername, // Add this to the context
       logout
     }}>
       {children}

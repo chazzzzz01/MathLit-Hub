@@ -12,7 +12,7 @@ import TeacherHub from "./hub/TeacherHub";
 import EquationEscapeRoom from "./games/EquationEscapeRoom"
 import BattleArena from "./games/BattleArena"
 import SpaceShooter from "./games/SpaceShooter"
-
+import TestEnv from "./TestEnv"
 import Dashboard from "./menu1/Dashboard"  
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
@@ -26,6 +26,7 @@ function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/test" element={<TestEnv />} />
           
           {/* Student hub with nested routes */}
           <Route path="/studenthub" element={<StudentHub />}>
