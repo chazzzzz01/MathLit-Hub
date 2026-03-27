@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { GiAchievement, GiTrophy } from 'react-icons/gi';
 import { FaStar, FaBolt } from 'react-icons/fa';
@@ -6,323 +6,173 @@ import { MdLock, MdEmojiEvents, MdTrendingUp } from 'react-icons/md';
 import { leaderboardService } from '../services/leaderboardService';
 
 function Achievement() {
-  // Get user data from context
-  const { user, userData, updateUserData, getUserIdentifier, getUserXP } = useOutletContext() || {};
+  // Get user data from context with error handling
+  const context = useOutletContext();
+  const { user, userData, updateUserData, getUserIdentifier, getUserXP } = context || {};
   
   const [achievements, setAchievements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leaderboardData, setLeaderboardData] = useState([]);
-  const [gameXP, setGameXP] = useState(0); // XP from games
-  const [userRank, setUserRank] = useState(null); // Store user's rank
-  const [totalScores, setTotalScores] = useState(0); // Total scores from all games
+  const [gameXP, setGameXP] = useState(0);
+  const [userRank, setUserRank] = useState(null);
+  const [totalScores, setTotalScores] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
+  const [error, setError] = useState(null);
+  
+  // Add refs to prevent multiple loads
+  const hasLoadedRef = useRef(false);
+  const isLoadingRef = useRef(false);
+  const initialLoadRef = useRef(true);
 
-  // Debug: Log user data when component mounts or updates
-  useEffect(() => {
-    console.log('🔍 Achievement Component - User Data:', {
-      user: user,
-      userData: userData,
-      username: getUserIdentifier ? getUserIdentifier() : (userData?.username || user?.username || user?.email?.split('@')[0]),
-      xp: getUserXP ? getUserXP() : userData?.xp,
-      gameProgress: userData?.gameProgress
-    });
-  }, [user, userData, getUserIdentifier, getUserXP]);
-
-  // Define the base achievement templates
-  const achievementTemplates = [
-    // Game Completion Achievements
-    {
-      id: 1,
-      name: "First Steps",
-      description: "Complete your first game",
-      rarity: "common",
-      xpReward: 50,
-      coinReward: 25,
-      icon: <FaStar size={24} />,
-      total: 1,
-      color: "#3b82f6",
-      requirementType: "gameCompleted",
-      requirementValue: 1
-    },
-    {
-      id: 2,
-      name: "Math Master",
-      description: "Complete all three games",
-      rarity: "epic",
-      xpReward: 300,
-      coinReward: 150,
-      icon: <GiTrophy size={24} />,
-      total: 3,
-      color: "#f59e0b",
-      requirementType: "allGamesCompleted",
-      requirementValue: 3
-    },
-    {
-      id: 3,
-      name: "Equation Hero",
-      description: "Complete Equation Escape Room",
-      rarity: "rare",
-      xpReward: 100,
-      coinReward: 50,
-      icon: <FaStar size={24} />,
-      total: 1,
-      color: "#3b82f6",
-      requirementType: "equationCompleted",
-      requirementValue: 1
-    },
-    {
-      id: 4,
-      name: "Battle Legend",
-      description: "Complete Math Battle Arena",
-      rarity: "rare",
-      xpReward: 100,
-      coinReward: 50,
-      icon: <FaBolt size={24} />,
-      total: 1,
-      color: "#8b5cf6",
-      requirementType: "battleCompleted",
-      requirementValue: 1
-    },
-    {
-      id: 5,
-      name: "Space Defender",
-      description: "Complete Math Space Shooter",
-      rarity: "rare",
-      xpReward: 100,
-      coinReward: 50,
-      icon: <FaBolt size={24} />,
-      total: 1,
-      color: "#f59e0b",
-      requirementType: "spaceCompleted",
-      requirementValue: 1
-    },
-    // High Score Achievements
-    {
-      id: 6,
-      name: "Point Collector",
-      description: "Achieve a high score of 500 in any game",
-      rarity: "rare",
-      xpReward: 75,
-      coinReward: 40,
-      icon: <GiTrophy size={24} />,
-      total: 500,
-      color: "#10b981",
-      requirementType: "score500",
-      requirementValue: 500
-    },
-    {
-      id: 7,
-      name: "Perfect Score",
-      description: "Achieve a perfect score of 1000 in any game",
-      rarity: "epic",
-      xpReward: 150,
-      coinReward: 75,
-      icon: <GiTrophy size={24} />,
-      total: 1000,
-      color: "#f97316",
-      requirementType: "score1000",
-      requirementValue: 1000
-    },
-    {
-      id: 8,
-      name: "Puzzle Master",
-      description: "Score 800+ in Equation Escape",
-      rarity: "rare",
-      xpReward: 125,
-      coinReward: 60,
-      icon: <FaStar size={24} />,
-      total: 800,
-      color: "#3b82f6",
-      requirementType: "equationScore",
-      requirementValue: 800
-    },
-    {
-      id: 9,
-      name: "Arena Champion",
-      description: "Score 800+ in Math Battle",
-      rarity: "rare",
-      xpReward: 125,
-      coinReward: 60,
-      icon: <GiTrophy size={24} />,
-      total: 800,
-      color: "#8b5cf6",
-      requirementType: "battleScore",
-      requirementValue: 800
-    },
-    {
-      id: 10,
-      name: "Galactic Hero",
-      description: "Score 800+ in Space Shooter",
-      rarity: "rare",
-      xpReward: 125,
-      coinReward: 60,
-      icon: <FaStar size={24} />,
-      total: 800,
-      color: "#f59e0b",
-      requirementType: "spaceScore",
-      requirementValue: 800
-    },
-    // Engagement Achievements
-    {
-      id: 11,
-      name: "Dedicated Player",
-      description: "Play any game 5 times",
-      rarity: "common",
-      xpReward: 60,
-      coinReward: 30,
-      icon: <FaBolt size={24} />,
-      total: 5,
-      color: "#14b8a6",
-      requirementType: "attempts5",
-      requirementValue: 5
-    },
-    {
-      id: 12,
-      name: "Try Hard",
-      description: "Play any game 10 times",
-      rarity: "rare",
-      xpReward: 100,
-      coinReward: 50,
-      icon: <FaBolt size={24} />,
-      total: 10,
-      color: "#a855f7",
-      requirementType: "attempts10",
-      requirementValue: 10
+  // Function to get icon component based on type
+  const getIconForAchievement = (iconType, size = 24) => {
+    switch(iconType) {
+      case 'star':
+        return React.createElement(FaStar, { size, key: 'star-icon' });
+      case 'bolt':
+        return React.createElement(FaBolt, { size, key: 'bolt-icon' });
+      case 'trophy':
+        return React.createElement(GiTrophy, { size, key: 'trophy-icon' });
+      case 'achievement':
+        return React.createElement(GiAchievement, { size, key: 'achievement-icon' });
+      default:
+        return React.createElement(FaStar, { size, key: 'default-icon' });
     }
-  ];
+  };
+
+
 
   // Helper function to check if an achievement is unlocked based on game progress
-  const checkIfAchievementUnlocked = (achievement, gameProgress) => {
+  const checkIfAchievementUnlocked = useCallback((achievement, gameProgress) => {
     if (!gameProgress) return false;
     
-    switch (achievement.requirementType) {
-      case 'gameCompleted':
-        return Object.values(gameProgress).some(game => game.completed === true);
-      
-      case 'allGamesCompleted':
-        return Object.values(gameProgress).every(game => game.completed === true);
-      
-      case 'equationCompleted':
-        return gameProgress.equation?.completed === true;
-      
-      case 'battleCompleted':
-        return gameProgress.battle?.completed === true;
-      
-      case 'spaceCompleted':
-        return gameProgress.spaceShooter?.completed === true;
-      
-      case 'score500':
-        return Object.values(gameProgress).some(game => (game.highScore || 0) >= 500);
-      
-      case 'score1000':
-        return Object.values(gameProgress).some(game => (game.highScore || 0) >= 1000);
-      
-      case 'equationScore':
-        return (gameProgress.equation?.highScore || 0) >= 800;
-      
-      case 'battleScore':
-        return (gameProgress.battle?.highScore || 0) >= 800;
-      
-      case 'spaceScore':
-        return (gameProgress.spaceShooter?.highScore || 0) >= 800;
-      
-      case 'attempts5':
-        return Object.values(gameProgress).some(game => (game.attempts || 0) >= 5);
-      
-      case 'attempts10':
-        return Object.values(gameProgress).some(game => (game.attempts || 0) >= 10);
-      
-      default:
-        return false;
+    try {
+      switch (achievement.requirementType) {
+        case 'gameCompleted':
+          return Object.values(gameProgress).some(game => game?.completed === true);
+        case 'allGamesCompleted':
+          return Object.values(gameProgress).every(game => game?.completed === true);
+        case 'equationCompleted':
+          return gameProgress.equation?.completed === true;
+        case 'battleCompleted':
+          return gameProgress.battle?.completed === true;
+        case 'spaceCompleted':
+          return gameProgress.spaceShooter?.completed === true;
+        case 'score500':
+          return Object.values(gameProgress).some(game => (game?.highScore || 0) >= 500);
+        case 'score1000':
+          return Object.values(gameProgress).some(game => (game?.highScore || 0) >= 1000);
+        case 'equationScore':
+          return (gameProgress.equation?.highScore || 0) >= 800;
+        case 'battleScore':
+          return (gameProgress.battle?.highScore || 0) >= 800;
+        case 'spaceScore':
+          return (gameProgress.spaceShooter?.highScore || 0) >= 800;
+        case 'attempts5':
+          return Object.values(gameProgress).some(game => (game?.attempts || 0) >= 5);
+        case 'attempts10':
+          return Object.values(gameProgress).some(game => (game?.attempts || 0) >= 10);
+        default:
+          return false;
+      }
+    } catch (err) {
+      console.error('Error checking achievement:', err);
+      return false;
     }
-  };
+  }, []);
 
   // Helper function to get achievement progress
-  const getAchievementProgress = (achievement, gameProgress) => {
+  const getAchievementProgress = useCallback((achievement, gameProgress) => {
     if (!gameProgress) return 0;
     
-    switch (achievement.requirementType) {
-      case 'gameCompleted':
-        return Object.values(gameProgress).filter(game => game.completed === true).length;
-      
-      case 'allGamesCompleted':
-        return Object.values(gameProgress).filter(game => game.completed === true).length;
-      
-      case 'equationCompleted':
-        return gameProgress.equation?.completed ? 1 : 0;
-      
-      case 'battleCompleted':
-        return gameProgress.battle?.completed ? 1 : 0;
-      
-      case 'spaceCompleted':
-        return gameProgress.spaceShooter?.completed ? 1 : 0;
-      
-      case 'score500':
-        return Math.max(...Object.values(gameProgress).map(game => game.highScore || 0));
-      
-      case 'score1000':
-        return Math.max(...Object.values(gameProgress).map(game => game.highScore || 0));
-      
-      case 'equationScore':
-        return gameProgress.equation?.highScore || 0;
-      
-      case 'battleScore':
-        return gameProgress.battle?.highScore || 0;
-      
-      case 'spaceScore':
-        return gameProgress.spaceShooter?.highScore || 0;
-      
-      case 'attempts5':
-        return Math.max(...Object.values(gameProgress).map(game => game.attempts || 0));
-      
-      case 'attempts10':
-        return Math.max(...Object.values(gameProgress).map(game => game.attempts || 0));
-      
-      default:
-        return 0;
+    try {
+      switch (achievement.requirementType) {
+        case 'gameCompleted':
+          return Object.values(gameProgress).filter(game => game?.completed === true).length;
+        case 'allGamesCompleted':
+          return Object.values(gameProgress).filter(game => game?.completed === true).length;
+        case 'equationCompleted':
+          return gameProgress.equation?.completed ? 1 : 0;
+        case 'battleCompleted':
+          return gameProgress.battle?.completed ? 1 : 0;
+        case 'spaceCompleted':
+          return gameProgress.spaceShooter?.completed ? 1 : 0;
+        case 'score500':
+          return Math.max(...Object.values(gameProgress).map(game => game?.highScore || 0));
+        case 'score1000':
+          return Math.max(...Object.values(gameProgress).map(game => game?.highScore || 0));
+        case 'equationScore':
+          return gameProgress.equation?.highScore || 0;
+        case 'battleScore':
+          return gameProgress.battle?.highScore || 0;
+        case 'spaceScore':
+          return gameProgress.spaceShooter?.highScore || 0;
+        case 'attempts5':
+          return Math.max(...Object.values(gameProgress).map(game => game?.attempts || 0));
+        case 'attempts10':
+          return Math.max(...Object.values(gameProgress).map(game => game?.attempts || 0));
+        default:
+          return 0;
+      }
+    } catch (err) {
+      console.error('Error getting progress:', err);
+      return 0;
     }
-  };
+  }, []);
 
   // Helper function to calculate total scores from game progress
-  const calculateTotalScores = (gameProgress) => {
+  const calculateTotalScores = useCallback((gameProgress) => {
     if (!gameProgress) return 0;
     const equationScore = gameProgress.equation?.highScore || 0;
     const battleScore = gameProgress.battle?.highScore || 0;
     const spaceScore = gameProgress.spaceShooter?.highScore || 0;
     return equationScore + battleScore + spaceScore;
-  };
+  }, []);
 
-  // Get username from user data using the same method as StudentHub
+  // Get username from user data
   const getUserName = useCallback(() => {
-    // First try the getUserIdentifier function from context
-    if (getUserIdentifier) {
-      return getUserIdentifier();
+    try {
+      if (getUserIdentifier && typeof getUserIdentifier === 'function') {
+        const identifier = getUserIdentifier();
+        if (identifier) return identifier;
+      }
+      if (userData?.username) return userData.username;
+      if (user?.name) return user.name;
+      if (user?.username) return user.username;
+      if (user?.email) return user.email.split('@')[0];
+      return 'Player';
+    } catch (err) {
+      console.error('Error getting username:', err);
+      return 'Player';
     }
-    // Then try userData
-    if (userData?.username) {
-      return userData.username;
-    }
-    // Then try user object
-    if (user?.name) {
-      return user.name;
-    }
-    if (user?.username) {
-      return user.username;
-    }
-    if (user?.email) {
-      return user.email.split('@')[0];
-    }
-    return 'Player';
   }, [getUserIdentifier, userData, user]);
+
+  // Save to localStorage with game progress
+  const saveToLocalStorage = useCallback((email, xp, scores, achievements, gameProgress) => {
+    if (!email) return;
+    try {
+      localStorage.setItem(`userXP_${email}`, xp.toString());
+      localStorage.setItem(`userTotalScores_${email}`, scores.toString());
+      if (achievements) {
+        localStorage.setItem(`achievements_${email}`, JSON.stringify(achievements));
+      }
+      if (gameProgress) {
+        localStorage.setItem(`gameProgress_${email}`, JSON.stringify(gameProgress));
+      }
+      console.log('💾 Saved to localStorage:', { xp, scores, hasGameProgress: !!gameProgress });
+    } catch (error) {
+      console.error('Error saving to localStorage:', error);
+    }
+  }, []);
 
   // Load leaderboard data from Supabase
   const loadLeaderboardData = useCallback(async () => {
     try {
       console.log('🔄 Loading leaderboard data...');
       const leaderboard = await leaderboardService.getLeaderboard();
-      console.log('📊 Raw leaderboard data:', leaderboard);
       
       const filteredLeaderboard = leaderboard.filter(entry => 
+        entry && 
         entry.email && 
         !entry.email.includes('test') && 
         !entry.email.includes('guest') &&
@@ -337,66 +187,48 @@ function Achievement() {
           console.log(`🏆 User rank: #${userIndex + 1}`);
         } else {
           setUserRank(null);
-          console.log('User not found in leaderboard');
         }
       }
       
       console.log('✅ Leaderboard loaded:', filteredLeaderboard.length, 'players');
     } catch (error) {
       console.error('❌ Error loading leaderboard:', error);
+      setError('Failed to load leaderboard data');
     }
   }, [user?.email]);
 
-  // Force update leaderboard with latest data from dashboard
+  // Force update leaderboard with latest data
   const forceUpdateLeaderboard = useCallback(async () => {
     if (!user?.email || user.email === 'guest') return;
     
     try {
-      // Get the latest game progress and XP from userData (this is the source of truth)
       const latestGameProgress = userData?.gameProgress || {};
-      
-      // Calculate total scores from all games
       const latestScores = calculateTotalScores(latestGameProgress);
-      
-      // Get latest XP from userData or from getUserXP function
-      const latestXP = getUserXP ? getUserXP() : (userData?.xp || 0);
-      
-      // Calculate achievements XP
-      const achievementsXP = achievements.filter(a => a.unlocked).reduce((sum, a) => sum + (a.xpReward || 0), 0);
-      
-      // Total XP = Game XP + Achievements XP
-      const totalXP = latestXP + achievementsXP;
-      
+      const latestGameXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : (userData?.xp || 0);
       const username = getUserName();
       
-      console.log('📊 Force updating leaderboard with dashboard values:', {
-        email: user.email,
-        username,
-        totalXP,
-        totalScores: latestScores,
-        gameXP: latestXP,
-        achievementsXP
-      });
+      console.log('📊 Force updating leaderboard with dashboard values');
       
-      // Update Supabase with current dashboard values
-      await leaderboardService.forceUpdateLeaderboard(user.email, username, totalXP, latestScores);
-      console.log('✅ Leaderboard force updated with dashboard values');
+      await leaderboardService.forceUpdateLeaderboard(user.email, username, latestGameXP, latestScores);
       
-      // Update local state to match
       setTotalScores(latestScores);
-      setGameXP(latestXP);
-      
-      // Reload leaderboard after update
+      setGameXP(latestGameXP);
       await loadLeaderboardData();
       setLastUpdate(Date.now());
       
     } catch (error) {
       console.error('❌ Error force updating leaderboard:', error);
+      setError('Failed to update leaderboard');
     }
-  }, [user, userData, achievements, loadLeaderboardData, getUserXP, getUserName]);
+  }, [user, userData, loadLeaderboardData, getUserXP, getUserName, calculateTotalScores]);
 
-  // Load user achievements and data
+  // Main load function with improved persistence
   const loadUserData = useCallback(async () => {
+    if (isLoadingRef.current) {
+      console.log('Already loading, skipping...');
+      return;
+    }
+    
     if (!user?.email) {
       console.log('Waiting for user to log in...');
       setLoading(false);
@@ -404,49 +236,73 @@ function Achievement() {
     }
 
     console.log(`🔄 Loading achievements for user: ${user.email}`);
+    isLoadingRef.current = true;
     setLoading(true);
+    setError(null);
     
     try {
-      // Get game progress from userData (source of truth)
+      // FIRST: Try to get data from Supabase
       let gameProgress = userData?.gameProgress || {};
+      let userXP = userData?.xp || 0;
+      let userTotalScores = userData?.totalScores || 0;
       
-      // If no userData, try localStorage
+      console.log('📊 Data from Supabase:', { 
+        hasGameProgress: Object.keys(gameProgress).length > 0,
+        userXP, 
+        userTotalScores 
+      });
+      
+      // If Supabase data is empty or incomplete, try localStorage
       if (Object.keys(gameProgress).length === 0) {
-        const savedProgress = localStorage.getItem('gameProgress');
+        const savedProgress = localStorage.getItem(`gameProgress_${user.email}`);
         if (savedProgress) {
           gameProgress = JSON.parse(savedProgress);
-          console.log('Game progress from localStorage:', gameProgress);
+          console.log('📀 Loaded game progress from localStorage:', gameProgress);
         }
       }
       
-      // Calculate total scores
-      const totalScoresValue = calculateTotalScores(gameProgress);
-      setTotalScores(totalScoresValue);
-      
-      // Load XP from userData (source of truth)
-      let loadedXP = getUserXP ? getUserXP() : (userData?.xp || 0);
-      
-      // If no userData, try localStorage
-      if (loadedXP === 0 && user?.email) {
+      if (userXP === 0) {
         const savedXP = localStorage.getItem(`userXP_${user.email}`);
         if (savedXP && !isNaN(parseInt(savedXP))) {
-          loadedXP = parseInt(savedXP);
+          userXP = parseInt(savedXP);
+          console.log('📀 Loaded XP from localStorage:', userXP);
         }
       }
-      setGameXP(loadedXP);
       
-      console.log('✅ Dashboard values loaded:', {
-        gameXP: loadedXP,
-        totalScores: totalScoresValue,
-        gameProgress
-      });
+      if (userTotalScores === 0) {
+        const savedScores = localStorage.getItem(`userTotalScores_${user.email}`);
+        if (savedScores && !isNaN(parseInt(savedScores))) {
+          userTotalScores = parseInt(savedScores);
+          console.log('📀 Loaded total scores from localStorage:', userTotalScores);
+        } else {
+          // Calculate from game progress if not stored
+          userTotalScores = calculateTotalScores(gameProgress);
+          console.log('📊 Calculated total scores from game progress:', userTotalScores);
+        }
+      }
+      
+      // If we have data in localStorage but not in Supabase, sync it up
+      if ((userXP > 0 || userTotalScores > 0) && (!userData?.xp || userData.xp === 0)) {
+        console.log('🔄 Syncing localStorage data to Supabase');
+        if (updateUserData && typeof updateUserData === 'function') {
+          await updateUserData({
+            ...userData,
+            gameProgress,
+            xp: userXP,
+            totalScores: userTotalScores
+          });
+        }
+      }
+      
+      setGameXP(userXP);
+      setTotalScores(userTotalScores);
       
       // Get achievements from Supabase
       let userAchievements = await leaderboardService.getUserAchievements(user.email);
       
       if (!userAchievements || userAchievements.length === 0) {
         console.log('Creating new achievements for user');
-        userAchievements = achievementTemplates.map(template => {
+        userAchievements = achievementTemplates.current.map(template => {
           const shouldBeUnlocked = checkIfAchievementUnlocked(template, gameProgress);
           const progressValue = getAchievementProgress(template, gameProgress);
           
@@ -460,7 +316,7 @@ function Achievement() {
         
         await leaderboardService.updateUserAchievements(user.email, userAchievements);
       } else {
-        // Update existing achievements progress
+        // Update existing achievements based on latest game progress
         let updatedAchievements = [...userAchievements];
         let hasChanges = false;
         
@@ -498,89 +354,90 @@ function Achievement() {
       
       setAchievements(userAchievements);
       
-      // Save to localStorage as backup
-      localStorage.setItem(`achievements_${user.email}`, JSON.stringify(userAchievements));
+      // Save to localStorage for future refreshes
+      saveToLocalStorage(user.email, userXP, userTotalScores, userAchievements, gameProgress);
       
-      // Force update leaderboard with current dashboard values
       await forceUpdateLeaderboard();
-      
-      // Load leaderboard data
       await loadLeaderboardData();
       
-      // Update userData if needed
-      if (updateUserData) {
+      if (updateUserData && typeof updateUserData === 'function') {
         updateUserData({ 
           ...userData,
+          gameProgress,
           achievements: userAchievements,
-          xp: loadedXP,
-          username: getUserName()
+          xp: userXP,
+          username: getUserName(),
+          totalScores: userTotalScores
         });
       }
       
+      hasLoadedRef.current = true;
+      
     } catch (error) {
       console.error('❌ Error loading achievements:', error);
+      setError('Failed to load achievements. Please try again later.');
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
-  }, [user, userData, updateUserData, loadLeaderboardData, forceUpdateLeaderboard, getUserXP, getUserName]);
+  }, [user, userData, updateUserData, loadLeaderboardData, forceUpdateLeaderboard, getUserXP, getUserName, calculateTotalScores, checkIfAchievementUnlocked, getAchievementProgress, saveToLocalStorage]);
 
-  // Initial load
+  // Initial load with improved checks
   useEffect(() => {
-    loadUserData();
-  }, [loadUserData]);
-
-  // Listen for messages from Games component to update leaderboard
-  useEffect(() => {
-    const handleMessage = (event) => {
-      console.log('📨 Message received in Achievement:', event.data);
-      
-      if (event.data && event.data.type === 'SCORE_UPDATE') {
-        console.log('📊 Score update received, refreshing data...');
-        // Refresh all data
+    // Check if user is logged in and we haven't loaded data
+    if (user?.email && !hasLoadedRef.current && !isLoadingRef.current) {
+      console.log('🎯 Initial load triggered');
+      loadUserData();
+    } else if (!user?.email && !loading) {
+      setLoading(false);
+    }
+    
+    // Listen for storage events (for cross-tab synchronization)
+    const handleStorageChange = (e) => {
+      if (e.key === `userXP_${user?.email}` || 
+          e.key === `userTotalScores_${user?.email}` ||
+          e.key === `gameProgress_${user?.email}`) {
+        console.log('🔄 Storage changed, reloading data');
         loadUserData();
       }
-      
-      if (event.data && event.data.type === 'GAME_RESULT') {
-        console.log('🎮 Game result received, refreshing data...');
-        // Refresh all data after a short delay
-        setTimeout(() => loadUserData(), 500);
-      }
-      
-      if (event.data && event.data.type === 'XP_UPDATE') {
-        console.log('⭐ XP update received, refreshing leaderboard...');
-        // Refresh leaderboard immediately for XP changes
-        setTimeout(() => forceUpdateLeaderboard(), 100);
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [user?.email, loadUserData, loading]);
+
+  // Listen for game completion messages
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data && (event.data.type === 'SCORE_UPDATE' || 
+          event.data.type === 'GAME_RESULT' || 
+          event.data.type === 'XP_UPDATE')) {
+        console.log('📨 Received game update message:', event.data);
+        setTimeout(() => {
+          if (!isLoadingRef.current) {
+            loadUserData();
+          }
+        }, 500); // Increased delay to ensure data is saved
       }
     };
     
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [loadUserData, forceUpdateLeaderboard]);
+  }, [loadUserData]);
 
-  // Periodic refresh of leaderboard (every 10 seconds)
+  // Periodic refresh
   useEffect(() => {
-    if (!user?.email) return;
+    if (!user?.email || !hasLoadedRef.current) return;
     
     const interval = setInterval(() => {
-      console.log('🔄 Periodic leaderboard refresh...');
-      forceUpdateLeaderboard();
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [user?.email, forceUpdateLeaderboard]);
-
-  // Refresh when page becomes visible again
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden && user?.email) {
-        console.log('👁️ Page became visible, refreshing data...');
+      if (!isLoadingRef.current && !loading && hasLoadedRef.current) {
+        console.log('🔄 Periodic refresh');
         forceUpdateLeaderboard();
       }
-    };
+    }, 30000);
     
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user?.email, forceUpdateLeaderboard]);
+    return () => clearInterval(interval);
+  }, [user?.email, forceUpdateLeaderboard, loading]);
 
   const getRarityColor = (rarity) => {
     switch(rarity) {
@@ -607,15 +464,9 @@ function Achievement() {
     unlocked: achievements.filter(a => a.unlocked).length,
     achievementsXP: achievements.filter(a => a.unlocked).reduce((sum, a) => sum + (a.xpReward || 0), 0),
     gameXP: gameXP,
-    totalXP: achievements.filter(a => a.unlocked).reduce((sum, a) => sum + (a.xpReward || 0), 0) + gameXP,
+    totalXP: gameXP,
     totalCoins: achievements.filter(a => a.unlocked).reduce((sum, a) => sum + (a.coinReward || 0), 0),
     totalScores: totalScores
-  };
-
-  const leaderboardTotals = {
-    totalScores: leaderboardData.reduce((sum, entry) => sum + (entry.totalScores || 0), 0),
-    totalXP: leaderboardData.reduce((sum, entry) => sum + (entry.totalXP || 0), 0),
-    totalPlayers: leaderboardData.length
   };
 
   const currentUserData = leaderboardData.find(entry => entry.email === user?.email);
@@ -627,7 +478,22 @@ function Achievement() {
     return null;
   };
 
-  if (loading) {
+  if (error) {
+    return (
+      <div style={styles.errorContainer}>
+        <div style={styles.errorContent}>
+          <GiAchievement size={64} color="#ef4444" />
+          <h3>Error Loading Achievements</h3>
+          <p>{error}</p>
+          <button onClick={() => loadUserData()} style={styles.retryButton}>
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading && achievements.length === 0) {
     return (
       <div style={styles.loadingContainer}>
         <div style={styles.loadingSpinner}></div>
@@ -648,7 +514,7 @@ function Achievement() {
 
   const rankBadge = userRank && getRankBadge(userRank);
   const displayUsername = getUserName();
-  const currentXP = getUserXP ? getUserXP() : gameXP;
+  const currentXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : gameXP;
 
   return (
     <div style={styles.container}>
@@ -664,6 +530,7 @@ function Achievement() {
             <div style={styles.userInfo}>
               <span>Logged in as: <strong>{displayUsername}</strong> ({user.email})</span>
               <span style={styles.xpBadge}>⭐ {currentXP} XP</span>
+              <span style={styles.scoreBadge}>🎯 {totalScores} Total Score</span>
               <span style={styles.lastUpdateBadge}>Last updated: {new Date(lastUpdate).toLocaleTimeString()}</span>
             </div>
           )}
@@ -675,7 +542,7 @@ function Achievement() {
             <div style={styles.userRankHeader}>
               <MdTrendingUp size={24} color="#f59e0b" />
               <h3>Your Global Ranking</h3>
-              <button onClick={forceUpdateLeaderboard} style={styles.refreshButton}>
+              <button onClick={() => forceUpdateLeaderboard()} style={styles.refreshButton}>
                 🔄 Refresh
               </button>
             </div>
@@ -709,14 +576,14 @@ function Achievement() {
                 </div>
                 <div style={styles.userStatItem}>
                   <span style={styles.userStatLabel}>Total XP</span>
-                  <span style={styles.userStatValue}>{stats.totalXP}</span>
+                  <span style={styles.userStatValue}>{stats.gameXP}</span>
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Stats Overview - Dashboard */}
+        {/* Stats Overview */}
         <div style={styles.statsGrid}>
           <div style={styles.statCard}>
             <GiTrophy size={32} color="#f59e0b" />
@@ -751,7 +618,7 @@ function Achievement() {
             <div style={styles.statInfo}>
               <span style={styles.statLabel}>Total XP</span>
               <span style={{...styles.statValue, color: '#f59e0b', fontWeight: 'bold'}}>
-                {stats.totalXP}
+                {stats.gameXP}
               </span>
             </div>
           </div>
@@ -772,7 +639,7 @@ function Achievement() {
             <GiTrophy size={28} color="#f59e0b" />
             <h2 style={styles.sectionTitle}>Global Leaderboard</h2>
             <span style={styles.playerCount}>{leaderboardData.length} Players</span>
-            <button onClick={forceUpdateLeaderboard} style={styles.smallRefreshButton}>
+            <button onClick={() => forceUpdateLeaderboard()} style={styles.smallRefreshButton}>
               🔄 Refresh
             </button>
           </div>
@@ -794,8 +661,9 @@ function Achievement() {
                     
                     return (
                       <tr 
-                        key={entry.email} 
+                        key={entry.email || index} 
                         style={isCurrentUser ? styles.currentUserRow : styles.tableRow}
+                        className={isCurrentUser ? 'current-user-row' : ''}
                       >
                         <td style={styles.tableCell}>
                           {index === 0 && <span style={styles.medal}>🥇</span>}
@@ -822,7 +690,7 @@ function Achievement() {
                           <div style={styles.xpContainer}>
                             <FaBolt size={14} color="#f59e0b" />
                             <span style={styles.xpValue}>
-                              {isCurrentUser ? stats.totalXP : (entry.totalXP?.toLocaleString() || 0)} XP
+                              {isCurrentUser ? stats.gameXP : (entry.totalXP?.toLocaleString() || 0)} XP
                             </span>
                           </div>
                         </td>
@@ -841,88 +709,86 @@ function Achievement() {
           </div>
         </div>
 
-        {/* Privacy Note */}
-       
-
         {/* Achievements Grid */}
         <div style={styles.achievementsGrid}>
-          {achievements.map(achievement => (
-            <div
-              key={achievement.id}
-              style={{
-                ...styles.achievementCard,
-                opacity: achievement.unlocked ? 1 : 0.8,
-                borderLeft: `4px solid ${getRarityColor(achievement.rarity)}`,
-              }}
-            >
-              <div style={{ ...styles.achievementIcon, backgroundColor: achievement.color + '20', color: achievement.color }}>
-                {achievement.icon}
-              </div>
-
-              <div style={styles.achievementContent}>
-                <div style={styles.achievementHeader}>
-                  <h3 style={styles.achievementName}>{achievement.name}</h3>
-                  <span style={{ ...styles.rarityBadge, backgroundColor: getRarityColor(achievement.rarity) + '20', color: getRarityColor(achievement.rarity) }}>
-                    {getRarityBadge(achievement.rarity)}
-                  </span>
+          {achievements.length > 0 ? (
+            achievements.map(achievement => (
+              <div
+                key={achievement.id}
+                style={{
+                  ...styles.achievementCard,
+                  opacity: achievement.unlocked ? 1 : 0.8,
+                  borderLeft: `4px solid ${getRarityColor(achievement.rarity)}`,
+                }}
+                className="achievement-card"
+              >
+                <div style={{ ...styles.achievementIcon, backgroundColor: achievement.color + '20', color: achievement.color }}>
+                  {getIconForAchievement(achievement.iconType, 24)}
                 </div>
 
-                <p style={styles.achievementDescription}>{achievement.description}</p>
+                <div style={styles.achievementContent}>
+                  <div style={styles.achievementHeader}>
+                    <h3 style={styles.achievementName}>{achievement.name}</h3>
+                    <span style={{ ...styles.rarityBadge, backgroundColor: getRarityColor(achievement.rarity) + '20', color: getRarityColor(achievement.rarity) }}>
+                      {getRarityBadge(achievement.rarity)}
+                    </span>
+                  </div>
+
+                  <p style={styles.achievementDescription}>{achievement.description}</p>
+
+                  {!achievement.unlocked && (
+                    <div style={styles.progressContainer}>
+                      <div style={styles.progressBarSmall}>
+                        <div 
+                          style={{
+                            ...styles.progressFill,
+                            width: `${(achievement.progress / achievement.total) * 100}%`,
+                            backgroundColor: getRarityColor(achievement.rarity)
+                          }}
+                        />
+                      </div>
+                      <span style={styles.progressText}>
+                        {achievement.progress}/{achievement.total}
+                      </span>
+                    </div>
+                  )}
+
+                  <div style={styles.achievementRewards}>
+                    <div style={styles.reward}>
+                      <FaBolt size={12} color="#f59e0b" />
+                      <span style={styles.rewardValue}>{achievement.xpReward} XP</span>
+                    </div>
+                    <div style={styles.reward}>
+                      <GiTrophy size={12} color="#f59e0b" />
+                      <span style={styles.rewardValue}>{achievement.coinReward} coins</span>
+                    </div>
+                  </div>
+
+                  {achievement.unlocked && achievement.unlockedDate && (
+                    <div style={styles.unlockedInfo}>
+                      <MdEmojiEvents size={14} color="#10b981" />
+                      <span style={styles.unlockedDate}>
+                        Unlocked on {new Date(achievement.unlockedDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
 
                 {!achievement.unlocked && (
-                  <div style={styles.progressContainer}>
-                    <div style={styles.progressBarSmall}>
-                      <div 
-                        style={{
-                          ...styles.progressFill,
-                          width: `${(achievement.progress / achievement.total) * 100}%`,
-                          backgroundColor: getRarityColor(achievement.rarity)
-                        }}
-                      />
-                    </div>
-                    <span style={styles.progressText}>
-                      {achievement.progress}/{achievement.total}
-                    </span>
-                  </div>
-                )}
-
-                <div style={styles.achievementRewards}>
-                  <div style={styles.reward}>
-                    <FaBolt size={12} color="#f59e0b" />
-                    <span style={styles.rewardValue}>{achievement.xpReward} XP</span>
-                  </div>
-                  <div style={styles.reward}>
-                    <GiTrophy size={12} color="#f59e0b" />
-                    <span style={styles.rewardValue}>{achievement.coinReward} coins</span>
-                  </div>
-                </div>
-
-                {achievement.unlocked && achievement.unlockedDate && (
-                  <div style={styles.unlockedInfo}>
-                    <MdEmojiEvents size={14} color="#10b981" />
-                    <span style={styles.unlockedDate}>
-                      Unlocked on {new Date(achievement.unlockedDate).toLocaleDateString()}
-                    </span>
+                  <div style={styles.lockedIcon}>
+                    <MdLock size={20} color="#9ca3af" />
                   </div>
                 )}
               </div>
-
-              {!achievement.unlocked && (
-                <div style={styles.lockedIcon}>
-                  <MdLock size={20} color="#9ca3af" />
-                </div>
-              )}
+            ))
+          ) : (
+            <div style={styles.emptyState}>
+              <GiAchievement size={64} color="#d1d5db" />
+              <h3 style={styles.emptyTitle}>No achievements found</h3>
+              <p style={styles.emptyText}>Start playing games to earn achievements!</p>
             </div>
-          ))}
+          )}
         </div>
-
-        {achievements.length === 0 && (
-          <div style={styles.emptyState}>
-            <GiAchievement size={64} color="#d1d5db" />
-            <h3 style={styles.emptyTitle}>No achievements found</h3>
-            <p style={styles.emptyText}>Start playing games to earn achievements!</p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -955,6 +821,31 @@ const styles = {
     borderTop: '4px solid #3b82f6',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
+  },
+  errorContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '100vh',
+    backgroundColor: '#f3f4f6',
+  },
+  errorContent: {
+    textAlign: 'center',
+    padding: '40px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    maxWidth: '400px',
+  },
+  retryButton: {
+    marginTop: '20px',
+    padding: '10px 20px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
   },
   header: {
     marginBottom: '30px',
@@ -996,10 +887,18 @@ const styles = {
     fontWeight: 'bold',
     fontSize: '13px',
   },
+  scoreBadge: {
+    backgroundColor: '#d1fae5',
+    color: '#059669',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+  },
   lastUpdateBadge: {
     fontSize: '11px',
-    color: '#f59e0b',
-    backgroundColor: '#fef3c7',
+    color: '#6b7280',
+    backgroundColor: '#f3f4f6',
     padding: '2px 8px',
     borderRadius: '12px',
   },
@@ -1207,15 +1106,6 @@ const styles = {
     padding: '40px',
     color: '#9ca3af',
   },
-  privacyNote: {
-    marginBottom: '20px',
-    padding: '12px',
-    backgroundColor: '#fef3c7',
-    borderRadius: '8px',
-    textAlign: 'center',
-    fontSize: '12px',
-    color: '#92400e',
-  },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
@@ -1370,35 +1260,37 @@ const styles = {
 };
 
 // Add keyframes for spinner animation
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  .achievement-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
-  }
-  
-  .current-user-row:hover {
-    background-color: #fef3c7 !important;
-    transform: scale(1.01);
-  }
-  
-  tr:not(.current-user-row):hover {
-    background-color: #f9fafb;
-  }
-  
-  button:hover {
-    transform: scale(1.02);
-  }
-  
-  button:active {
-    transform: scale(0.98);
-  }
-`;
-document.head.appendChild(styleSheet);
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.textContent = `
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .achievement-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    }
+    
+    .current-user-row:hover {
+      background-color: #fef3c7 !important;
+      transform: scale(1.01);
+    }
+    
+    tr:not(.current-user-row):hover {
+      background-color: #f9fafb;
+    }
+    
+    button:hover {
+      transform: scale(1.02);
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+  `;
+  document.head.appendChild(styleSheet);
+}
 
 export default Achievement;
