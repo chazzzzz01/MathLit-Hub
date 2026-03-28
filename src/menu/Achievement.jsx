@@ -5,8 +5,40 @@ import { FaStar, FaBolt } from 'react-icons/fa';
 import { MdLock, MdEmojiEvents, MdTrendingUp } from 'react-icons/md';
 import { leaderboardService } from '../services/leaderboardService';
 
+// Achievement templates - ADD THIS ARRAY (only the achievements you want to keep)
+const ACHIEVEMENT_TEMPLATES = [
+  // Point Collector Achievement
+  {
+    id: 'point_collector',
+    name: 'Point Collector',
+    description: 'Collect points across all games',
+    requirementType: 'score1000',
+    total: 1000,
+    xpReward: 500,
+    coinReward: 100,
+    rarity: 'rare',
+    iconType: 'star',
+    color: '#8b5cf6'
+  },
+  // Arena Champion Achievement
+  {
+    id: 'arena_champion',
+    name: 'Arena Champion',
+    description: 'Complete Math Battle Arena',
+    requirementType: 'battleCompleted',
+    total: 1,
+    xpReward: 100,
+    coinReward: 50,
+    rarity: 'rare',
+    iconType: 'trophy',
+    color: '#3b82f6'
+  },
+  // Add more achievements you want to keep here
+  // DO NOT include First Steps, Battle Legend, Perfect Score, 
+  // Galactic Hero, Dedicated Player, or Try Hard
+];
+
 function Achievement() {
-  // Get user data from context with error handling
   const context = useOutletContext();
   const { user, userData, updateUserData, getUserIdentifier, getUserXP } = context || {};
   
@@ -18,13 +50,36 @@ function Achievement() {
   const [totalScores, setTotalScores] = useState(0);
   const [lastUpdate, setLastUpdate] = useState(Date.now());
   const [error, setError] = useState(null);
+  const [dataCleared, setDataCleared] = useState(false);
   
-  // Add refs to prevent multiple loads
+  // Refs for preventing multiple loads
   const hasLoadedRef = useRef(false);
   const isLoadingRef = useRef(false);
-  const initialLoadRef = useRef(true);
+  const mountedRef = useRef(true);
+  const refreshIntervalRef = useRef(null);
+  const isMobileRef = useRef(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
 
-  // Function to get icon component based on type
+  // Function to clear old achievement data
+  const clearOldAchievementData = useCallback(async () => {
+    if (!user?.email || dataCleared) return;
+    
+    try {
+      console.log('🧹 Clearing old achievement data...');
+      
+      // Clear from localStorage
+      localStorage.removeItem(`achievements_${user.email}`);
+      
+      // Clear from Supabase - set empty achievements array
+      await leaderboardService.updateUserAchievements(user.email, []);
+      
+      setDataCleared(true);
+      console.log('✅ Old achievement data cleared');
+    } catch (error) {
+      console.error('Error clearing old data:', error);
+    }
+  }, [user?.email, dataCleared]);
+
+  // Function to get icon component
   const getIconForAchievement = (iconType, size = 24) => {
     switch(iconType) {
       case 'star':
@@ -40,9 +95,6 @@ function Achievement() {
     }
   };
 
-
-
-  // Helper function to check if an achievement is unlocked based on game progress
   const checkIfAchievementUnlocked = useCallback((achievement, gameProgress) => {
     if (!gameProgress) return false;
     
@@ -81,7 +133,6 @@ function Achievement() {
     }
   }, []);
 
-  // Helper function to get achievement progress
   const getAchievementProgress = useCallback((achievement, gameProgress) => {
     if (!gameProgress) return 0;
     
@@ -120,7 +171,6 @@ function Achievement() {
     }
   }, []);
 
-  // Helper function to calculate total scores from game progress
   const calculateTotalScores = useCallback((gameProgress) => {
     if (!gameProgress) return 0;
     const equationScore = gameProgress.equation?.highScore || 0;
@@ -129,7 +179,6 @@ function Achievement() {
     return equationScore + battleScore + spaceScore;
   }, []);
 
-  // Get username from user data
   const getUserName = useCallback(() => {
     try {
       if (getUserIdentifier && typeof getUserIdentifier === 'function') {
@@ -147,7 +196,6 @@ function Achievement() {
     }
   }, [getUserIdentifier, userData, user]);
 
-  // Save to localStorage with game progress
   const saveToLocalStorage = useCallback((email, xp, scores, achievements, gameProgress) => {
     if (!email) return;
     try {
@@ -159,16 +207,13 @@ function Achievement() {
       if (gameProgress) {
         localStorage.setItem(`gameProgress_${email}`, JSON.stringify(gameProgress));
       }
-      console.log('💾 Saved to localStorage:', { xp, scores, hasGameProgress: !!gameProgress });
     } catch (error) {
       console.error('Error saving to localStorage:', error);
     }
   }, []);
 
-  // Load leaderboard data from Supabase
   const loadLeaderboardData = useCallback(async () => {
     try {
-      console.log('🔄 Loading leaderboard data...');
       const leaderboard = await leaderboardService.getLeaderboard();
       
       const filteredLeaderboard = leaderboard.filter(entry => 
@@ -178,28 +223,30 @@ function Achievement() {
         !entry.email.includes('guest') &&
         entry.username !== 'Guest'
       );
-      setLeaderboardData(filteredLeaderboard);
       
-      if (user?.email) {
-        const userIndex = filteredLeaderboard.findIndex(entry => entry.email === user.email);
-        if (userIndex !== -1) {
-          setUserRank(userIndex + 1);
-          console.log(`🏆 User rank: #${userIndex + 1}`);
-        } else {
-          setUserRank(null);
+      if (mountedRef.current) {
+        setLeaderboardData(filteredLeaderboard);
+        
+        if (user?.email) {
+          const userIndex = filteredLeaderboard.findIndex(entry => entry.email === user.email);
+          if (userIndex !== -1) {
+            setUserRank(userIndex + 1);
+          } else {
+            setUserRank(null);
+          }
         }
       }
-      
-      console.log('✅ Leaderboard loaded:', filteredLeaderboard.length, 'players');
     } catch (error) {
-      console.error('❌ Error loading leaderboard:', error);
-      setError('Failed to load leaderboard data');
+      console.error('Error loading leaderboard:', error);
+      if (mountedRef.current) {
+        setError('Failed to load leaderboard data');
+      }
     }
   }, [user?.email]);
 
-  // Force update leaderboard with latest data
   const forceUpdateLeaderboard = useCallback(async () => {
     if (!user?.email || user.email === 'guest') return;
+    if (isLoadingRef.current) return;
     
     try {
       const latestGameProgress = userData?.gameProgress || {};
@@ -207,57 +254,53 @@ function Achievement() {
       const latestGameXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : (userData?.xp || 0);
       const username = getUserName();
       
-      console.log('📊 Force updating leaderboard with dashboard values');
-      
       await leaderboardService.forceUpdateLeaderboard(user.email, username, latestGameXP, latestScores);
       
-      setTotalScores(latestScores);
-      setGameXP(latestGameXP);
-      await loadLeaderboardData();
-      setLastUpdate(Date.now());
-      
+      if (mountedRef.current) {
+        setTotalScores(latestScores);
+        setGameXP(latestGameXP);
+        await loadLeaderboardData();
+        setLastUpdate(Date.now());
+      }
     } catch (error) {
-      console.error('❌ Error force updating leaderboard:', error);
-      setError('Failed to update leaderboard');
+      console.error('Error force updating leaderboard:', error);
     }
   }, [user, userData, loadLeaderboardData, getUserXP, getUserName, calculateTotalScores]);
 
-  // Main load function with improved persistence
-  const loadUserData = useCallback(async () => {
+  // Main load function with improved mobile handling
+  const loadUserData = useCallback(async (isRetry = false) => {
+    // Prevent concurrent loads
     if (isLoadingRef.current) {
       console.log('Already loading, skipping...');
       return;
     }
     
     if (!user?.email) {
-      console.log('Waiting for user to log in...');
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
       return;
     }
 
-    console.log(`🔄 Loading achievements for user: ${user.email}`);
+    console.log(`Loading achievements for user: ${user.email}`);
     isLoadingRef.current = true;
-    setLoading(true);
-    setError(null);
+    
+    if (mountedRef.current) setLoading(true);
     
     try {
-      // FIRST: Try to get data from Supabase
+      // First, clear old achievement data if needed
+      if (!dataCleared) {
+        await clearOldAchievementData();
+      }
+      
+      // Get data from Supabase
       let gameProgress = userData?.gameProgress || {};
       let userXP = userData?.xp || 0;
       let userTotalScores = userData?.totalScores || 0;
       
-      console.log('📊 Data from Supabase:', { 
-        hasGameProgress: Object.keys(gameProgress).length > 0,
-        userXP, 
-        userTotalScores 
-      });
-      
-      // If Supabase data is empty or incomplete, try localStorage
+      // Try localStorage if Supabase data is empty
       if (Object.keys(gameProgress).length === 0) {
         const savedProgress = localStorage.getItem(`gameProgress_${user.email}`);
         if (savedProgress) {
           gameProgress = JSON.parse(savedProgress);
-          console.log('📀 Loaded game progress from localStorage:', gameProgress);
         }
       }
       
@@ -265,7 +308,6 @@ function Achievement() {
         const savedXP = localStorage.getItem(`userXP_${user.email}`);
         if (savedXP && !isNaN(parseInt(savedXP))) {
           userXP = parseInt(savedXP);
-          console.log('📀 Loaded XP from localStorage:', userXP);
         }
       }
       
@@ -273,36 +315,33 @@ function Achievement() {
         const savedScores = localStorage.getItem(`userTotalScores_${user.email}`);
         if (savedScores && !isNaN(parseInt(savedScores))) {
           userTotalScores = parseInt(savedScores);
-          console.log('📀 Loaded total scores from localStorage:', userTotalScores);
         } else {
-          // Calculate from game progress if not stored
           userTotalScores = calculateTotalScores(gameProgress);
-          console.log('📊 Calculated total scores from game progress:', userTotalScores);
         }
       }
       
-      // If we have data in localStorage but not in Supabase, sync it up
-      if ((userXP > 0 || userTotalScores > 0) && (!userData?.xp || userData.xp === 0)) {
-        console.log('🔄 Syncing localStorage data to Supabase');
-        if (updateUserData && typeof updateUserData === 'function') {
-          await updateUserData({
-            ...userData,
-            gameProgress,
-            xp: userXP,
-            totalScores: userTotalScores
-          });
-        }
+      // Sync localStorage data to Supabase if needed
+      if ((userXP > 0 || userTotalScores > 0) && (!userData?.xp || userData.xp === 0) && updateUserData) {
+        await updateUserData({
+          ...userData,
+          gameProgress,
+          xp: userXP,
+          totalScores: userTotalScores
+        });
       }
       
-      setGameXP(userXP);
-      setTotalScores(userTotalScores);
+      if (mountedRef.current) {
+        setGameXP(userXP);
+        setTotalScores(userTotalScores);
+      }
       
-      // Get achievements from Supabase
+      // Get achievements - now with the new templates only
       let userAchievements = await leaderboardService.getUserAchievements(user.email);
       
-      if (!userAchievements || userAchievements.length === 0) {
-        console.log('Creating new achievements for user');
-        userAchievements = achievementTemplates.current.map(template => {
+      // If no achievements or if there are achievements but they're from old templates
+      if (!userAchievements || userAchievements.length === 0 || userAchievements.length !== ACHIEVEMENT_TEMPLATES.length) {
+        // Create fresh achievements from templates
+        userAchievements = ACHIEVEMENT_TEMPLATES.map(template => {
           const shouldBeUnlocked = checkIfAchievementUnlocked(template, gameProgress);
           const progressValue = getAchievementProgress(template, gameProgress);
           
@@ -315,19 +354,40 @@ function Achievement() {
         });
         
         await leaderboardService.updateUserAchievements(user.email, userAchievements);
+        console.log('✅ Created new achievements from templates');
       } else {
-        // Update existing achievements based on latest game progress
+        // Update existing achievements but only keep ones that match our templates
         let updatedAchievements = [...userAchievements];
         let hasChanges = false;
         
+        // Filter out achievements that aren't in our templates
+        updatedAchievements = updatedAchievements.filter(achievement => 
+          ACHIEVEMENT_TEMPLATES.some(template => template.id === achievement.id)
+        );
+        
+        // Add any missing achievements from templates
+        for (const template of ACHIEVEMENT_TEMPLATES) {
+          if (!updatedAchievements.some(a => a.id === template.id)) {
+            const newAchievement = {
+              ...template,
+              unlocked: checkIfAchievementUnlocked(template, gameProgress),
+              unlockedDate: checkIfAchievementUnlocked(template, gameProgress) ? new Date().toISOString() : null,
+              progress: getAchievementProgress(template, gameProgress)
+            };
+            updatedAchievements.push(newAchievement);
+            hasChanges = true;
+          }
+        }
+        
+        // Update progress for existing achievements
         updatedAchievements = updatedAchievements.map(achievement => {
-          if (!achievement.unlocked) {
-            const progressValue = getAchievementProgress(achievement, gameProgress);
-            const newProgress = Math.min(progressValue, achievement.total);
-            const nowUnlocked = newProgress >= achievement.total;
+          const template = ACHIEVEMENT_TEMPLATES.find(t => t.id === achievement.id);
+          if (template && !achievement.unlocked) {
+            const progressValue = getAchievementProgress(template, gameProgress);
+            const newProgress = Math.min(progressValue, template.total);
+            const nowUnlocked = newProgress >= template.total;
             
             if (nowUnlocked && !achievement.unlocked) {
-              console.log(`🎉 Achievement unlocked: ${achievement.name}`);
               hasChanges = true;
               return {
                 ...achievement,
@@ -352,91 +412,100 @@ function Achievement() {
         userAchievements = updatedAchievements;
       }
       
-      setAchievements(userAchievements);
+      if (mountedRef.current) {
+        setAchievements(userAchievements);
+      }
       
-      // Save to localStorage for future refreshes
+      // Save to localStorage
       saveToLocalStorage(user.email, userXP, userTotalScores, userAchievements, gameProgress);
       
-      await forceUpdateLeaderboard();
-      await loadLeaderboardData();
+      // Load leaderboard data (but don't wait for it)
+      loadLeaderboardData().catch(console.error);
       
-      if (updateUserData && typeof updateUserData === 'function') {
-        updateUserData({ 
-          ...userData,
-          gameProgress,
-          achievements: userAchievements,
-          xp: userXP,
-          username: getUserName(),
-          totalScores: userTotalScores
-        });
+      // Force update leaderboard in background
+      if (!isRetry) {
+        forceUpdateLeaderboard().catch(console.error);
       }
       
       hasLoadedRef.current = true;
       
     } catch (error) {
-      console.error('❌ Error loading achievements:', error);
-      setError('Failed to load achievements. Please try again later.');
+      console.error('Error loading achievements:', error);
+      if (mountedRef.current) {
+        setError('Failed to load achievements. Please try again later.');
+      }
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
       isLoadingRef.current = false;
     }
-  }, [user, userData, updateUserData, loadLeaderboardData, forceUpdateLeaderboard, getUserXP, getUserName, calculateTotalScores, checkIfAchievementUnlocked, getAchievementProgress, saveToLocalStorage]);
+  }, [user, userData, updateUserData, loadLeaderboardData, forceUpdateLeaderboard, getUserXP, getUserName, calculateTotalScores, checkIfAchievementUnlocked, getAchievementProgress, saveToLocalStorage, clearOldAchievementData, dataCleared]);
 
-  // Initial load with improved checks
+  // Initial load
   useEffect(() => {
-    // Check if user is logged in and we haven't loaded data
+    mountedRef.current = true;
+    
     if (user?.email && !hasLoadedRef.current && !isLoadingRef.current) {
-      console.log('🎯 Initial load triggered');
-      loadUserData();
-    } else if (!user?.email && !loading) {
+      // Add a small delay on mobile to ensure DOM is ready
+      const delay = isMobileRef.current ? 100 : 0;
+      const timer = setTimeout(() => {
+        loadUserData();
+      }, delay);
+      return () => clearTimeout(timer);
+    } else if (!user?.email) {
       setLoading(false);
     }
     
-    // Listen for storage events (for cross-tab synchronization)
-    const handleStorageChange = (e) => {
-      if (e.key === `userXP_${user?.email}` || 
-          e.key === `userTotalScores_${user?.email}` ||
-          e.key === `gameProgress_${user?.email}`) {
-        console.log('🔄 Storage changed, reloading data');
-        loadUserData();
-      }
+    return () => {
+      mountedRef.current = false;
     };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [user?.email, loadUserData, loading]);
+  }, [user?.email, loadUserData]);
 
-  // Listen for game completion messages
+  // Listen for game completion messages (with debounce)
   useEffect(() => {
+    let messageTimeout = null;
+    
     const handleMessage = (event) => {
       if (event.data && (event.data.type === 'SCORE_UPDATE' || 
           event.data.type === 'GAME_RESULT' || 
           event.data.type === 'XP_UPDATE')) {
-        console.log('📨 Received game update message:', event.data);
-        setTimeout(() => {
-          if (!isLoadingRef.current) {
-            loadUserData();
+        
+        // Debounce reload on mobile to prevent multiple rapid reloads
+        if (messageTimeout) clearTimeout(messageTimeout);
+        messageTimeout = setTimeout(() => {
+          if (!isLoadingRef.current && hasLoadedRef.current) {
+            loadUserData(true);
           }
-        }, 500); // Increased delay to ensure data is saved
+        }, isMobileRef.current ? 1000 : 500);
       }
     };
     
     window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+      if (messageTimeout) clearTimeout(messageTimeout);
+    };
   }, [loadUserData]);
 
-  // Periodic refresh
+  // Periodic refresh - longer interval on mobile to save battery
   useEffect(() => {
     if (!user?.email || !hasLoadedRef.current) return;
     
-    const interval = setInterval(() => {
-      if (!isLoadingRef.current && !loading && hasLoadedRef.current) {
-        console.log('🔄 Periodic refresh');
+    // Longer interval on mobile (60s vs 30s)
+    const intervalTime = isMobileRef.current ? 60000 : 30000;
+    
+    refreshIntervalRef.current = setInterval(() => {
+      if (!isLoadingRef.current && !loading && hasLoadedRef.current && mountedRef.current) {
         forceUpdateLeaderboard();
       }
-    }, 30000);
+    }, intervalTime);
     
-    return () => clearInterval(interval);
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
   }, [user?.email, forceUpdateLeaderboard, loading]);
 
   const getRarityColor = (rarity) => {
@@ -478,6 +547,16 @@ function Achievement() {
     return null;
   };
 
+  // Show loading only on first load
+  if (loading && achievements.length === 0) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading your achievements...</p>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div style={styles.errorContainer}>
@@ -489,15 +568,6 @@ function Achievement() {
             Try Again
           </button>
         </div>
-      </div>
-    );
-  }
-
-  if (loading && achievements.length === 0) {
-    return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.loadingSpinner}></div>
-        <p>Loading your achievements...</p>
       </div>
     );
   }
@@ -528,7 +598,7 @@ function Achievement() {
           <p style={styles.subtitle}>Track your progress and earn rewards!</p>
           {user && (
             <div style={styles.userInfo}>
-              <span>Logged in as: <strong>{displayUsername}</strong> ({user.email})</span>
+              <span>Logged in as: <strong>{displayUsername}</strong></span>
               <span style={styles.xpBadge}>⭐ {currentXP} XP</span>
               <span style={styles.scoreBadge}>🎯 {totalScores} Total Score</span>
               <span style={styles.lastUpdateBadge}>Last updated: {new Date(lastUpdate).toLocaleTimeString()}</span>
@@ -655,7 +725,7 @@ function Achievement() {
               </thead>
               <tbody>
                 {leaderboardData.length > 0 ? (
-                  leaderboardData.map((entry, index) => {
+                  leaderboardData.slice(0, isMobileRef.current ? 20 : 50).map((entry, index) => {
                     const isCurrentUser = entry.email === user?.email;
                     const userDisplayName = entry.username || entry.email?.split('@')[0];
                     
@@ -663,7 +733,6 @@ function Achievement() {
                       <tr 
                         key={entry.email || index} 
                         style={isCurrentUser ? styles.currentUserRow : styles.tableRow}
-                        className={isCurrentUser ? 'current-user-row' : ''}
                       >
                         <td style={styles.tableCell}>
                           {index === 0 && <span style={styles.medal}>🥇</span>}
@@ -709,8 +778,13 @@ function Achievement() {
           </div>
         </div>
 
-        {/* Achievements Grid */}
-        <div style={styles.achievementsGrid}>
+        {/* Achievements Grid - Responsive columns */}
+        <div style={{
+          ...styles.achievementsGrid,
+          gridTemplateColumns: isMobileRef.current 
+            ? '1fr' 
+            : 'repeat(auto-fill, minmax(380px, 1fr))'
+        }}>
           {achievements.length > 0 ? (
             achievements.map(achievement => (
               <div
@@ -720,7 +794,6 @@ function Achievement() {
                   opacity: achievement.unlocked ? 1 : 0.8,
                   borderLeft: `4px solid ${getRarityColor(achievement.rarity)}`,
                 }}
-                className="achievement-card"
               >
                 <div style={{ ...styles.achievementIcon, backgroundColor: achievement.color + '20', color: achievement.color }}>
                   {getIconForAchievement(achievement.iconType, 24)}
@@ -793,6 +866,8 @@ function Achievement() {
     </div>
   );
 }
+
+// ... rest of the styles remain the same ...
 
 const styles = {
   container: {
@@ -1031,10 +1106,12 @@ const styles = {
   },
   tableContainer: {
     overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch', // Better scrolling on iOS
   },
   leaderboardTable: {
     width: '100%',
     borderCollapse: 'collapse',
+    minWidth: '300px', // Ensure table doesn't get too small on mobile
   },
   tableHeader: {
     textAlign: 'left',
@@ -1136,7 +1213,6 @@ const styles = {
   },
   achievementsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
     gap: '20px',
     marginBottom: '40px',
   },
@@ -1288,6 +1364,50 @@ if (typeof document !== 'undefined') {
     
     button:active {
       transform: scale(0.98);
+    }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 12px !important;
+      }
+      
+      .stat-card {
+        padding: 12px !important;
+      }
+      
+      .stat-value {
+        font-size: 18px !important;
+      }
+      
+      .leaderboard-section {
+        padding: 12px !important;
+      }
+      
+      .table-cell {
+        padding: 8px 6px !important;
+        font-size: 12px !important;
+      }
+      
+      .username-container {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+      }
+      
+      .you-badge {
+        font-size: 9px !important;
+        padding: 1px 6px !important;
+      }
+      
+      .medal {
+        font-size: 16px !important;
+      }
+      
+      .rank-number {
+        font-size: 12px !important;
+      }
     }
   `;
   document.head.appendChild(styleSheet);
