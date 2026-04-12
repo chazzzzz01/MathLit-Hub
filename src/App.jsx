@@ -19,6 +19,8 @@ import Dashboard from "./menu1/Dashboard"
 import Classes from "./menu1/Classes"
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
+import AboutUs from "./landingmenu/aboutus";
+import Mission1 from "./missions/mission1";
 import '/src/App.css'
 
 function App() {
@@ -27,6 +29,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutUs />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/test" element={<TestEnv />} />
@@ -36,6 +39,7 @@ function App() {
             <Route index element={<Homepage />} />
             <Route path="homepage" element={<Homepage />} />
             <Route path="missions" element={<Missions />} />
+             <Route path="missions/1" element={<Mission1 />} />
             <Route path="games" element={<Games />} />
             <Route path="achievement" element={<Achievement />} />
             <Route path="class/:classId" element={<classView />} />  {/* Add classView route */}

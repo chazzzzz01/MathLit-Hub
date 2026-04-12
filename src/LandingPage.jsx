@@ -13,7 +13,7 @@ const LandingPage = () => {
   };
 
   const scrollToSection = (sectionId) => {
-    setMobileMenuOpen(false); // Close menu after clicking
+    setMobileMenuOpen(false);
     sectionRefs[sectionId].current?.scrollIntoView({ 
       behavior: 'smooth',
       block: 'start'
@@ -65,6 +65,10 @@ const LandingPage = () => {
       document.body.style.overflow = 'unset';
     };
   }, [mobileMenuOpen]);
+
+  const handleLearnMore = () => {
+    navigate("/about");
+  };
 
   return (
     <div style={styles.container}>
@@ -285,44 +289,59 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* About Section */}
+      {/* About Section with Learn More Button */}
       <section ref={sectionRefs.about} id="about" style={styles.aboutSection}>
         <h2 style={styles.sectionTitle}>About</h2>
         <p style={styles.aboutText}>
           An interaction platform to boost students mathematical literacy.<br />
           Learn through missions, games, and collaboration while tracking progress.
         </p>
+        
+        {/* Learn More Button */}
+        <button 
+          style={styles.learnMoreButton}
+          onClick={handleLearnMore}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = '#1d4ed8';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = '#2563eb';
+          }}
+        >
+          Learn More
+        </button>
+        
         <hr style={styles.divider} />
       </section>
 
-      {/* Features Section with Blue Cards */}
+      {/* Features Section with Blue Cards - UPDATED (removed offline and downloadable) */}
       <section ref={sectionRefs.features} id="features" style={styles.featuresSection}>
         <h2 style={styles.sectionTitle}>Features</h2>
         <div style={styles.featuresGrid}>
           
           <div style={styles.featureCard} className="feature-card">
             <h3 style={styles.featureTitle}>Mission-based Learning</h3>
-            <p style={styles.featureDescription}>Step by step through engaging missions</p>
+            <p style={styles.featureDescription}>Complete engaging missions and unlock new levels</p>
           </div>
 
           <div style={styles.featureCard} className="feature-card">
             <h3 style={styles.featureTitle}>Game-based Learning</h3>
-            <p style={styles.featureDescription}>Practice math with fun interactive games</p>
+            <p style={styles.featureDescription}>Practice math with fun and enjoyable interactive games</p>
           </div>
 
           <div style={styles.featureCard} className="feature-card">
             <h3 style={styles.featureTitle}>Progress Tracking</h3>
-            <p style={styles.featureDescription}>Monitor scores, progress, mission completion</p>
+            <p style={styles.featureDescription}>Monitor scores, progress, and mission completion</p>
           </div>
 
           <div style={styles.featureCard} className="feature-card">
-            <h3 style={styles.featureTitle}>Offline Resources</h3>
-            <p style={styles.featureDescription}>Access lessons, mentor, and manage activities</p>
+            <h3 style={styles.featureTitle}>Achievements & Rewards</h3>
+            <p style={styles.featureDescription}>Earn badges and rewards as you master new concepts</p>
           </div>
 
           <div style={styles.featureCard} className="feature-card">
-            <h3 style={styles.featureTitle}>Downloadable Materials</h3>
-            <p style={styles.featureDescription}>Download worksheets and learning materials anytime</p>
+            <h3 style={styles.featureTitle}>Daily Challenges</h3>
+            <p style={styles.featureDescription}>Take on new challenges every day to sharpen your skills</p>
           </div>
 
         </div>
@@ -429,7 +448,7 @@ const styles = {
     letterSpacing: '-0.5px'
   },
   hamburgerButton: {
-    display: 'none', // Hidden by default, shown via media query
+    display: 'none',
     flexDirection: 'column',
     justifyContent: 'space-around',
     width: '30px',
@@ -471,6 +490,20 @@ const styles = {
     transition: 'background-color 0.3s ease',
     marginLeft: '8px',
     whiteSpace: 'nowrap'
+  },
+  learnMoreButton: {
+    backgroundColor: '#2563EB',
+    color: 'white',
+    padding: '12px 28px',
+    fontSize: '16px',
+    fontWeight: '500',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease',
+    marginTop: '20px',
+    marginBottom: '20px',
+    minWidth: '160px'
   },
   mobileMenuOverlay: {
     position: 'fixed',

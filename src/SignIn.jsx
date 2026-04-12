@@ -27,46 +27,65 @@ function SignIn() {
     try {
       console.log('Getting/Creating user:', userData.email);
       
-      // First, try to get existing user
-      let { data: existingUser, error: fetchError } = await supabase
+      // First, try to get existing user - use maybeSingle() to avoid 406 errors
+      const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('email', userData.email)
-        .single();
+        .maybeSingle();
       
-      // If no user found, create one
-      if (fetchError && fetchError.code === 'PGRST116') {
-        console.log('User not found, creating new user...');
-        
-        const { data: newUser, error: insertError } = await supabase
-          .from('users')
-          .insert([{
-            id: userData.sub || userData.id || crypto.randomUUID(),
-            google_id: userData.sub || userData.id,
-            email: userData.email,
-            name: userData.name,
-            avatar_url: userData.picture,
-            role: null
-          }])
-          .select()
-          .single();
-        
-        if (insertError) {
-          console.error('Insert error:', insertError);
-          throw insertError;
-        }
-        
-        console.log('User created:', newUser);
-        return newUser;
+      // If user exists, return it
+      if (existingUser) {
+        console.log('User found:', existingUser);
+        return existingUser;
       }
       
-      if (fetchError) {
+      // Check if error is not just "no rows returned"
+      if (fetchError && fetchError.code !== 'PGRST116') {
         console.error('Fetch error:', fetchError);
         throw fetchError;
       }
       
-      console.log('User found:', existingUser);
-      return existingUser;
+      // No user found, create new user
+      console.log('User not found, creating new user...');
+      
+      const newUserId = userData.sub || userData.id || crypto.randomUUID();
+      
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: newUserId,
+          google_id: userData.sub || userData.id,
+          email: userData.email,
+          name: userData.name,
+          avatar_url: userData.picture,
+          role: null
+        })
+        .select()
+        .single();
+      
+      if (insertError) {
+        console.error('Insert error:', insertError);
+        
+        // If insert fails because user already exists (race condition), try fetching again
+        if (insertError.code === '23505') { // Unique violation
+          console.log('User was created by another request, fetching again...');
+          const { data: retryUser, error: retryError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', userData.email)
+            .maybeSingle();
+          
+          if (retryUser) {
+            return retryUser;
+          }
+        }
+        
+        throw insertError;
+      }
+      
+      console.log('User created:', newUser);
+      return newUser;
       
     } catch (error) {
       console.error('Error in getOrCreateUser:', error);
@@ -77,6 +96,7 @@ function SignIn() {
   // Listen for Google OAuth response
   useEffect(() => {
     const handleMessage = async (event) => {
+      // Make sure the message is from our origin
       if (event.origin !== window.location.origin) return;
       
       if (event.data.type === 'google-auth-success') {
@@ -103,9 +123,12 @@ function SignIn() {
           localStorage.setItem('user', JSON.stringify(userWithDbInfo));
           console.log('User saved successfully:', userWithDbInfo);
           
+          // REMOVED: Auto-redirect code that was causing the issue
+          // Now user MUST click "Continue" button to proceed
+          
         } catch (error) {
           console.error('Error saving user:', error);
-          alert('Failed to save user information. Please check if tables exist in Supabase.');
+          alert(`Failed to save user information: ${error.message || 'Please check if tables exist in Supabase'}`);
         } finally {
           setLoading(false);
         }
@@ -114,7 +137,7 @@ function SignIn() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, []); // Removed navigate dependency
 
   const handleGoogleSignIn = () => {
     setLoading(true);
@@ -143,6 +166,7 @@ function SignIn() {
     setTimeout(() => {
       if (loading) {
         setLoading(false);
+        alert('Sign in is taking longer than expected. Please try again.');
       }
     }, 30000);
   };
@@ -188,9 +212,19 @@ function SignIn() {
   };
 
   const handleContinue = async () => {
-    if (!selectedRole || !user) return;
+    // Validate that user has selected a role
+    if (!selectedRole) {
+      alert('Please select a role (Student or Teacher) before continuing');
+      return;
+    }
     
-    if (user && user.dbId && (!user.role || user.role !== selectedRole)) {
+    if (!user) {
+      alert('Please sign in first');
+      return;
+    }
+    
+    // Save the role to database if not already saved
+    if (user.dbId && (!user.role || user.role !== selectedRole)) {
       try {
         setSavingRole(true);
         
@@ -217,10 +251,11 @@ function SignIn() {
       }
     }
     
+    // Navigate based on selected role
     if (selectedRole === 'student') {
-      navigate("/studenthub", { state: { user } });
+      navigate("/studenthub", { state: { user: { ...user, role: selectedRole } } });
     } else if (selectedRole === 'teacher') {
-      navigate("/teacherhub", { state: { user } });
+      navigate("/teacherhub", { state: { user: { ...user, role: selectedRole } } });
     }
   };
 
@@ -371,10 +406,9 @@ function SignIn() {
   );
 }
 
-// ... (keep all your existing styles here, they remain the same)
+// ... keep all your existing styles (they remain exactly the same as before)
 
 const styles = {
-  // ... your existing styles
   container: {
     minHeight: '100vh',
     display: 'flex',
