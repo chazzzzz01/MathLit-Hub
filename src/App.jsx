@@ -6,6 +6,7 @@ import Homepage from "./menu/Homepage"
 import Missions from "./menu/Missions" 
 import Games from "./menu/Games" 
 import Achievement from "./menu/Achievement" 
+import classView from "./menu/classView.jsx"  // Import classView component
 import StudentHub from "./hub/StudentHub";
 import TeacherHub from "./hub/TeacherHub";
 // Import your game components
@@ -13,7 +14,9 @@ import EquationEscapeRoom from "./games/EquationEscapeRoom"
 import BattleArena from "./games/BattleArena"
 import SpaceShooter from "./games/SpaceShooter"
 import TestEnv from "./TestEnv"
-import Dashboard from "./menu1/Dashboard"  
+import Home from "./menu1/Home"
+import Dashboard from "./menu1/Dashboard"
+import Classes from "./menu1/Classes"
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
 import '/src/App.css'
@@ -35,12 +38,17 @@ function App() {
             <Route path="missions" element={<Missions />} />
             <Route path="games" element={<Games />} />
             <Route path="achievement" element={<Achievement />} />
+            <Route path="class/:classId" element={<classView />} />  {/* Add classView route */}
           </Route>
           
           {/* Teacher hub routes */}
           <Route path="/teacherhub" element={<TeacherHub />}>
-            <Route index element={<Dashboard />} />
+            <Route index element={<Home />} />
+            <Route path="home" element={<Home />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="classes/:classId" element={<Classes />} />
+            <Route path="students" element={<div>Students Page</div>} />
+            <Route path="progress" element={<div>Progress Page</div>} />
           </Route>
           
           {/* Game routes - These will open in new tabs/pages */}

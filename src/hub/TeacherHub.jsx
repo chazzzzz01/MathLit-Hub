@@ -1,18 +1,30 @@
 import '../App.css';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
-import { FiUser, FiMenu, FiX } from 'react-icons/fi';
-import { MdDashboard, MdPeople, MdTrendingUp } from 'react-icons/md';
+import { FiUser, FiMenu, FiX, FiHome, FiBarChart2, FiChevronDown, FiEdit2 } from 'react-icons/fi';
+import { MdPeople, MdTrendingUp } from 'react-icons/md';
 import { useUser } from '../context/UserContext';
+import { classService } from '../services/classService';
 
 function TeacherHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editedUsername, setEditedUsername] = useState('');
+  const [teacherStats, setTeacherStats] = useState({
+    totalStudents: 0,
+    activeClasses: 0,
+    memberSince: null,
+    lastLogin: null
+  });
+  const [loadingStats, setLoadingStats] = useState(true);
   const { user, setUser, logout, userData, updateUserData } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
+  const dropdownRef = useRef(null);
+  const usernameInputRef = useRef(null);
 
   // Debug: Log user data and current path
   useEffect(() => {
@@ -20,6 +32,71 @@ function TeacherHub() {
     console.log('TeacherHub - UserData:', userData);
     console.log('TeacherHub - Current Path:', location.pathname);
   }, [user, userData, location.pathname]);
+
+  // Load teacher statistics
+  useEffect(() => {
+    loadTeacherStats();
+  }, [user]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdown(null);
+        setIsEditingUsername(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingUsername && usernameInputRef.current) {
+      usernameInputRef.current.focus();
+    }
+  }, [isEditingUsername]);
+
+  const loadTeacherStats = async () => {
+    if (!user?.dbId) {
+      setLoadingStats(false);
+      return;
+    }
+
+    try {
+      setLoadingStats(true);
+      
+      // Get all classes created by this teacher
+      const teacherClasses = await classService.getTeacherClasses(user.dbId);
+      
+      let totalStudentsCount = 0;
+      
+      // Calculate total students across all classes
+      for (const classItem of teacherClasses) {
+        const students = await classService.getClassStudents(classItem.id);
+        totalStudentsCount += students.length;
+      }
+      
+      setTeacherStats({
+        totalStudents: totalStudentsCount,
+        activeClasses: teacherClasses.length,
+        memberSince: user?.createdAt || userData?.createdAt || new Date(),
+        lastLogin: user?.lastLogin || userData?.lastLogin || new Date()
+      });
+      
+    } catch (error) {
+      console.error('Error loading teacher stats:', error);
+      // Fallback to userData if available
+      setTeacherStats({
+        totalStudents: userData?.teacherStats?.studentsCount || 0,
+        activeClasses: userData?.teacherStats?.activeClasses || 0,
+        memberSince: user?.createdAt || userData?.createdAt || new Date(),
+        lastLogin: user?.lastLogin || userData?.lastLogin || new Date()
+      });
+    } finally {
+      setLoadingStats(false);
+    }
+  };
 
   // Check screen size for responsive behavior
   useEffect(() => {
@@ -43,11 +120,11 @@ function TeacherHub() {
     }
   }, [location.state, user, setUser]);
 
-  // Redirect to dashboard if at exactly /teacherhub
+  // Redirect to home if at exactly /teacherhub
   useEffect(() => {
     if (location.pathname === '/teacherhub') {
-      console.log('Redirecting to dashboard');
-      navigate('/teacherhub/dashboard', { replace: true });
+      console.log('Redirecting to home');
+      navigate('/teacherhub/home', { replace: true });
     }
   }, [location.pathname, navigate]);
 
@@ -75,17 +152,61 @@ function TeacherHub() {
     }
   };
 
+  const handleProfileClick = () => {
+    setOpenDropdown(openDropdown === 'profile' ? null : 'profile');
+    setIsEditingUsername(false);
+  };
+
   // Get user identifier for display
   const getUserIdentifier = () => {
-    if (user && user.email) {
-      return user.email.split('@')[0];
-    }
+    if (user?.name) return user.name;
+    if (user?.email) return user.email.split('@')[0];
     return 'Teacher';
+  };
+
+  const handleEditUsername = () => {
+    setEditedUsername(getUserIdentifier());
+    setIsEditingUsername(true);
+  };
+
+  const handleSaveUsername = () => {
+    if (editedUsername.trim() && editedUsername !== getUserIdentifier()) {
+      // Update user context
+      const updatedUser = { ...user, name: editedUsername.trim() };
+      setUser(updatedUser);
+      
+      // Also update in userData if needed
+      if (updateUserData) {
+        updateUserData({ ...userData, name: editedUsername.trim() });
+      }
+    }
+    setIsEditingUsername(false);
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSaveUsername();
+    } else if (e.key === 'Escape') {
+      setIsEditingUsername(false);
+    }
+  };
+
+  const formatDate = (date) => {
+    if (!date) return 'Not available';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   // Teacher navigation items
   const navItems = [
-    { path: "/teacherhub/dashboard", icon: MdDashboard, label: "Dashboard" },
+    { path: "/teacherhub/home", icon: FiHome, label: "Home" },
+    { path: "/teacherhub/dashboard", icon: FiBarChart2, label: "Dashboard" },
     { path: "/teacherhub/students", icon: MdPeople, label: "Students" },
     { path: "/teacherhub/progress", icon: MdTrendingUp, label: "Progress" }
   ];
@@ -196,54 +317,125 @@ function TeacherHub() {
             <FiMenu size={24} color="white" />
           </button>
 
-          {/* Right side - Teacher name and profile icon */}
+          {/* Right section - Teacher name and profile icon */}
           <div style={styles.rightSection}>
-            <span style={styles.teacherName}>
-              {getUserIdentifier()}
-            </span>
-            
-            {/* Profile icon with dropdown */}
-            <div style={{ position: 'relative' }}>
-              {user?.picture ? (
-                <img 
-                  src={user.picture}
-                  alt={user.name}
-                  style={styles.userAvatar}
-                  onClick={() =>
-                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
-                  }
+            <div style={styles.profileContainer} ref={dropdownRef}>
+              <div style={styles.profileContent} onClick={handleProfileClick}>
+                <span style={styles.teacherName}>
+                  {getUserIdentifier()}
+                </span>
+                <FiChevronDown 
+                  size={18} 
+                  color="white" 
+                  style={{
+                    ...styles.chevronIcon,
+                    transform: openDropdown === 'profile' ? 'rotate(180deg)' : 'rotate(0deg)'
+                  }}
                 />
-              ) : (
-                <FiUser
-                  size={24}
-                  color="white"
-                  style={styles.userIcon}
-                  onClick={() =>
-                    setOpenDropdown(openDropdown === 'profile' ? null : 'profile')
-                  }
-                />
-              )}
+                {user?.picture ? (
+                  <img 
+                    src={user.picture}
+                    alt={user.name}
+                    style={styles.userAvatar}
+                  />
+                ) : (
+                  <FiUser
+                    size={24}
+                    color="white"
+                    style={styles.userIcon}
+                  />
+                )}
+              </div>
+              
+              {/* Profile Dropdown */}
               {openDropdown === 'profile' && (
                 <div style={styles.dropdown}>
-                  {user && (
-                    <>
-                      <div style={styles.dropdownEmail}>{user.email}</div>
-                      <div style={styles.dropdownUserId}>
-                        Username: {getUserIdentifier()}
+                  {/* User Header */}
+                  <div style={styles.dropdownHeader}>
+                    {user?.picture ? (
+                      <img src={user.picture} alt={user.name} style={styles.dropdownAvatar} />
+                    ) : (
+                      <div style={styles.dropdownAvatarPlaceholder}>
+                        {getUserIdentifier().charAt(0).toUpperCase()}
                       </div>
-                      {userData && (
-                        <div style={styles.dropdownStats}>
-                          <div>🎓 Member since: {new Date(userData.createdAt).toLocaleDateString()}</div>
-                          <div>🕒 Last login: {new Date(userData.lastLogin).toLocaleDateString()}</div>
-                          <div>📚 Students: {userData.teacherStats?.studentsCount || 0}</div>
-                          <div>📊 Active Classes: {userData.teacherStats?.activeClasses || 0}</div>
+                    )}
+                    <div style={styles.dropdownUserInfo}>
+                      <div style={styles.dropdownName}>{user?.name || getUserIdentifier()}</div>
+                      <div style={styles.dropdownEmail}>{user?.email}</div>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.dropdownDivider}></div>
+                  
+                  {/* Account Information Section */}
+                  <div style={styles.dropdownSection}>
+                    <div style={styles.dropdownSectionTitle}>Account Information</div>
+                    
+                    {/* Username with Edit */}
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>👤 Username:</span>
+                      {isEditingUsername ? (
+                        <div style={styles.editUsernameContainer}>
+                          <input
+                            ref={usernameInputRef}
+                            type="text"
+                            value={editedUsername}
+                            onChange={(e) => setEditedUsername(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            style={styles.usernameInput}
+                            maxLength={50}
+                          />
+                          <button onClick={handleSaveUsername} style={styles.saveButton}>
+                            Save
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={styles.usernameValueContainer}>
+                          <span style={styles.infoValue}>{getUserIdentifier()}</span>
+                          <FiEdit2 
+                            size={14} 
+                            style={styles.editIcon}
+                            onClick={handleEditUsername}
+                          />
                         </div>
                       )}
-                      <div style={styles.dropdownDivider}></div>
-                    </>
-                  )}
-                  <div style={styles.dropdownItem} onClick={handleLogout}>
-                    Logout
+                    </div>
+                    
+                    {/* Member Since */}
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>🎓 Member since:</span>
+                      <span style={styles.infoValue}>
+                        {formatDate(teacherStats.memberSince || user?.createdAt || userData?.createdAt)}
+                      </span>
+                    </div>
+                    
+                    {/* Last Login */}
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>🕒 Last login:</span>
+                      <span style={styles.infoValue}>
+                        {formatDate(teacherStats.lastLogin || user?.lastLogin || userData?.lastLogin)}
+                      </span>
+                    </div>
+                    
+                    {/* Teacher Statistics */}
+                    <div style={styles.dropdownStatsSection}>
+                      <div style={styles.dropdownSectionTitle}>Teaching Statistics</div>
+                      <div style={styles.dropdownInfoItem}>
+                        <span style={styles.infoLabel}>📚 Active Classes:</span>
+                        <span style={styles.infoValue}>{teacherStats.activeClasses}</span>
+                      </div>
+                      <div style={styles.dropdownInfoItem}>
+                        <span style={styles.infoLabel}>👥 Total Students:</span>
+                        <span style={styles.infoValue}>{teacherStats.totalStudents}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.dropdownDivider}></div>
+                  
+                  {/* Logout Button */}
+                  <div style={styles.logoutItem} onClick={handleLogout}>
+                    🚪 Logout
                   </div>
                 </div>
               )}
@@ -258,7 +450,9 @@ function TeacherHub() {
               user, 
               userData, 
               updateUserData, 
-              getUserIdentifier 
+              getUserIdentifier,
+              teacherStats,
+              loadingStats
             }} />
           </div>
         </div>
@@ -375,10 +569,28 @@ const styles = {
     alignItems: 'center',
     gap: '15px',
   },
+  profileContainer: {
+    position: 'relative',
+  },
+  profileContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    cursor: 'pointer',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
+    ':hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    },
+  },
   teacherName: {
     color: 'white',
     fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '500',
+  },
+  chevronIcon: {
+    transition: 'transform 0.2s ease',
   },
   userIcon: {
     cursor: 'pointer',
@@ -401,49 +613,137 @@ const styles = {
   },
   dropdown: {
     position: 'absolute',
-    top: '45px',
+    top: 'calc(100% + 10px)',
     right: 0,
     backgroundColor: 'white',
     borderRadius: '12px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
     overflow: 'hidden',
-    minWidth: '280px',
+    minWidth: '320px',
     zIndex: 1000,
     animation: 'slideDown 0.2s ease',
   },
-  dropdownEmail: {
-    padding: '12px 16px',
-    fontSize: '13px',
+  dropdownHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#f8f9fa',
+  },
+  dropdownAvatar: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+  },
+  dropdownAvatarPlaceholder: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '50%',
+    backgroundColor: '#2563eb',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontSize: '20px',
+    fontWeight: 'bold',
+  },
+  dropdownUserInfo: {
+    flex: 1,
+  },
+  dropdownName: {
+    fontSize: '16px',
+    fontWeight: '600',
     color: '#333',
-    backgroundColor: '#f8f9fa',
+    marginBottom: '4px',
+  },
+  dropdownEmail: {
+    fontSize: '12px',
+    color: '#666',
     wordBreak: 'break-all',
-    borderBottom: '1px solid #e0e0e0',
   },
-  dropdownUserId: {
-    padding: '8px 16px',
-    fontSize: '12px',
-    color: '#666',
-    backgroundColor: '#f8f9fa',
-    borderBottom: '1px solid #e0e0e0',
+  dropdownSection: {
+    padding: '12px 16px',
   },
-  dropdownStats: {
-    padding: '10px 16px',
-    fontSize: '12px',
+  dropdownSectionTitle: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#999',
+    textTransform: 'uppercase',
+    marginBottom: '12px',
+    letterSpacing: '0.5px',
+  },
+  dropdownInfoItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
+    fontSize: '13px',
+    borderBottom: '1px solid #f0f0f0',
+  },
+  infoLabel: {
     color: '#666',
-    backgroundColor: '#f8f9fa',
-    borderBottom: '1px solid #e0e0e0',
-    lineHeight: '1.6',
+    fontWeight: '500',
+  },
+  infoValue: {
+    color: '#333',
+    textAlign: 'right',
+  },
+  usernameValueContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  editIcon: {
+    cursor: 'pointer',
+    color: '#666',
+    transition: 'color 0.2s',
+    ':hover': {
+      color: '#2563eb',
+    },
+  },
+  editUsernameContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  usernameInput: {
+    padding: '4px 8px',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '13px',
+    width: '120px',
+    outline: 'none',
+    ':focus': {
+      borderColor: '#2563eb',
+    },
+  },
+  saveButton: {
+    padding: '4px 8px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '12px',
+    cursor: 'pointer',
+    transition: 'background-color 0.2s',
+    ':hover': {
+      backgroundColor: '#1e4db9',
+    },
+  },
+  dropdownStatsSection: {
+    marginTop: '8px',
   },
   dropdownDivider: {
     height: '1px',
     backgroundColor: '#e0e0e0',
   },
-  dropdownItem: {
+  logoutItem: {
     padding: '12px 16px',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
-    color: '#dc2626',
     fontSize: '14px',
+    color: '#dc2626',
     fontWeight: '500',
     textAlign: 'center',
     ':hover': {

@@ -153,16 +153,29 @@ function Games() {
       
       localStorage.setItem('gameProgress', JSON.stringify(updatedProgress));
       
+      // Calculate total scores for leaderboard
+      const totalScores = calculateTotalScores(updatedProgress);
+      
       if (updateUserData) {
         updateUserData({ 
           ...userData,
           gameProgress: updatedProgress,
-          xp: xpPoints + (stats.correctAnswers ? (stats.correctAnswers * 10) - (stats.wrongAnswers * 5) : 0)
+          xp: xpPoints + (stats.correctAnswers ? (stats.correctAnswers * 10) - (stats.wrongAnswers * 5) : 0),
+          totalScores: totalScores
         });
       }
       
       return updatedProgress;
     });
+  };
+  
+  // Helper function to calculate total scores
+  const calculateTotalScores = (progress) => {
+    if (!progress) return 0;
+    const equationScore = progress.equation?.highScore || 0;
+    const battleScore = progress.battle?.highScore || 0;
+    const spaceScore = progress.spaceShooter?.highScore || 0;
+    return equationScore + battleScore + spaceScore;
   };
 
   // Listen for messages from iframe
@@ -242,23 +255,59 @@ function Games() {
     setGameProgress(resetProgress);
     localStorage.setItem('gameProgress', JSON.stringify(resetProgress));
     
-    // Reset XP to 0 when resetting progress (optional)
-    if (window.confirm('Do you also want to reset XP points to 0?')) {
+    // Show confirmation dialog for XP reset
+    const resetXP = window.confirm('Do you also want to reset XP points to 0?');
+    
+    if (resetXP) {
       setXpPoints(0);
+      
+      // Update userData with both reset progress and XP
       if (updateUserData) {
         updateUserData({ 
+          ...userData,
           gameProgress: resetProgress,
-          xp: 0
+          xp: 0,
+          totalScores: 0, // Also reset total scores
+          lastXPUpdate: {
+            points: -xpPoints, // Record the XP loss
+            reason: 'Reset all progress',
+            timestamp: new Date().toISOString(),
+            newTotal: 0
+          }
         });
       }
-    } else {
-      if (updateUserData) {
-        updateUserData({ gameProgress: resetProgress });
+      
+      // Also clear XP from localStorage
+      if (user?.email) {
+        localStorage.setItem(`userXP_${user.email}`, '0');
+        localStorage.setItem(`userTotalScores_${user.email}`, '0');
+        localStorage.setItem(`gameProgress_${user.email}`, JSON.stringify(resetProgress));
       }
+      
+      showNotification('🗑️ All progress and XP have been reset!', '#10b981');
+    } else {
+      // Only reset game progress, keep XP
+      if (updateUserData) {
+        updateUserData({ 
+          ...userData,
+          gameProgress: resetProgress
+        });
+      }
+      
+      // Also update localStorage
+      if (user?.email) {
+        localStorage.setItem(`gameProgress_${user.email}`, JSON.stringify(resetProgress));
+      }
+      
+      showNotification('🗑️ Game progress has been reset! (XP kept)', '#10b981');
     }
     
     setShowResetConfirm(false);
-    showNotification('🗑️ All progress has been reset!', '#10b981');
+    
+    // Force a refresh of the achievement component by dispatching a custom event
+    window.dispatchEvent(new CustomEvent('progressReset', { 
+      detail: { reset: true, timestamp: Date.now(), resetXP: resetXP } 
+    }));
   };
 
   const closeGame = () => {

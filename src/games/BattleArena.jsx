@@ -757,67 +757,75 @@ const styles = {
     maxWidth: '1200px',
     width: '95%',
     margin: '20px auto',
-    padding: '20px',
+    padding: 'clamp(12px, 3vw, 20px)',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '20px',
+    borderRadius: 'clamp(12px, 3vw, 20px)',
     boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     color: '#fff',
+    boxSizing: 'border-box',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '15px 20px',
+    padding: 'clamp(10px, 2vw, 15px) clamp(12px, 3vw, 20px)',
     backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: '12px',
-    marginBottom: '20px',
+    borderRadius: 'clamp(8px, 2vw, 12px)',
+    marginBottom: 'clamp(15px, 3vw, 20px)',
     backdropFilter: 'blur(10px)',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   scoreDisplay: {
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
     fontWeight: 'bold',
     color: '#ffd700',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
   },
   enemyCount: {
-    fontSize: '16px',
+    fontSize: 'clamp(12px, 3vw, 16px)',
     color: '#fff',
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '8px',
+    flexWrap: 'wrap',
   },
   bossBadge: {
     backgroundColor: '#f44336',
     padding: '3px 8px',
     borderRadius: '12px',
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
     fontWeight: 'bold',
   },
   battleArena: {
     display: 'grid',
     gridTemplateColumns: '1fr auto 1fr',
-    gap: '20px',
-    marginBottom: '30px',
+    gap: 'clamp(10px, 3vw, 20px)',
+    marginBottom: 'clamp(20px, 4vw, 30px)',
     alignItems: 'center',
+    '@media (max-width: 768px)': {
+      gridTemplateColumns: '1fr',
+      gap: '20px',
+    },
   },
   enemySection: {
     textAlign: 'center',
   },
   enemyCard: {
-    padding: '20px',
-    borderRadius: '16px',
+    padding: 'clamp(12px, 3vw, 20px)',
+    borderRadius: 'clamp(12px, 3vw, 16px)',
     boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
     transition: 'transform 0.3s ease',
   },
   enemyName: {
-    fontSize: '32px',
+    fontSize: 'clamp(20px, 6vw, 32px)',
     fontWeight: 'bold',
     marginBottom: '8px',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
   },
   enemyDifficulty: {
-    fontSize: '14px',
+    fontSize: 'clamp(10px, 2.5vw, 14px)',
     marginBottom: '15px',
     opacity: 0.9,
     textTransform: 'uppercase',
@@ -828,34 +836,35 @@ const styles = {
   },
   playerCard: {
     background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    padding: '20px',
-    borderRadius: '16px',
+    padding: 'clamp(12px, 3vw, 20px)',
+    borderRadius: 'clamp(12px, 3vw, 16px)',
     boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
   },
   playerName: {
-    fontSize: '32px',
+    fontSize: 'clamp(20px, 6vw, 32px)',
     fontWeight: 'bold',
     marginBottom: '15px',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
   },
   vsDivider: {
-    fontSize: '48px',
+    fontSize: 'clamp(28px, 8vw, 48px)',
     fontWeight: 'bold',
     color: '#ffd700',
     textShadow: '0 0 10px rgba(255,215,0,0.5)',
     animation: 'pulse 1.5s ease-in-out infinite',
+    textAlign: 'center',
   },
   healthBarContainer: {
     width: '100%',
   },
   healthBarLabel: {
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3vw, 14px)',
     marginBottom: '5px',
     fontWeight: 'bold',
   },
   healthBar: {
     width: '100%',
-    height: '25px',
+    height: 'clamp(20px, 5vw, 25px)',
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: '12px',
     overflow: 'hidden',
@@ -868,40 +877,41 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
     fontWeight: 'bold',
     color: '#fff',
   },
   mathChallenge: {
-    marginBottom: '30px',
+    marginBottom: 'clamp(20px, 4vw, 30px)',
   },
   equationBox: {
     background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
     backdropFilter: 'blur(10px)',
-    padding: '30px',
-    borderRadius: '16px',
+    padding: 'clamp(20px, 5vw, 30px)',
+    borderRadius: 'clamp(12px, 3vw, 16px)',
     textAlign: 'center',
     border: '1px solid rgba(255,255,255,0.2)',
   },
   equationText: {
-    fontSize: '48px',
+    fontSize: 'clamp(24px, 8vw, 48px)',
     fontWeight: 'bold',
-    marginBottom: '25px',
+    marginBottom: 'clamp(15px, 4vw, 25px)',
     fontFamily: 'monospace',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
     letterSpacing: '2px',
+    wordBreak: 'break-word',
   },
   inputArea: {
     display: 'flex',
-    gap: '15px',
+    gap: 'clamp(10px, 3vw, 15px)',
     justifyContent: 'center',
     flexWrap: 'wrap',
   },
   answerInput: {
     flex: 2,
-    maxWidth: '300px',
-    padding: '15px 20px',
-    fontSize: '18px',
+    minWidth: 'clamp(180px, 40vw, 300px)',
+    padding: 'clamp(10px, 2.5vw, 15px) clamp(12px, 3vw, 20px)',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     border: '2px solid #ffd700',
     borderRadius: '12px',
     backgroundColor: 'rgba(255,255,255,0.95)',
@@ -910,10 +920,11 @@ const styles = {
     textAlign: 'center',
     fontWeight: 'bold',
     transition: 'all 0.3s',
+    boxSizing: 'border-box',
   },
   attackButton: {
-    padding: '15px 40px',
-    fontSize: '18px',
+    padding: 'clamp(10px, 2.5vw, 15px) clamp(20px, 5vw, 40px)',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     backgroundColor: '#ff4757',
     color: 'white',
     border: 'none',
@@ -924,54 +935,67 @@ const styles = {
     boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
     textTransform: 'uppercase',
     letterSpacing: '1px',
+    whiteSpace: 'nowrap',
+    '@media (max-width: 480px)': {
+      whiteSpace: 'normal',
+    },
   },
   feedback: {
-    marginTop: '20px',
-    padding: '12px',
+    marginTop: 'clamp(15px, 3vw, 20px)',
+    padding: 'clamp(8px, 2vw, 12px)',
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     color: '#ffd700',
     whiteSpace: 'pre-line',
     fontWeight: 'bold',
+    wordBreak: 'break-word',
   },
   powerUpsSection: {
     backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: '20px',
+    padding: 'clamp(15px, 3vw, 20px)',
     borderRadius: '12px',
     marginBottom: '15px',
     backdropFilter: 'blur(10px)',
   },
   powerUpsTitle: {
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     marginBottom: '15px',
     color: '#ffd700',
     textAlign: 'center',
   },
   powerUpsContainer: {
     display: 'flex',
-    gap: '15px',
+    gap: 'clamp(8px, 2vw, 15px)',
     justifyContent: 'center',
     flexWrap: 'wrap',
   },
   powerUpButton: {
-    padding: '10px 20px',
-    fontSize: '14px',
+    padding: 'clamp(8px, 2vw, 10px) clamp(12px, 3vw, 20px)',
+    fontSize: 'clamp(11px, 3vw, 14px)',
     fontWeight: 'bold',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
+    '@media (max-width: 480px)': {
+      whiteSpace: 'normal',
+    },
+    '&:disabled': {
+      opacity: 0.5,
+      cursor: 'not-allowed',
+    },
   },
   statsDisplay: {
     display: 'flex',
     justifyContent: 'space-between',
-    padding: '12px 20px',
+    padding: 'clamp(10px, 2vw, 12px) clamp(12px, 3vw, 20px)',
     backgroundColor: 'rgba(0,0,0,0.3)',
     borderRadius: '12px',
     color: '#fff',
-    fontSize: '14px',
+    fontSize: 'clamp(10px, 2.5vw, 14px)',
     backdropFilter: 'blur(10px)',
     flexWrap: 'wrap',
     gap: '10px',
@@ -985,44 +1009,45 @@ const styles = {
   },
   completionCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '20px',
-    padding: '40px',
+    borderRadius: 'clamp(16px, 4vw, 20px)',
+    padding: 'clamp(20px, 5vw, 40px)',
     textAlign: 'center',
     maxWidth: '450px',
     width: '90%',
     boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+    boxSizing: 'border-box',
   },
   trophyIcon: {
-    fontSize: '80px',
+    fontSize: 'clamp(60px, 15vw, 80px)',
     marginBottom: '20px',
     animation: 'bounce 0.5s ease',
   },
   sadIcon: {
-    fontSize: '80px',
+    fontSize: 'clamp(60px, 15vw, 80px)',
     marginBottom: '20px',
   },
   completionTitle: {
-    fontSize: '36px',
+    fontSize: 'clamp(24px, 6vw, 36px)',
     marginBottom: '15px',
     color: '#ffd700',
   },
   completionText: {
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     marginBottom: '20px',
     color: '#fff',
   },
   finalScore: {
     backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: '15px',
+    padding: 'clamp(12px, 3vw, 15px)',
     borderRadius: '10px',
     marginBottom: '20px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     lineHeight: '1.8',
     color: '#fff',
   },
   continueButton: {
-    padding: '12px 30px',
-    fontSize: '16px',
+    padding: 'clamp(10px, 2.5vw, 12px) clamp(20px, 5vw, 30px)',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     backgroundColor: '#ffd700',
     color: '#333',
     border: 'none',
@@ -1030,10 +1055,14 @@ const styles = {
     cursor: 'pointer',
     fontWeight: 'bold',
     transition: 'all 0.3s',
+    '&:hover': {
+      transform: 'scale(1.02)',
+      backgroundColor: '#ffed4e',
+    },
   },
 };
 
-// Add CSS animations
+// Add responsive CSS with media queries
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes pulse {
@@ -1074,12 +1103,49 @@ styleSheet.textContent = `
     transition: all 0.2s ease;
   }
   
-  button:hover {
+  button:hover:not(:disabled) {
     transform: scale(1.02);
   }
   
-  button:active {
+  button:active:not(:disabled) {
     transform: scale(0.98);
+  }
+  
+  /* Responsive design for tablets */
+  @media (max-width: 768px) {
+    .battle-arena {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  /* Responsive design for mobile devices */
+  @media (max-width: 480px) {
+    .stats-display {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    
+    .power-ups-container {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .power-up-button {
+      width: 100%;
+    }
+  }
+  
+  /* Touch-friendly improvements */
+  @media (hover: none) and (pointer: coarse) {
+    button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    
+    .answer-input {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
   }
 `;
 document.head.appendChild(styleSheet);

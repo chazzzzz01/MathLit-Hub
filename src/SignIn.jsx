@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { supabase } from './lib/supabase';
 
 function SignIn() {
   const navigate = useNavigate();
@@ -7,35 +8,111 @@ function SignIn() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
 
-  // Check for user data from navigation state (for redirect fallback)
+  // Check for existing user session on mount
   useEffect(() => {
-    if (location.state?.user) {
-      setUser(location.state.user);
-      // Clear the state so it doesn't persist on refresh
-      navigate('/signin', { replace: true, state: {} });
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      if (parsedUser.role) {
+        setSelectedRole(parsedUser.role);
+      }
     }
-  }, [location.state, navigate]);
+  }, []);
 
-  // Listen for the Google OAuth response from popup
+  // Function to save or get user from Supabase
+  const getOrCreateUser = async (userData) => {
+    try {
+      console.log('Getting/Creating user:', userData.email);
+      
+      // First, try to get existing user
+      let { data: existingUser, error: fetchError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', userData.email)
+        .single();
+      
+      // If no user found, create one
+      if (fetchError && fetchError.code === 'PGRST116') {
+        console.log('User not found, creating new user...');
+        
+        const { data: newUser, error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            id: userData.sub || userData.id || crypto.randomUUID(),
+            google_id: userData.sub || userData.id,
+            email: userData.email,
+            name: userData.name,
+            avatar_url: userData.picture,
+            role: null
+          }])
+          .select()
+          .single();
+        
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw insertError;
+        }
+        
+        console.log('User created:', newUser);
+        return newUser;
+      }
+      
+      if (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw fetchError;
+      }
+      
+      console.log('User found:', existingUser);
+      return existingUser;
+      
+    } catch (error) {
+      console.error('Error in getOrCreateUser:', error);
+      throw error;
+    }
+  };
+
+  // Listen for Google OAuth response
   useEffect(() => {
-    const handleMessage = (event) => {
-      // Check if the message is from our origin for security
+    const handleMessage = async (event) => {
       if (event.origin !== window.location.origin) return;
       
       if (event.data.type === 'google-auth-success') {
         const userData = event.data.user;
-        setUser({
-          name: userData.name,
-          email: userData.email,
-          picture: userData.picture
-        });
-        setLoading(false);
+        console.log('Received Google auth success:', userData);
+        
+        try {
+          setLoading(true);
+          
+          // Get or create user in Supabase
+          const dbUser = await getOrCreateUser(userData);
+          
+          // Create user object with database info
+          const userWithDbInfo = {
+            name: userData.name,
+            email: userData.email,
+            picture: userData.picture,
+            dbId: dbUser.id,
+            role: dbUser.role,
+            googleId: userData.sub || userData.id
+          };
+          
+          setUser(userWithDbInfo);
+          localStorage.setItem('user', JSON.stringify(userWithDbInfo));
+          console.log('User saved successfully:', userWithDbInfo);
+          
+        } catch (error) {
+          console.error('Error saving user:', error);
+          alert('Failed to save user information. Please check if tables exist in Supabase.');
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
     window.addEventListener('message', handleMessage);
-    
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
@@ -43,7 +120,6 @@ function SignIn() {
     setLoading(true);
     
     const clientId = '1065159934891-est3sn4f9i99tff0cf7bcjgcnudg9cg4.apps.googleusercontent.com';
-    // Use the auth callback URL instead of the main URL
     const redirectUri = `${window.location.origin}/auth/callback`;
     
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -54,45 +130,101 @@ function SignIn() {
       `&prompt=select_account` +
       `&nonce=${Math.random().toString(36).substring(7)}`;
 
-    // Try to open in popup first
     const popup = window.open(
       authUrl,
       'google-signin',
       'width=500,height=600,left=200,top=100'
     );
 
-    // If popup is blocked, fallback to redirect
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
       window.location.href = authUrl;
     }
 
-    // Optional: Add a timeout to reset loading if popup takes too long
     setTimeout(() => {
       if (loading) {
         setLoading(false);
       }
-    }, 30000); // Reset after 30 seconds
+    }, 30000);
   };
 
   const handleSignOut = () => {
     setUser(null);
     setSelectedRole(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('teacherClasses');
   };
 
   const handleSwitchAccount = () => {
     handleGoogleSignIn();
   };
 
-  const handleContinue = () => {
-    if (selectedRole === 'student') {
-      // Pass user data to StudentHub
-      navigate("/studenthub", { state: { user: user } });
-    } else if (selectedRole === 'teacher') {
-      // Pass user data to TeacherHub (if needed)
-      navigate("/teacherhub", { state: { user: user } });
+  const handleRoleSelect = async (role) => {
+    setSelectedRole(role);
+    
+    if (user && user.dbId) {
+      try {
+        setSavingRole(true);
+        
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({ role: role })
+          .eq('id', user.dbId)
+          .select()
+          .single();
+        
+        if (updateError) throw updateError;
+        
+        const updatedUserWithRole = { ...user, role: updatedUser.role };
+        setUser(updatedUserWithRole);
+        localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+        
+      } catch (error) {
+        console.error('Error saving role:', error);
+        alert('Failed to save role. Please try again.');
+      } finally {
+        setSavingRole(false);
+      }
     }
   };
 
+  const handleContinue = async () => {
+    if (!selectedRole || !user) return;
+    
+    if (user && user.dbId && (!user.role || user.role !== selectedRole)) {
+      try {
+        setSavingRole(true);
+        
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({ role: selectedRole })
+          .eq('id', user.dbId)
+          .select()
+          .single();
+        
+        if (updateError) throw updateError;
+        
+        const updatedUserWithRole = { ...user, role: updatedUser.role };
+        setUser(updatedUserWithRole);
+        localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+        
+      } catch (error) {
+        console.error('Error saving role:', error);
+        alert('Failed to save your role. Please try again.');
+        setSavingRole(false);
+        return;
+      } finally {
+        setSavingRole(false);
+      }
+    }
+    
+    if (selectedRole === 'student') {
+      navigate("/studenthub", { state: { user } });
+    } else if (selectedRole === 'teacher') {
+      navigate("/teacherhub", { state: { user } });
+    }
+  };
+
+  // Rest of your component remains the same...
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -101,7 +233,6 @@ function SignIn() {
           {user ? `Hello, ${user.name.split(' ')[0]}!` : 'Sign in to continue your learning journey'}
         </p>
         
-        {/* User Info - Only show when signed in */}
         {user && (
           <div style={styles.userInfo}>
             <img 
@@ -116,17 +247,24 @@ function SignIn() {
             <div style={styles.userDetails}>
               <h3 style={styles.userName}>{user.name}</h3>
               <p style={styles.userEmail}>{user.email}</p>
+              {user.role && (
+                <p style={styles.userRole}>
+                  Role: {user.role === 'teacher' ? '👨‍🏫 Teacher' : '👨‍🎓 Student'}
+                </p>
+              )}
             </div>
             <div style={styles.userActions}>
               <button 
                 style={styles.switchAccountButton}
                 onClick={handleSwitchAccount}
+                disabled={loading || savingRole}
               >
                 Switch Account
               </button>
               <button 
                 style={styles.signOutButton}
                 onClick={handleSignOut}
+                disabled={loading || savingRole}
               >
                 Sign Out
               </button>
@@ -134,7 +272,6 @@ function SignIn() {
           </div>
         )}
 
-        {/* Google Sign-In Button - Only show when not signed in */}
         {!user && (
           <button 
             style={styles.googleButton}
@@ -159,24 +296,24 @@ function SignIn() {
           </button>
         )}
 
-        {/* Role Selection - Always Visible */}
         <div style={styles.roleSelectionContainer}>
           <h2 style={styles.roleSelectionTitle}>Select your role</h2>
           <p style={styles.rolePrompt}>
             {user 
-              ? 'Choose how you want to use MathLit-Hub' 
+              ? (user.role 
+                  ? `You are currently signed in as a ${user.role}. You can change your role below.`
+                  : 'Choose how you want to use MathLit-Hub')
               : 'Choose your role to preview, then sign in to continue'}
           </p>
           
           <div style={styles.roleContainer}>
-            {/* Student Option */}
             <div 
               style={{
                 ...styles.roleCard,
                 ...(selectedRole === 'student' ? styles.selectedRole : {}),
                 ...(!user ? styles.roleCardPreview : {})
               }}
-              onClick={() => setSelectedRole('student')}
+              onClick={() => user && handleRoleSelect('student')}
             >
               <div style={styles.roleIcon}>👨‍🎓</div>
               <h3 style={styles.roleTitle}>Student</h3>
@@ -186,14 +323,13 @@ function SignIn() {
               )}
             </div>
 
-            {/* Teacher Option */}
             <div 
               style={{
                 ...styles.roleCard,
                 ...(selectedRole === 'teacher' ? styles.selectedRole : {}),
                 ...(!user ? styles.roleCardPreview : {})
               }}
-              onClick={() => setSelectedRole('teacher')}
+              onClick={() => user && handleRoleSelect('teacher')}
             >
               <div style={styles.roleIcon}>👨‍🏫</div>
               <h3 style={styles.roleTitle}>Teacher</h3>
@@ -207,20 +343,26 @@ function SignIn() {
           <button 
             style={{
               ...styles.continueButton,
-              ...(!selectedRole || !user ? styles.buttonDisabled : {})
+              ...(!selectedRole || !user || savingRole ? styles.buttonDisabled : {})
             }}
             onClick={handleContinue}
-            disabled={!selectedRole || !user}
+            disabled={!selectedRole || !user || savingRole}
           >
-            {!user 
-              ? 'Sign in with Google to continue' 
-              : !selectedRole 
-                ? 'Select a role to continue' 
-                : `Continue as ${selectedRole === 'student' ? 'Student' : 'Teacher'}`}
+            {savingRole ? (
+              <div style={styles.loadingContainer}>
+                <span style={styles.loadingSpinner}></span>
+                <span>Saving role...</span>
+              </div>
+            ) : (
+              !user 
+                ? 'Sign in with Google to continue' 
+                : !selectedRole 
+                  ? 'Select a role to continue' 
+                  : `Continue as ${selectedRole === 'student' ? 'Student' : 'Teacher'}`
+            )}
           </button>
         </div>
 
-        {/* Terms Text - Always visible */}
         <p style={styles.termsText}>
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>
@@ -229,8 +371,10 @@ function SignIn() {
   );
 }
 
-// Responsive styles with full screen adaptation
+// ... (keep all your existing styles here, they remain the same)
+
 const styles = {
+  // ... your existing styles
   container: {
     minHeight: '100vh',
     display: 'flex',
@@ -282,14 +426,6 @@ const styles = {
     transition: 'all 0.3s ease',
     marginBottom: 'clamp(20px, 5vw, 30px)',
     boxSizing: 'border-box',
-    ':hover': {
-      backgroundColor: '#f8f9fa',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    },
-    ':disabled': {
-      opacity: 0.7,
-      cursor: 'not-allowed',
-    },
   },
   googleIcon: {
     width: 'clamp(16px, 4vw, 20px)',
@@ -342,6 +478,13 @@ const styles = {
     fontSize: 'clamp(11px, 3vw, 14px)',
     color: '#666',
     wordBreak: 'break-word',
+    marginBottom: '4px',
+  },
+  userRole: {
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
+    color: '#2563eb',
+    fontWeight: '500',
+    marginTop: '4px',
   },
   userActions: {
     display: 'flex',
@@ -360,10 +503,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
     whiteSpace: 'nowrap',
-    ':hover': {
-      backgroundColor: '#2563eb',
-      color: 'white',
-    },
   },
   signOutButton: {
     padding: 'clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px)',
@@ -376,10 +515,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s ease',
     whiteSpace: 'nowrap',
-    ':hover': {
-      backgroundColor: '#dc2626',
-      color: 'white',
-    },
   },
   roleSelectionContainer: {
     marginTop: 'clamp(16px, 4vw, 20px)',
@@ -421,19 +556,10 @@ const styles = {
     position: 'relative',
     backgroundColor: '#fff',
     boxSizing: 'border-box',
-    ':hover': {
-      borderColor: '#2563eb',
-      transform: 'translateY(-4px)',
-      boxShadow: '0 8px 20px rgba(37,99,235,0.15)',
-    },
   },
   roleCardPreview: {
     opacity: '0.95',
-    ':hover': {
-      borderColor: '#2563eb',
-      transform: 'translateY(-4px)',
-      boxShadow: '0 8px 20px rgba(37,99,235,0.15)',
-    },
+    cursor: 'default',
   },
   selectedRole: {
     borderColor: '#2563eb',
@@ -478,20 +604,10 @@ const styles = {
     transition: 'all 0.3s ease',
     fontWeight: '600',
     boxSizing: 'border-box',
-    ':hover': {
-      backgroundColor: '#1d4ed8',
-      transform: 'translateY(-2px)',
-      boxShadow: '0 6px 12px rgba(37,99,235,0.3)',
-    },
   },
   buttonDisabled: {
     backgroundColor: '#cccccc',
     cursor: 'not-allowed',
-    ':hover': {
-      backgroundColor: '#cccccc',
-      transform: 'none',
-      boxShadow: 'none',
-    },
   },
   termsText: {
     fontSize: 'clamp(10px, 2.5vw, 12px)',
@@ -502,7 +618,7 @@ const styles = {
   },
 };
 
-// Add global styles and animations
+// Add global styles
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
@@ -510,7 +626,6 @@ styleSheet.textContent = `
     100% { transform: rotate(360deg); }
   }
 
-  /* Responsive styles for all screen sizes */
   @media (max-width: 768px) {
     .user-info {
       flex-direction: column;
@@ -611,12 +726,10 @@ styleSheet.textContent = `
     }
   }
 
-  /* Smooth transitions */
   * {
     transition: all 0.2s ease-in-out;
   }
 
-  /* Better touch targets for mobile */
   button, [role="button"], .role-card {
     touch-action: manipulation;
   }

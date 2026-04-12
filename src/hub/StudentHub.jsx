@@ -1,5 +1,5 @@
 import '../App.css';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { AiFillHome } from 'react-icons/ai';
 import { FiUser, FiMenu, FiX, FiChevronDown, FiEdit2 } from 'react-icons/fi';
@@ -7,6 +7,8 @@ import { GiAchievement } from 'react-icons/gi';
 import { IoGameController } from 'react-icons/io5';
 import { MdAssignment } from 'react-icons/md';
 import { useUser } from '../context/UserContext';
+import { classService } from '../services/classService';
+import CheeringAvatar from "../components/CheeringAvatar";
 
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -15,11 +17,65 @@ function StudentHub() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [editedUsername, setEditedUsername] = useState('');
+  const [joinedClasses, setJoinedClasses] = useState([]);
+  const [loadingClasses, setLoadingClasses] = useState(true);
+  const [showLockModal, setShowLockModal] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState(null);
   const { user, setUser, userData, updateUserData } = useUser();
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef(null);
   const usernameInputRef = useRef(null);
+
+  // Load joined classes - defined as useCallback so it can be passed to children
+  const loadJoinedClasses = useCallback(async () => {
+    if (!user?.dbId) {
+      setLoadingClasses(false);
+      return;
+    }
+    
+    try {
+      setLoadingClasses(true);
+      const classes = await classService.getStudentClasses(user.dbId);
+      setJoinedClasses(classes);
+      console.log('Joined classes loaded:', classes.length);
+      return classes;
+    } catch (error) {
+      console.error('Error loading joined classes:', error);
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, [user?.dbId]);
+
+  // Check if user has access to Missions/Games
+  const hasClassAccess = useCallback(() => {
+    return joinedClasses.length > 0;
+  }, [joinedClasses.length]);
+
+  // Set up event listener for class changes (for real-time updates)
+  useEffect(() => {
+    // Listen for custom event when classes are updated from other components
+    const handleClassesUpdated = () => {
+      console.log('Classes updated event received, reloading...');
+      loadJoinedClasses();
+    };
+    
+    // Listen for storage events (in case of multiple tabs)
+    const handleStorageChange = (e) => {
+      if (e.key === 'classesUpdated' || e.key === 'userClasses') {
+        console.log('Storage change detected, reloading classes...');
+        loadJoinedClasses();
+      }
+    };
+    
+    window.addEventListener('classesUpdated', handleClassesUpdated);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('classesUpdated', handleClassesUpdated);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [loadJoinedClasses]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -72,6 +128,13 @@ function StudentHub() {
     }
   }, [location.state, user, setUser]);
 
+  // Load classes when user is available
+  useEffect(() => {
+    if (user?.dbId) {
+      loadJoinedClasses();
+    }
+  }, [user?.dbId, loadJoinedClasses]);
+
   // Redirect to homepage if at exactly /studenthub
   useEffect(() => {
     if (location.pathname === '/studenthub') {
@@ -79,6 +142,45 @@ function StudentHub() {
       navigate('/studenthub/homepage', { replace: true });
     }
   }, [location.pathname, navigate]);
+
+  // Show lock modal
+  const showAccessDeniedModal = (destination) => {
+    setPendingNavigation(destination);
+    setShowLockModal(true);
+  };
+
+  // Handle navigation with access check
+  const handleMissionsClick = () => {
+    if (hasClassAccess()) {
+      navigate("/studenthub/missions");
+    } else {
+      showAccessDeniedModal('missions');
+    }
+    setOpenDropdown(null);
+    closeSidebar();
+  };
+
+  const handleGamesClick = () => {
+    if (hasClassAccess()) {
+      navigate("/studenthub/games");
+    } else {
+      showAccessDeniedModal('games');
+    }
+    setOpenDropdown(null);
+    closeSidebar();
+  };
+
+  const handleHomeClick = () => {
+    navigate("/studenthub/homepage");
+    setOpenDropdown(null);
+    closeSidebar();
+  };
+
+  const handleAchievementClick = () => {
+    navigate("/studenthub/achievement");
+    setOpenDropdown(null);
+    closeSidebar();
+  };
 
   const toggleSidebar = () => {
     if (isMobile) {
@@ -99,30 +201,6 @@ function StudentHub() {
     navigate("/");
     setOpenDropdown(null);
     setMobileMenuOpen(false);
-  };
-
-  const handleHomeClick = () => {
-    navigate("/studenthub/homepage");
-    setOpenDropdown(null);
-    closeSidebar();
-  };
-
-  const handleMissionsClick = () => {
-    navigate("/studenthub/missions");
-    setOpenDropdown(null);
-    closeSidebar();
-  };
-
-  const handleGamesClick = () => {
-    navigate("/studenthub/games");
-    setOpenDropdown(null);
-    closeSidebar();
-  };
-
-  const handleAchievementClick = () => {
-    navigate("/studenthub/achievement");
-    setOpenDropdown(null);
-    closeSidebar();
   };
 
   const handleProfileClick = () => {
@@ -157,6 +235,17 @@ function StudentHub() {
     }
   };
 
+  // Function to manually refresh classes (can be called from child components)
+  const refreshClasses = async () => {
+    console.log('Manually refreshing classes...');
+    await loadJoinedClasses();
+    // Dispatch event to notify other components
+    window.dispatchEvent(new Event('classesUpdated'));
+    // Store in localStorage for cross-tab communication
+    localStorage.setItem('classesUpdated', Date.now().toString());
+    return joinedClasses;
+  };
+
   // Determine sidebar width and visibility
   const sidebarWidth = sidebarCollapsed ? '60px' : '220px';
   const sidebarDisplay = isMobile && !mobileMenuOpen ? 'none' : 'flex';
@@ -185,7 +274,7 @@ function StudentHub() {
             {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Home</span>}
           </div>
 
-          {/* Missions Icon */}
+          {/* Missions Icon - Auto-locks/unlocks based on class access */}
           <div 
             style={styles.iconWrapper}
             onClick={handleMissionsClick}
@@ -193,10 +282,17 @@ function StudentHub() {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <MdAssignment size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Missions</span>}
+            {(!sidebarCollapsed || isMobile) && (
+              <div style={styles.iconTextWrapper}>
+                <span style={styles.iconText}>Missions</span>
+                {!hasClassAccess() && !loadingClasses && (
+                  <span style={styles.lockIcon}>🔒</span>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Games Icon */}
+          {/* Games Icon - Auto-locks/unlocks based on class access */}
           <div 
             style={styles.iconWrapper}
             onClick={handleGamesClick}
@@ -204,10 +300,17 @@ function StudentHub() {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <IoGameController size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Games</span>}
+            {(!sidebarCollapsed || isMobile) && (
+              <div style={styles.iconTextWrapper}>
+                <span style={styles.iconText}>Games</span>
+                {!hasClassAccess() && !loadingClasses && (
+                  <span style={styles.lockIcon}>🔒</span>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Achievement Icon */}
+          {/* Achievement Icon - Always accessible */}
           <div 
             style={styles.iconWrapper}
             onClick={handleAchievementClick}
@@ -248,42 +351,46 @@ function StudentHub() {
           </button>
 
           <div style={styles.rightSection}>
-            {/* Profile Button with Chevron and XP Points */}
-            <div style={styles.profileButton} onClick={handleProfileClick}>
-              <span style={styles.studentName}>
-                {getUserIdentifier()}
-              </span>
-              <span style={styles.xpPoints}>
-                ⭐ {getUserXP()} XP
-              </span>
-              <FiChevronDown 
-                size={18} 
-                color="white" 
-                style={{
-                  ...styles.chevronIcon,
-                  transform: openDropdown === 'profile' ? 'rotate(180deg)' : 'rotate(0deg)'
-                }}
-              />
-            </div>
-            
-            {/* Profile Dropdown */}
-            <div style={{ position: 'relative' }} ref={dropdownRef}>
-              {user?.picture ? (
-                <img 
-                  src={user.picture}
-                  alt={user.name}
-                  style={styles.userAvatar}
-                  onClick={handleProfileClick}
+            {/* Combined Profile Area - Click anywhere shows the same dropdown */}
+            <div style={styles.profileContainer} ref={dropdownRef}>
+              <div style={styles.profileContent} onClick={handleProfileClick}>
+                {/* Name and XP Section */}
+                <div style={styles.profileInfo}>
+                  <span style={styles.studentName}>
+                    {getUserIdentifier()}
+                  </span>
+                  <span style={styles.xpPoints}>
+                    ⭐ {getUserXP()} XP
+                  </span>
+                </div>
+                
+                {/* Chevron Icon */}
+                <FiChevronDown 
+                  size={18} 
+                  color="white" 
+                  style={{
+                    ...styles.chevronIcon,
+                    transform: openDropdown === 'profile' ? 'rotate(180deg)' : 'rotate(0deg)'
+                  }}
                 />
-              ) : (
-                <FiUser
-                  size={24}
-                  color="white"
-                  style={styles.userIcon}
-                  onClick={handleProfileClick}
-                />
-              )}
+                
+                {/* Avatar */}
+                {user?.picture ? (
+                  <img 
+                    src={user.picture}
+                    alt={user.name}
+                    style={styles.userAvatar}
+                  />
+                ) : (
+                  <FiUser
+                    size={24}
+                    color="white"
+                    style={styles.userIcon}
+                  />
+                )}
+              </div>
               
+              {/* Profile Dropdown */}
               {openDropdown === 'profile' && (
                 <div style={styles.dropdown}>
                   {/* User Header */}
@@ -342,6 +449,10 @@ function StudentHub() {
                       <span style={styles.infoLabel}>⭐ XP Points:</span>
                       <span style={styles.infoValue}>{getUserXP()} XP</span>
                     </div>
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>📚 Classes:</span>
+                      <span style={styles.infoValue}>{joinedClasses.length}</span>
+                    </div>
                     {userData && userData.lastLogin && (
                       <div style={styles.dropdownInfoItem}>
                         <span style={styles.infoLabel}>🕒 Last login:</span>
@@ -360,12 +471,6 @@ function StudentHub() {
                   
                   <div style={styles.dropdownDivider}></div>
                   
-                  <div style={styles.dropdownDivider}></div>
-                  
-            
-                  
-                  <div style={styles.dropdownDivider}></div>
-                  
                   {/* Logout Button */}
                   <div style={styles.logoutItem} onClick={handleLogout}>
                     🚪 Logout
@@ -376,7 +481,7 @@ function StudentHub() {
           </div>
         </header>
 
-        {/* Content Area - Pass user data to child routes */}
+        {/* Content Area - Pass user data and joined classes to child routes */}
         <div style={styles.contentWrapper}>
           <div style={styles.content}>
             <Outlet context={{ 
@@ -384,11 +489,68 @@ function StudentHub() {
               userData, 
               updateUserData, 
               getUserIdentifier,
-              getUserXP
+              getUserXP,
+              joinedClasses,
+              loadingClasses,
+              hasClassAccess: hasClassAccess(),
+              refreshClasses, // Pass refresh function to child components
+              loadJoinedClasses // Also pass this for backward compatibility
             }} />
           </div>
         </div>
       </main>
+
+      {/* Lock Modal - Shown when trying to access locked features without joining a class */}
+      {showLockModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowLockModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalIcon}>🔒</div>
+              <h2 style={styles.modalTitle}>Access Locked</h2>
+              <button 
+                style={styles.modalCloseButton} 
+                onClick={() => setShowLockModal(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <p style={styles.modalMessage}>
+                You need to join a class first to access {pendingNavigation === 'missions' ? 'missions' : 'games'}!
+              </p>
+              <p style={styles.modalSubMessage}>
+                Join a class using the class code provided by your teacher to unlock all features and start your learning journey.
+              </p>
+              
+              <div style={styles.modalActions}>
+                <button 
+                  style={styles.modalCancelButton}
+                  onClick={() => setShowLockModal(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={styles.modalJoinButton}
+                  onClick={() => {
+                    setShowLockModal(false);
+                    navigate("/studenthub/homepage");
+                    // Scroll to join class section after navigation
+                    setTimeout(() => {
+                      const joinSection = document.querySelector('[data-join-class-section]');
+                      if (joinSection) {
+                        joinSection.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }, 100);
+                  }}
+                >
+                  Join a Class
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -449,12 +611,22 @@ const styles = {
     borderRadius: '0 20px 20px 0',
     transition: 'background-color 0.2s',
   },
+  iconTextWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flex: 1,
+  },
   iconText: {
     marginLeft: '12px',
     color: 'white',
     fontSize: '15px',
     fontWeight: '500',
     whiteSpace: 'nowrap',
+  },
+  lockIcon: {
+    fontSize: '12px',
+    opacity: 0.7,
   },
   main: {
     flex: 1,
@@ -497,7 +669,10 @@ const styles = {
     alignItems: 'center',
     gap: '15px',
   },
-  profileButton: {
+  profileContainer: {
+    position: 'relative',
+  },
+  profileContent: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -508,6 +683,11 @@ const styles = {
     ':hover': {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
+  },
+  profileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
   },
   studentName: {
     color: 'white',
@@ -521,7 +701,6 @@ const styles = {
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
     padding: '4px 8px',
     borderRadius: '12px',
-    marginLeft: '4px',
   },
   chevronIcon: {
     transition: 'transform 0.2s ease',
@@ -547,7 +726,7 @@ const styles = {
   },
   dropdown: {
     position: 'absolute',
-    top: '50px',
+    top: 'calc(100% + 10px)',
     right: 0,
     backgroundColor: 'white',
     borderRadius: '12px',
@@ -665,46 +844,9 @@ const styles = {
       backgroundColor: '#1e4db9',
     },
   },
-  statsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '12px',
-  },
-  statBadge: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    padding: '10px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    textAlign: 'center',
-  },
-  statBadgeValue: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    color: '#2563eb',
-  },
-  statBadgeLabel: {
-    fontSize: '11px',
-    color: '#666',
-    marginTop: '4px',
-  },
   dropdownDivider: {
     height: '1px',
     backgroundColor: '#e0e0e0',
-  },
-  dropdownItem: {
-    padding: '10px 0',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    fontSize: '14px',
-    color: '#333',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    ':hover': {
-      color: '#2563eb',
-    },
   },
   logoutItem: {
     padding: '12px 16px',
@@ -744,6 +886,115 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
   },
+  // Lock Modal Styles
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backdropFilter: 'blur(5px)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    animation: 'fadeIn 0.3s ease',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    maxWidth: '450px',
+    width: '90%',
+    overflow: 'hidden',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+    animation: 'slideUp 0.3s ease',
+  },
+  modalHeader: {
+    padding: '24px 24px 16px 24px',
+    textAlign: 'center',
+    position: 'relative',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  modalIcon: {
+    fontSize: '48px',
+    marginBottom: '12px',
+  },
+  modalTitle: {
+    fontSize: '24px',
+    fontWeight: 'bold',
+    color: '#1f2937',
+    margin: 0,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    cursor: 'pointer',
+    color: '#9ca3af',
+    transition: 'color 0.2s',
+    padding: '4px 8px',
+    borderRadius: '8px',
+    ':hover': {
+      color: '#ef4444',
+      backgroundColor: '#fee2e2',
+    },
+  },
+  modalBody: {
+    padding: '24px',
+  },
+  modalMessage: {
+    fontSize: '16px',
+    color: '#374151',
+    textAlign: 'center',
+    marginBottom: '12px',
+    fontWeight: '500',
+  },
+  modalSubMessage: {
+    fontSize: '14px',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: '24px',
+    lineHeight: 1.5,
+  },
+  modalActions: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+  },
+  modalCancelButton: {
+    padding: '10px 20px',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+    ':hover': {
+      backgroundColor: '#e5e7eb',
+      transform: 'translateY(-1px)',
+    },
+  },
+  modalJoinButton: {
+    padding: '10px 24px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+    ':hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+    },
+  },
 };
 
 // Add CSS animations
@@ -766,6 +1017,26 @@ styleSheet.textContent = `
     }
     to {
       transform: rotate(360deg);
+    }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
   

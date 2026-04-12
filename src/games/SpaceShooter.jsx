@@ -18,6 +18,8 @@ const SpaceShooter = () => {
   const [correctShots, setCorrectShots] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [touchMove, setTouchMove] = useState({ active: false, x: 0 });
+  const [canvasScale, setCanvasScale] = useState(1);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   
   // Game tracking stats
   const [gameStartTime, setGameStartTime] = useState(null);
@@ -225,14 +227,65 @@ const SpaceShooter = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
-  // Detect if device is mobile
+  // Detect if device is mobile and calculate canvas scale
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      const isMobileDevice = window.innerWidth <= 768;
+      setIsMobile(isMobileDevice);
+      
+      // Calculate canvas scale based on container width
+      const container = document.querySelector('.game-wrapper');
+      if (container) {
+        const containerWidth = container.clientWidth;
+        const scale = containerWidth / 800;
+        setCanvasScale(Math.min(scale, 1));
+      }
+      
+      // Set canvas size based on device
+      if (isMobileDevice) {
+        setCanvasSize({ width: 800, height: 600 });
+      } else {
+        setCanvasSize({ width: 800, height: 600 });
+      }
     };
+    
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    
+    // Add resize observer for canvas container
+    const resizeObserver = new ResizeObserver(() => {
+      const container = document.querySelector('.game-wrapper');
+      if (container) {
+        const containerWidth = container.clientWidth;
+        const scale = containerWidth / 800;
+        setCanvasScale(Math.min(scale, 1));
+      }
+    });
+    
+    const gameWrapper = document.querySelector('.game-wrapper');
+    if (gameWrapper) {
+      resizeObserver.observe(gameWrapper);
+    }
+    
+    return () => {
+      window.removeEventListener('resize', checkMobile);
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  // Convert screen coordinates to canvas coordinates
+  const getCanvasCoordinates = useCallback((clientX, clientY) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
   }, []);
 
   // ------------------ LINEAR EQUATIONS ------------------
@@ -456,18 +509,19 @@ const SpaceShooter = () => {
   // Mobile controls
   const handleTouchStart = (e) => {
     e.preventDefault();
-    const rect = canvasRef.current.getBoundingClientRect();
-    const touchX = e.touches[0].clientX - rect.left;
-    setTouchMove({ active: true, x: touchX });
+    const touch = e.touches[0];
+    const canvasCoords = getCanvasCoordinates(touch.clientX, touch.clientY);
+    setTouchMove({ active: true, x: canvasCoords.x });
   };
 
   const handleTouchMove = (e) => {
     e.preventDefault();
     if (touchMove.active) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const touchX = e.touches[0].clientX - rect.left;
-      const newX = Math.max(0, Math.min(760, touchX - 20));
+      const touch = e.touches[0];
+      const canvasCoords = getCanvasCoordinates(touch.clientX, touch.clientY);
+      const newX = Math.max(0, Math.min(760, canvasCoords.x - 20));
       gameRef.current.player.x = newX;
+      setTouchMove(prev => ({ ...prev, x: canvasCoords.x }));
     }
   };
 
@@ -729,7 +783,7 @@ const SpaceShooter = () => {
       ctx.fillRect(e.x + e.width - 20, e.y + 9, 6, 4);
       
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 28px "Courier New", monospace';
+      ctx.font = `bold ${Math.min(28, Math.max(18, 28 * canvasScale))}px "Courier New", monospace`;
       ctx.shadowBlur = 3;
       ctx.shadowColor = '#000000';
       ctx.fillText(e.answer, e.x + 27, e.y + 45);
@@ -743,7 +797,7 @@ const SpaceShooter = () => {
 
     if (feedback.message) {
       ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336';
-      ctx.font = 'bold 24px Arial';
+      ctx.font = `bold ${Math.min(24, Math.max(16, 24 * canvasScale))}px Arial`;
       ctx.shadowBlur = 4;
       ctx.shadowColor = 'black';
       ctx.fillText(feedback.message, 180, 100);
@@ -758,37 +812,43 @@ const SpaceShooter = () => {
       ctx.fillRect(0, 0, 800, 600);
       
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 48px Arial';
+      ctx.font = `bold ${Math.min(48, Math.max(32, 48 * canvasScale))}px Arial`;
       ctx.shadowBlur = 10;
       ctx.shadowColor = '#ff6600';
       ctx.fillText(levelAnnouncement, 280, 280);
       
       ctx.fillStyle = '#ffffff';
-      ctx.font = '28px Arial';
+      ctx.font = `${Math.min(28, Math.max(20, 28 * canvasScale))}px Arial`;
       ctx.fillText('Press SPACE to start!', 290, 360);
       ctx.fillStyle = '#88ff88';
-      ctx.font = '20px Arial';
+      ctx.font = `${Math.min(20, Math.max(14, 20 * canvasScale))}px Arial`;
       ctx.fillText('Solve for x in each equation!', 290, 420);
       ctx.shadowBlur = 0;
     }
 
+    // Adjust font sizes based on screen size
+    const titleFontSize = Math.min(22, Math.max(16, 22 * canvasScale));
+    const subFontSize = Math.min(18, Math.max(12, 18 * canvasScale));
+    const smallFontSize = Math.min(16, Math.max(10, 16 * canvasScale));
+    const tinyFontSize = Math.min(12, Math.max(8, 12 * canvasScale));
+    
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px Arial';
+    ctx.font = `bold ${titleFontSize}px Arial`;
     ctx.fillText(`Score: ${score}`, 20, 40);
     ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 70);
     
     ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 28px Arial';
+    ctx.font = `bold ${Math.min(28, Math.max(20, 28 * canvasScale))}px Arial`;
     ctx.fillText(`LEVEL ${level}`, 20, 120);
     
     // ✅ Display XP earned (consistent with other games)
     ctx.fillStyle = '#aaffaa';
-    ctx.font = 'bold 16px Arial';
+    ctx.font = `bold ${subFontSize}px Arial`;
     ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
     
     const speedColor = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
     ctx.fillStyle = speedColor;
-    ctx.font = 'bold 18px Arial';
+    ctx.font = `bold ${subFontSize}px Arial`;
     ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 180);
     
     const requiredCorrect = 5 + Math.floor(level / 2);
@@ -798,34 +858,34 @@ const SpaceShooter = () => {
     ctx.fillStyle = '#4caf50';
     ctx.fillRect(20, 200, (progress / 100) * 150, 12);
     ctx.fillStyle = '#cccccc';
-    ctx.font = '12px Arial';
+    ctx.font = `${smallFontSize}px Arial`;
     ctx.fillText(`${correctShots}/${requiredCorrect} correct to level up`, 20, 195);
     
     // Display accuracy stats
     if (totalShots > 0) {
       const accuracy = Math.round((totalCorrect / totalShots) * 100);
       ctx.fillStyle = '#88ff88';
-      ctx.font = '12px Arial';
+      ctx.font = `${smallFontSize}px Arial`;
       ctx.fillText(`Accuracy: ${accuracy}% (${totalCorrect}/${totalShots})`, 20, 230);
     }
     
     // ✅ Display XP breakdown (consistent with other games)
     ctx.fillStyle = '#ffaa88';
-    ctx.font = '10px Arial';
+    ctx.font = `${tinyFontSize}px Arial`;
     ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
     ctx.fillText(`✅ Correct: ${correctAnswers} | ❌ Wrong: ${wrongAnswers}`, 20, 265);
     
     if (targetEquation && !showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 28px Arial';
+      ctx.font = `bold ${Math.min(28, Math.max(20, 28 * canvasScale))}px Arial`;
       ctx.fillText(`Solve: ${targetEquation.equation}`, 260, 50);
       ctx.fillStyle = '#88ff88';
-      ctx.font = '18px Arial';
+      ctx.font = `${subFontSize}px Arial`;
       ctx.fillText('Find x = ?', 360, 85);
     }
     
     ctx.fillStyle = '#888888';
-    ctx.font = '16px Arial';
+    ctx.font = `${smallFontSize}px Arial`;
     if (!isMobile) {
       ctx.fillText('← →  Move', 20, 575);
       ctx.fillText('SPACE  Shoot', 20, 595);
@@ -836,21 +896,21 @@ const SpaceShooter = () => {
     
     if (!showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ff8888';
-      ctx.font = '18px Arial';
+      ctx.font = `${smallFontSize}px Arial`;
       ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40);
     }
     
     // Display timer
     if (gameState === 'playing' && !showLevelAnnouncement) {
       ctx.fillStyle = '#aaaaaa';
-      ctx.font = '14px Arial';
+      ctx.font = `${tinyFontSize}px Arial`;
       const minutes = Math.floor(timeSpent / 60);
       const seconds = timeSpent % 60;
       ctx.fillText(`Time: ${minutes}:${seconds.toString().padStart(2, '0')}`, 700, 70);
     }
     
     game.frame++;
-  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers]);
+  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasScale]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -905,12 +965,19 @@ const SpaceShooter = () => {
         Back to Games
       </button>
       
-      <div style={styles.gameWrapper}>
+      <div className="game-wrapper" style={styles.gameWrapper}>
         <canvas 
           ref={canvasRef} 
-          width={800} 
-          height={600} 
-          style={styles.canvas}
+          width={canvasSize.width} 
+          height={canvasSize.height} 
+          style={{
+            ...styles.canvas,
+            width: '100%',
+            height: 'auto',
+            maxWidth: `${canvasSize.width}px`,
+            display: 'block',
+            margin: '0 auto'
+          }}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -971,14 +1038,14 @@ const SpaceShooter = () => {
               onMouseDown={moveLeft}
               style={styles.mobileButton}
             >
-              <FaArrowLeft size={32} />
+              <FaArrowLeft size={28} />
             </button>
             <button 
               onTouchStart={moveRight} 
               onMouseDown={moveRight}
               style={styles.mobileButton}
             >
-              <FaArrowRight size={32} />
+              <FaArrowRight size={28} />
             </button>
           </div>
           <div style={styles.rightControls}>
@@ -987,7 +1054,7 @@ const SpaceShooter = () => {
               onMouseDown={handleMobileShoot}
               style={{...styles.mobileButton, ...styles.shootButton}}
             >
-              <FaCrosshairs size={32} />
+              <FaCrosshairs size={28} />
             </button>
           </div>
         </div>
@@ -1001,7 +1068,7 @@ const styles = {
     width: '100%',
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '20px',
+    padding: 'clamp(10px, 3vw, 20px)',
     boxSizing: 'border-box',
     display: 'flex',
     flexDirection: 'column',
@@ -1011,18 +1078,18 @@ const styles = {
   },
   backButton: {
     position: 'fixed',
-    top: '20px',
-    left: '20px',
+    top: 'clamp(10px, 2vw, 20px)',
+    left: 'clamp(10px, 2vw, 20px)',
     backgroundColor: 'rgba(0,0,0,0.85)',
     color: 'white',
     border: '2px solid rgba(255,255,255,0.3)',
-    padding: '12px 20px',
+    padding: 'clamp(8px, 2vw, 12px) clamp(15px, 3vw, 20px)',
     borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '16px',
+    fontSize: 'clamp(12px, 3vw, 16px)',
     fontWeight: 'bold',
     zIndex: 1000,
     transition: 'all 0.3s',
@@ -1030,17 +1097,17 @@ const styles = {
     boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
   },
   backIcon: {
-    fontSize: '16px',
+    fontSize: 'clamp(12px, 3vw, 16px)',
   },
   gameWrapper: {
     position: 'relative',
     display: 'inline-block',
-    margin: '40px auto 0 auto',
+    margin: 'clamp(60px, 10vh, 80px) auto 0 auto',
     boxShadow: '0 10px 40px rgba(0,0,0,0.3)',
     borderRadius: '10px',
     overflow: 'hidden',
     width: '100%',
-    maxWidth: '800px',
+    maxWidth: 'min(800px, 95vw)',
   },
   canvas: {
     display: 'block',
@@ -1049,6 +1116,7 @@ const styles = {
     border: '3px solid rgba(255,255,255,0.2)',
     borderRadius: '10px',
     touchAction: 'none',
+    cursor: 'none',
   },
   menuOverlay: {
     position: 'absolute',
@@ -1070,11 +1138,11 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '20px',
-    padding: '30px 20px',
+    gap: 'clamp(15px, 4vh, 20px)',
+    padding: 'clamp(20px, 5vh, 30px)',
     textAlign: 'center',
     width: '100%',
-    maxWidth: '600px',
+    maxWidth: 'min(600px, 90vw)',
     margin: 'auto',
   },
   gameTitle: {
@@ -1090,7 +1158,7 @@ const styles = {
   },
   features: {
     backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: '15px 20px',
+    padding: 'clamp(12px, 3vw, 20px)',
     borderRadius: '10px',
     marginTop: '10px',
     textAlign: 'left',
@@ -1098,12 +1166,12 @@ const styles = {
     width: '100%',
     fontSize: 'clamp(11px, 2.5vw, 16px)',
     border: '1px solid rgba(255,255,255,0.2)',
-    maxHeight: '60vh',
+    maxHeight: 'min(60vh, 400px)',
     overflow: 'auto',
   },
   startButton: {
-    padding: '14px 40px',
-    fontSize: 'clamp(18px, 5vw, 20px)',
+    padding: 'clamp(12px, 3vw, 14px) clamp(30px, 8vw, 40px)',
+    fontSize: 'clamp(16px, 4vw, 20px)',
     fontWeight: 'bold',
     background: 'linear-gradient(135deg, #4CAF50, #45a049)',
     color: 'white',
@@ -1113,8 +1181,7 @@ const styles = {
     transition: 'transform 0.2s, box-shadow 0.2s',
     marginTop: '20px',
     boxShadow: '0 4px 15px rgba(76,175,80,0.3)',
-    minWidth: '200px',
-    width: 'auto',
+    minWidth: 'clamp(160px, 40vw, 200px)',
   },
   gameOverOverlay: {
     position: 'absolute',
@@ -1128,7 +1195,7 @@ const styles = {
     justifyContent: 'center',
     color: 'white',
     textAlign: 'center',
-    padding: '20px',
+    padding: 'clamp(15px, 4vh, 20px)',
     zIndex: 10,
   },
   gameOverContent: {
@@ -1136,8 +1203,8 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '20px',
-    padding: '20px',
+    gap: 'clamp(12px, 3vh, 20px)',
+    padding: 'clamp(15px, 4vh, 20px)',
   },
   gameOverTitle: {
     fontSize: 'clamp(24px, 6vw, 42px)',
@@ -1145,12 +1212,12 @@ const styles = {
     marginBottom: '10px',
   },
   finalScore: {
-    fontSize: 'clamp(16px, 4vw, 24px)',
+    fontSize: 'clamp(14px, 3.5vw, 24px)',
     margin: '5px 0',
   },
   retryButton: {
-    padding: '12px 35px',
-    fontSize: 'clamp(16px, 4vw, 18px)',
+    padding: 'clamp(10px, 2.5vw, 12px) clamp(25px, 6vw, 35px)',
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
     fontWeight: 'bold',
     background: 'linear-gradient(135deg, #2196F3, #1976D2)',
     color: 'white',
@@ -1160,17 +1227,17 @@ const styles = {
     transition: 'transform 0.2s',
     marginTop: '20px',
     boxShadow: '0 4px 15px rgba(33,150,243,0.3)',
-    minWidth: '160px',
+    minWidth: 'clamp(140px, 35vw, 160px)',
   },
   mobileControls: {
     position: 'fixed',
-    bottom: '20px',
+    bottom: 'clamp(10px, 3vh, 20px)',
     left: 0,
     right: 0,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '15px 30px',
+    padding: 'clamp(10px, 2vh, 15px) clamp(15px, 4vw, 30px)',
     backgroundColor: 'rgba(0,0,0,0.85)',
     backdropFilter: 'blur(15px)',
     zIndex: 100,
@@ -1179,7 +1246,7 @@ const styles = {
   },
   leftControls: {
     display: 'flex',
-    gap: '20px',
+    gap: 'clamp(15px, 5vw, 20px)',
   },
   rightControls: {
     display: 'flex',
@@ -1188,8 +1255,8 @@ const styles = {
     backgroundColor: 'rgba(255,255,255,0.2)',
     border: '2px solid rgba(255,255,255,0.6)',
     borderRadius: '60px',
-    width: 'clamp(60px, 15vw, 80px)',
-    height: 'clamp(60px, 15vw, 80px)',
+    width: 'clamp(55px, 13vw, 70px)',
+    height: 'clamp(55px, 13vw, 70px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1212,6 +1279,7 @@ const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   button:hover {
     transform: scale(1.05);
+    transition: transform 0.2s;
   }
   button:active {
     transform: scale(0.95);
@@ -1224,6 +1292,31 @@ styleSheet.textContent = `
     button:active {
       transform: scale(0.95);
     }
+    
+    .game-wrapper {
+      margin-top: 70px !important;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .game-wrapper {
+      margin-top: 65px !important;
+    }
+  }
+  
+  /* Scrollbar styling for features section */
+  .game-wrapper + div ~ div div::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .game-wrapper + div ~ div div::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+  }
+  
+  .game-wrapper + div ~ div div::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 3px;
   }
 `;
 document.head.appendChild(styleSheet);

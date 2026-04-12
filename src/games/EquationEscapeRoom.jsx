@@ -1,7 +1,7 @@
 // src/games/EquationEscapeRoom.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaTimes, FaArrowLeft, FaPlay, FaSave } from 'react-icons/fa';
+import { FaArrowLeft, FaPlay, FaSave } from 'react-icons/fa';
 import EscapeRoom from './equation-function/EscapeRoom.jsx';
 
 const EquationEscapeRoom = () => {
@@ -33,7 +33,7 @@ const EquationEscapeRoom = () => {
     }
   }, []);
 
-  const saveGameState = (gameState) => {
+  const saveGameState = useCallback((gameState) => {
     const stateToSave = {
       currentPuzzle: gameState.currentPuzzle !== undefined ? gameState.currentPuzzle : 0,
       puzzlesCompleted: gameState.puzzlesCompleted !== undefined ? gameState.puzzlesCompleted : 0,
@@ -48,16 +48,16 @@ const EquationEscapeRoom = () => {
     };
     localStorage.setItem('equationEscapeRoomState', JSON.stringify(stateToSave));
     setSavedGameState(stateToSave);
-  };
+  }, []);
 
-  const clearSavedGameState = () => {
+  const clearSavedGameState = useCallback(() => {
     localStorage.removeItem('equationEscapeRoomState');
     setSavedGameState(null);
     setShouldLoadSaved(false);
-  };
+  }, []);
 
   // Only send result from wrapper, not from EscapeRoom
-  const sendGameResult = (completed, timeRemaining, timeSpentSeconds, puzzlesCompletedCount, extraStats = {}) => {
+  const sendGameResult = useCallback((completed, timeRemaining, timeSpentSeconds, puzzlesCompletedCount, extraStats = {}) => {
     if (gameResultSent) return;
     
     const totalPuzzles = 20;
@@ -101,7 +101,7 @@ const EquationEscapeRoom = () => {
     const results = previousResults ? JSON.parse(previousResults) : [];
     results.push(gameResult);
     localStorage.setItem('equationGameResults', JSON.stringify(results.slice(-10)));
-  };
+  }, [gameResultSent]);
 
   const handleBack = () => {
     if (activeGameMode !== 'start') {
@@ -109,29 +109,26 @@ const EquationEscapeRoom = () => {
     }
   };
 
-  const handleClose = () => {
-    navigate('/studenthub/games');
-  };
-
   const startEscapeRoom = (loadSaved = false) => {
     setActiveGameMode('escape');
     setGameStartTime(Date.now());
     setShouldLoadSaved(loadSaved);
     setGameResultSent(false);
+    setPlayTime(0); // Reset play time when starting new game
     
     if (!loadSaved) {
       clearSavedGameState();
     }
   };
 
-  const handleEscapeComplete = (completed) => {
+  const handleEscapeComplete = useCallback((completed) => {
     if (completed) {
       clearSavedGameState();
     }
     setActiveGameMode('start');
-  };
+  }, [clearSavedGameState]);
 
-  const handleGameStateUpdate = (gameState) => {
+  const handleGameStateUpdate = useCallback((gameState) => {
     saveGameState(gameState);
     
     if (gameState.puzzlesCompleted !== undefined) {
@@ -141,15 +138,25 @@ const EquationEscapeRoom = () => {
       setChallengeScore(gameState.challengeScore);
     }
     if (gameState.timeLeft !== undefined) {
-      setPlayTime(360 - gameState.timeLeft);
+      // Calculate elapsed time (6 minutes = 360 seconds)
+      const elapsedTime = 360 - gameState.timeLeft;
+      setPlayTime(elapsedTime);
     }
-  };
+  }, [saveGameState]);
 
   const formatTimeRemaining = (timeLeft) => {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
+
+  // Cleanup function to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clear any intervals or timeouts if needed
+      setGameStartTime(null);
+    };
+  }, []);
 
   return (
     <div style={styles.container}>
@@ -159,13 +166,6 @@ const EquationEscapeRoom = () => {
           <span style={styles.backText}>Back to Menu</span>
         </button>
       )}
-
-      {/* Close button removed - commented out */}
-      {/* <div style={styles.buttonContainer}>
-        <button onClick={handleClose} style={styles.closeButton}>
-          <FaTimes style={styles.closeIcon} />
-        </button>
-      </div> */}
 
       {activeGameMode === 'start' && (
         <div style={styles.startContainer}>
@@ -283,9 +283,6 @@ const styles = {
   backText: {
     fontWeight: 'bold',
   },
-  // buttonContainer removed - not used anymore
-  // closeButton removed - not used anymore
-  // closeIcon removed - not used anymore
   header: {
     textAlign: 'center',
     marginBottom: '40px',
