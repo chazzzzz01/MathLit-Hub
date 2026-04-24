@@ -6,7 +6,7 @@ import Homepage from "./menu/Homepage"
 import Missions from "./menu/Missions" 
 import Games from "./menu/Games" 
 import Achievement from "./menu/Achievement" 
-import ClassView from "./menu/ClassView"
+// import ClassView from "./menu/ClassView"
 import StudentHub from "./hub/StudentHub";
 import TeacherHub from "./hub/TeacherHub";
 // Import your game components
