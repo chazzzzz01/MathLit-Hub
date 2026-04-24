@@ -6,7 +6,7 @@ import Homepage from "./menu/Homepage"
 import Missions from "./menu/Missions" 
 import Games from "./menu/Games" 
 import Achievement from "./menu/Achievement" 
-import classView from "./menu/classView.jsx"  // Import classView component
+import ClassView from "./menu/ClassView"
 import StudentHub from "./hub/StudentHub";
 import TeacherHub from "./hub/TeacherHub";
 // Import your game components
@@ -17,10 +17,16 @@ import TestEnv from "./TestEnv"
 import Home from "./menu1/Home"
 import Dashboard from "./menu1/Dashboard"
 import Classes from "./menu1/Classes"
+import Collaboration from "./menu1/Collaboration"
+import CollaborationStudent from "./menu/CollaborationStudent";
+
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
 import AboutUs from "./landingmenu/aboutus";
 import Mission1 from "./missions/mission1";
+import Mission2 from "./missions/mission2";  
+import Mission3 from "./missions/mission3";
+import Mission4 from "./missions/mission4";
 import '/src/App.css'
 
 function App() {
@@ -39,10 +45,14 @@ function App() {
             <Route index element={<Homepage />} />
             <Route path="homepage" element={<Homepage />} />
             <Route path="missions" element={<Missions />} />
-             <Route path="missions/1" element={<Mission1 />} />
+            <Route path="missions/1" element={<Mission1 />} />
+            <Route path="missions/2" element={<Mission2 />} /> 
+            <Route path="missions/3" element={<Mission3 />} />
+            <Route path="missions/4" element={<Mission4 />} />
             <Route path="games" element={<Games />} />
             <Route path="achievement" element={<Achievement />} />
-            <Route path="class/:classId" element={<classView />} />  {/* Add classView route */}
+            <Route path="collaboration" element={<CollaborationStudent />} />
+              
           </Route>
           
           {/* Teacher hub routes */}
@@ -50,9 +60,11 @@ function App() {
             <Route index element={<Home />} />
             <Route path="home" element={<Home />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="collaboration" element={<Collaboration />} />
             <Route path="classes/:classId" element={<Classes />} />
             <Route path="students" element={<div>Students Page</div>} />
             <Route path="progress" element={<div>Progress Page</div>} />
+             
           </Route>
           
           {/* Game routes - These will open in new tabs/pages */}

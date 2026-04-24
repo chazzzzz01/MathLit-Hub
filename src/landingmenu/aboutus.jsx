@@ -30,7 +30,7 @@ const AboutUs = () => {
       <div style={styles.heroSection}>
         <h1 style={styles.title}>About MathLit Hub</h1>
         <p style={styles.subtitle}>
-          Empowering Students Through Mathematical Excellence
+          A web-based mathematical literacy hub on finding equations of the line to address learners' mathematical reasoning, problem-solving skills and application of linear equations.
         </p>
       </div>
 
@@ -39,10 +39,7 @@ const AboutUs = () => {
         <div style={styles.sectionContent}>
           <h2 style={styles.sectionTitle}>Our Mission</h2>
           <p style={styles.sectionText}>
-            At MathLit Hub, our mission is to transform mathematics education by making it 
-            accessible, engaging, and effective for every learner. We believe that every 
-            student has the potential to excel in mathematics when provided with the right 
-            tools, guidance, and motivation.
+            At MathLit Hub, our mission is to enhance students' mathematical literacy in finding the equation of a line by providing accessible, engaging, and effective digital learning experiences. The platform aims to support learners in understanding key concepts such as slope, intercepts, and linear relationships through interactive lessons, collaborative activities, and real-life applications. We believe that every student can develop strong problem-solving skills in mathematics when guided by meaningful tasks, appropriate tools, and a supportive learning environment.
           </p>
         </div>
       </section>
@@ -52,129 +49,131 @@ const AboutUs = () => {
         <div style={styles.sectionContent}>
           <h2 style={styles.sectionTitle}>Our Vision</h2>
           <p style={styles.sectionText}>
-            We envision a world where mathematical literacy is not a barrier but a bridge 
-            to endless opportunities. Through innovative technology and proven pedagogical 
-            approaches, we're creating a global community of confident, mathematically 
-            empowered learners.
+            We envision a learning environment where mathematical literacy in linear equations becomes a foundation for understanding real-life situations rather than a barrier to learning. Through innovative digital tools and effective instructional approaches, MathLit Hub aims to develop confident learners who can interpret, construct, and apply equations of a line in meaningful contexts, empowering them to succeed in mathematics and beyond.
           </p>
         </div>
       </section>
 
-      {/* What We Offer Section - Updated */}
+      {/* Features Section */}
       <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>What We Offer</h2>
+        <h2 style={styles.sectionTitle}>Features</h2>
         <div style={styles.offeringsGrid}>
           <div style={styles.offerCard}>
             <div style={styles.offerIcon}>🎯</div>
-            <h3 style={styles.offerTitle}>Engaging Missions</h3>
+            <h3 style={styles.offerTitle}>Missions</h3>
             <p style={styles.offerText}>
-              Complete exciting math missions that challenge your skills and unlock new levels of mathematical understanding.
+              Learning missions aligned with the selected competencies.
             </p>
           </div>
 
           <div style={styles.offerCard}>
             <div style={styles.offerIcon}>🎮</div>
-            <h3 style={styles.offerTitle}>Fun & Enjoyable Games</h3>
+            <h3 style={styles.offerTitle}>Game Zone</h3>
             <p style={styles.offerText}>
-              Learn math through interactive games that make solving problems fun, addictive, and rewarding.
-            </p>
-          </div>
-
-          <div style={styles.offerCard}>
-            <div style={styles.offerIcon}>📊</div>
-            <h3 style={styles.offerTitle}>Real-time Analytics</h3>
-            <p style={styles.offerText}>
-              Comprehensive progress tracking and detailed insights to help students and 
-              educators identify areas for improvement.
+              Gamified activities designed to reinforce students' understanding of linear equations.
             </p>
           </div>
 
           <div style={styles.offerCard}>
             <div style={styles.offerIcon}>🤝</div>
-            <h3 style={styles.offerTitle}>Collaborative Learning</h3>
+            <h3 style={styles.offerTitle}>Collaboration Corner</h3>
             <p style={styles.offerText}>
-              Interactive group activities and peer-to-peer learning opportunities that 
-              foster teamwork and communication skills.
+              Structured group tasks that encourage students to work collaboratively in solving mathematical problems and explaining their reasoning.
+            </p>
+          </div>
+
+          <div style={styles.offerCard}>
+            <div style={styles.offerIcon}>📊</div>
+            <h3 style={styles.offerTitle}>Progress Tracker</h3>
+            <p style={styles.offerText}>
+              Monitor scores, progress, and mission completion.
             </p>
           </div>
 
           <div style={styles.offerCard}>
             <div style={styles.offerIcon}>🏆</div>
-            <h3 style={styles.offerTitle}>Achievement System</h3>
+            <h3 style={styles.offerTitle}>Achievements and Rewards</h3>
             <p style={styles.offerText}>
-              Earn badges, certificates, and rewards as you complete missions and master new concepts.
-            </p>
-          </div>
-
-          <div style={styles.offerCard}>
-            <div style={styles.offerIcon}>⭐</div>
-            <h3 style={styles.offerTitle}>Daily Challenges</h3>
-            <p style={styles.offerText}>
-              Take on new challenges every day to keep your math skills sharp and earn bonus rewards.
+              Earn badges and rewards as you master new concepts.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Why Choose Us Section */}
-      <section style={styles.sectionAlt}>
+      {/* About the Researchers Section */}
+      <section style={styles.researchersSection}>
         <div style={styles.sectionContent}>
-          <h2 style={styles.sectionTitle}>Why Choose MathLit Hub?</h2>
-          <div style={styles.featuresList}>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Complete engaging missions with increasing difficulty levels</span>
+          <h2 style={styles.sectionTitleWhite}>About the Researchers</h2>
+          <div style={styles.researchersGrid}>
+            {/* Researcher 1 - Sheila Ann Bacunawa Gevera */}
+            <div style={styles.researcherCard}>
+              <div style={styles.researcherAvatar}>
+                <img 
+                  src="/sheila.jpg" 
+                  alt="Sheila Ann Bacunawa Gevera" 
+                  style={styles.researcherImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div style={styles.avatarInitials}>SG</div>';
+                  }}
+                />
+              </div>
+              <h3 style={styles.researcherName}>SHEILA ANN BACUNAWA GEVERA</h3>
+              <p style={styles.researcherTitle}>Researcher, Biliran Province State University</p>
+              <div style={styles.researcherContact}>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>📞</span>
+                  <span style={styles.contactText}>09483426236</span>
+                </div>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>✉️</span>
+                  <span style={styles.contactText}>geverasheila27@gmail.com</span>
+                </div>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>📘</span>
+                  <span style={styles.contactText}>Sheila Ann Bacunawa Gevera</span>
+                </div>
+              </div>
+              <p style={styles.researcherBio}>
+                Sheila Ann Bacunawa Gevera is a third-year student taking up Bachelor of Secondary Education major in Mathematics at Biliran Province State University. She is actively engaged in developing innovative and technology-integrated instructional materials that promote mathematical literacy among learners. Her research interests focus on enhancing students' conceptual understanding of linear equations through interactive, learner-centered approaches. As one of the proponents of the MathLit Hub, she contributes to the design and development of meaningful digital learning experiences that support problem-solving, collaboration, and real-life application of mathematical concepts.
+              </p>
             </div>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Enjoyable games that make learning math fun and interactive</span>
-            </div>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Research-based curriculum aligned with educational standards</span>
-            </div>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Track your progress and see your improvement over time</span>
-            </div>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Compete with friends and earn achievements</span>
-            </div>
-            <div style={styles.featureItem}>
-              <span style={styles.checkmark}>✓</span>
-              <span>Cross-platform compatibility (Web, Mobile, Tablet)</span>
-            </div>
-          </div>
-        </div>
-      </section>
 
-      {/* How It Works Section - New */}
-      <section style={styles.section}>
-        <h2 style={styles.sectionTitle}>How It Works</h2>
-        <div style={styles.stepsGrid}>
-          <div style={styles.stepCard}>
-            <div style={styles.stepNumber}>1</div>
-            <h3 style={styles.stepTitle}>Choose Your Mission</h3>
-            <p style={styles.stepText}>Select from a variety of math missions tailored to your skill level</p>
-          </div>
-
-          <div style={styles.stepCard}>
-            <div style={styles.stepNumber}>2</div>
-            <h3 style={styles.stepTitle}>Play & Learn</h3>
-            <p style={styles.stepText}>Complete enjoyable games and challenges to master concepts</p>
-          </div>
-
-          <div style={styles.stepCard}>
-            <div style={styles.stepNumber}>3</div>
-            <h3 style={styles.stepTitle}>Earn Rewards</h3>
-            <p style={styles.stepText}>Collect badges, unlock achievements, and level up</p>
-          </div>
-
-          <div style={styles.stepCard}>
-            <div style={styles.stepNumber}>4</div>
-            <h3 style={styles.stepTitle}>Track Progress</h3>
-            <p style={styles.stepText}>Monitor your improvement and see your math skills grow</p>
+            {/* Researcher 2 - Louie Lyn Dela Cruz */}
+            <div style={styles.researcherCard}>
+              <div style={styles.researcherAvatar}>
+                <img 
+                  src="/lou.jpg" 
+                  alt="Louie Lyn Dela Cruz" 
+                  style={styles.researcherImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML = '<div style={styles.avatarInitials}>LC</div>';
+                  }}
+                />
+              </div>
+              <h3 style={styles.researcherName}>LOUIE LYN DELA CRUZ</h3>
+              <p style={styles.researcherTitle}>Researcher, Biliran Province State University</p>
+              <div style={styles.researcherContact}>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>📞</span>
+                  <span style={styles.contactText}>09481234567</span>
+                </div>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>✉️</span>
+                  <span style={styles.contactText}>louielyn.delacruz@bpsu.edu.ph</span>
+                </div>
+                <div style={styles.contactItem}>
+                  <span style={styles.contactIcon}>📘</span>
+                  <span style={styles.contactText}>Louie Lyn Dela Cruz</span>
+                </div>
+              </div>
+              <p style={styles.researcherBio}>
+                Louie Lyn Dela Cruz is a third-year Bachelor of Secondary Education major in Mathematics student at Biliran Province State University. She is committed to improving mathematics education through the integration of digital platforms and innovative teaching strategies. Her academic focus centers on strengthening students' mathematical literacy, particularly in understanding and constructing linear equations. As a co-developer of the MathLit Hub, she plays a key role in structuring interactive modules and collaborative activities that aim to make mathematics more engaging, accessible, and relevant to learners.
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -184,7 +183,7 @@ const AboutUs = () => {
         <div style={styles.sectionContent}>
           <h2 style={styles.ctaTitle}>Ready to Start Your Math Journey?</h2>
           <p style={styles.ctaText}>
-            Join thousands of students who are already mastering mathematics through missions and games with MathLit Hub.
+            Join learners who are mastering linear equations through missions, games, and collaborative activities with MathLit Hub.
           </p>
           <div style={styles.ctaButtons}>
             <button 
@@ -197,7 +196,7 @@ const AboutUs = () => {
                 e.target.style.backgroundColor = '#2563eb';
               }}
             >
-              Get Started Free
+              Get Started
             </button>
             <button 
               style={styles.secondaryButton}
@@ -209,7 +208,7 @@ const AboutUs = () => {
                 e.target.style.backgroundColor = 'transparent';
               }}
             >
-              Explore Features
+              Back to Home
             </button>
           </div>
         </div>
@@ -242,9 +241,9 @@ const AboutUs = () => {
           transition: all 0.3s ease;
         }
         
-        .step-card:hover {
+        .researcher-card:hover {
           transform: translateY(-5px);
-          box-shadow: 0 12px 24px rgba(37, 99, 235, 0.2);
+          box-shadow: 0 20px 40px rgba(0,0,0,0.15);
           transition: all 0.3s ease;
         }
       `}</style>
@@ -306,7 +305,7 @@ const styles = {
     letterSpacing: '-0.02em'
   },
   subtitle: {
-    fontSize: 'clamp(18px, 4vw, 22px)',
+    fontSize: 'clamp(16px, 4vw, 18px)',
     color: '#FFFFFF',
     opacity: '0.95',
     maxWidth: '700px',
@@ -321,6 +320,11 @@ const styles = {
     padding: 'clamp(60px, 10vh, 80px) 20px',
     backgroundColor: '#F9FAFB'
   },
+  researchersSection: {
+    padding: 'clamp(60px, 10vh, 80px) 20px',
+    backgroundColor: '#1E1B4B',
+    backgroundImage: 'linear-gradient(135deg, #1E1B4B 0%, #312E81 100%)'
+  },
   sectionContent: {
     maxWidth: '1200px',
     margin: '0 auto'
@@ -328,6 +332,13 @@ const styles = {
   sectionTitle: {
     fontSize: 'clamp(28px, 6vw, 36px)',
     color: '#111827',
+    marginBottom: 'clamp(30px, 5vh, 40px)',
+    fontWeight: '600',
+    textAlign: 'center'
+  },
+  sectionTitleWhite: {
+    fontSize: 'clamp(28px, 6vw, 36px)',
+    color: '#FFFFFF',
     marginBottom: 'clamp(30px, 5vh, 40px)',
     fontWeight: '600',
     textAlign: 'center'
@@ -372,54 +383,89 @@ const styles = {
     color: '#6B7280',
     lineHeight: '1.6'
   },
-  featuresList: {
-    maxWidth: '600px',
-    margin: '0 auto'
-  },
-  featureItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '12px 0',
-    fontSize: 'clamp(16px, 4vw, 18px)',
-    color: '#4B5563'
-  },
-  checkmark: {
-    color: '#2563EB',
-    fontSize: '20px',
-    fontWeight: 'bold'
-  },
-  stepsGrid: {
+  researchersGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(250px, 100%), 1fr))',
-    gap: 'clamp(24px, 4vw, 32px)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(400px, 100%), 1fr))',
+    gap: 'clamp(32px, 5vw, 48px)',
     maxWidth: '1200px',
     margin: '0 auto'
   },
-  stepCard: {
-    backgroundColor: '#2563EB',
-    borderRadius: '12px',
-    padding: 'clamp(24px, 5vw, 32px)',
-    textAlign: 'center',
+  researcherCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '20px',
+    padding: 'clamp(28px, 5vw, 36px)',
+    boxShadow: '0 20px 35px -10px rgba(0,0,0,0.2)',
     transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-    cursor: 'pointer',
-    color: 'white'
+    textAlign: 'center',
+    cursor: 'pointer'
   },
-  stepNumber: {
+  researcherAvatar: {
+    marginBottom: '20px',
+    display: 'flex',
+    justifyContent: 'center'
+  },
+  researcherImage: {
+    width: '150px',
+    height: '150px',
+    borderRadius: '50%',
+    objectFit: 'cover',
+    border: '4px solid #FFFFFF',
+    boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
+  },
+  avatarInitials: {
+    width: '150px',
+    height: '150px',
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontSize: '48px',
-    fontWeight: 'bold',
-    color: 'rgba(255,255,255,0.3)',
-    marginBottom: '16px'
+    fontWeight: '700',
+    color: '#FFFFFF',
+    boxShadow: '0 8px 20px rgba(0,0,0,0.15)'
   },
-  stepTitle: {
-    fontSize: 'clamp(18px, 4vw, 22px)',
-    marginBottom: '12px',
-    fontWeight: '600'
+  researcherName: {
+    fontSize: 'clamp(20px, 4vw, 24px)',
+    color: '#111827',
+    marginBottom: '8px',
+    fontWeight: '700'
   },
-  stepText: {
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    opacity: '0.95',
-    lineHeight: '1.6'
+  researcherTitle: {
+    fontSize: '14px',
+    color: '#2563EB',
+    fontWeight: '600',
+    marginBottom: '20px',
+    letterSpacing: '0.5px'
+  },
+  researcherContact: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: '12px',
+    padding: '16px',
+    marginBottom: '20px',
+    textAlign: 'left'
+  },
+  contactItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '8px 0',
+    fontSize: '14px',
+    color: '#4B5563',
+    borderBottom: '1px solid #E5E7EB'
+  },
+  contactIcon: {
+    fontSize: '16px',
+    minWidth: '24px'
+  },
+  contactText: {
+    wordBreak: 'break-all'
+  },
+  researcherBio: {
+    fontSize: 'clamp(14px, 3.5vw, 15px)',
+    color: '#6B7280',
+    lineHeight: '1.7',
+    textAlign: 'left'
   },
   ctaSection: {
     padding: 'clamp(60px, 10vh, 80px) 20px',

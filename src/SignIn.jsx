@@ -9,6 +9,9 @@ function SignIn() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
   // Check for existing user session on mount
   useEffect(() => {
@@ -123,9 +126,6 @@ function SignIn() {
           localStorage.setItem('user', JSON.stringify(userWithDbInfo));
           console.log('User saved successfully:', userWithDbInfo);
           
-          // REMOVED: Auto-redirect code that was causing the issue
-          // Now user MUST click "Continue" button to proceed
-          
         } catch (error) {
           console.error('Error saving user:', error);
           alert(`Failed to save user information: ${error.message || 'Please check if tables exist in Supabase'}`);
@@ -137,7 +137,7 @@ function SignIn() {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []); // Removed navigate dependency
+  }, []);
 
   const handleGoogleSignIn = () => {
     setLoading(true);
@@ -174,6 +174,7 @@ function SignIn() {
   const handleSignOut = () => {
     setUser(null);
     setSelectedRole(null);
+    setAgreeToTerms(false);
     localStorage.removeItem('user');
     localStorage.removeItem('teacherClasses');
   };
@@ -212,6 +213,12 @@ function SignIn() {
   };
 
   const handleContinue = async () => {
+    // Validate terms agreement
+    if (!agreeToTerms) {
+      alert('Please agree to the Terms of Service and Privacy Policy before continuing');
+      return;
+    }
+    
     // Validate that user has selected a role
     if (!selectedRole) {
       alert('Please select a role (Student or Teacher) before continuing');
@@ -259,7 +266,84 @@ function SignIn() {
     }
   };
 
-  // Rest of your component remains the same...
+  // Terms of Service Modal
+  const TermsModal = () => (
+    <div style={styles.modalOverlay} onClick={() => setShowTermsModal(false)}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>Terms of Service</h2>
+          <button style={styles.modalClose} onClick={() => setShowTermsModal(false)}>✕</button>
+        </div>
+        <div style={styles.modalBody}>
+          <p style={styles.modalText}>
+            <strong>MathLit (SHELD) Hub</strong> is a web-based instructional platform developed for academic and research purposes, specifically to support learning in finding the equation of a line.
+          </p>
+          <p style={styles.modalText}>By continuing to use this platform, you agree to:</p>
+          <ul style={styles.modalList}>
+            <li>Use the platform for educational purposes only</li>
+            <li>Participate responsibly and respectfully, especially in collaborative activities</li>
+            <li>Allow the collection of limited data (e.g., name, responses, scores) for academic research and platform improvement</li>
+          </ul>
+          <p style={styles.modalText}>
+            All information gathered will be kept confidential and will not be used for commercial purposes.
+          </p>
+        </div>
+        <div style={styles.modalFooter}>
+          <button style={styles.modalButton} onClick={() => setShowTermsModal(false)}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Privacy Policy Modal
+  const PrivacyModal = () => (
+    <div style={styles.modalOverlay} onClick={() => setShowPrivacyModal(false)}>
+      <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalHeader}>
+          <h2 style={styles.modalTitle}>Privacy Policy</h2>
+          <button style={styles.modalClose} onClick={() => setShowPrivacyModal(false)}>✕</button>
+        </div>
+        <div style={styles.modalBody}>
+          <p style={styles.modalText}>
+            <strong>MathLit (SHELD) Hub Privacy Notice</strong>
+          </p>
+          <p style={styles.modalText}>
+            This privacy policy explains how MathLit Hub collects, uses, and protects your information.
+          </p>
+          <h3 style={styles.modalSubtitle}>Information We Collect</h3>
+          <ul style={styles.modalList}>
+            <li>Name and email address (via Google Sign-In)</li>
+            <li>User role (Student or Teacher)</li>
+            <li>Learning progress, scores, and responses to activities</li>
+            <li>Platform usage data for research purposes</li>
+          </ul>
+          <h3 style={styles.modalSubtitle}>How We Use Your Information</h3>
+          <ul style={styles.modalList}>
+            <li>To provide and improve the learning platform</li>
+            <li>For academic research on mathematics education</li>
+            <li>To track progress and personalize learning experiences</li>
+            <li>To communicate important platform updates</li>
+          </ul>
+          <h3 style={styles.modalSubtitle}>Data Protection</h3>
+          <p style={styles.modalText}>
+            All data is kept confidential and secure. We do not sell or share your personal information with third parties for commercial purposes. Your data is used solely for educational and research purposes within MathLit Hub.
+          </p>
+          <h3 style={styles.modalSubtitle}>Contact Us</h3>
+          <p style={styles.modalText}>
+            If you have questions about this privacy policy, please contact the MathLit Hub administrators.
+          </p>
+        </div>
+        <div style={styles.modalFooter}>
+          <button style={styles.modalButton} onClick={() => setShowPrivacyModal(false)}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -375,13 +459,50 @@ function SignIn() {
             </div>
           </div>
 
+          {/* Terms of Service and Privacy Policy with Checkbox */}
+          <div style={styles.termsContainer}>
+            <div 
+              style={styles.checkboxWrapper}
+              onClick={() => setAgreeToTerms(!agreeToTerms)}
+            >
+              <div style={{
+                ...styles.circleCheckbox,
+                ...(agreeToTerms ? styles.circleCheckboxChecked : {})
+              }}>
+                {agreeToTerms && <span style={styles.checkmark}>✓</span>}
+              </div>
+            </div>
+            <div style={styles.termsTextWrapper}>
+              <span style={styles.termsPrefix}>I agree to the </span>
+              <span 
+                style={styles.termsLink}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowTermsModal(true);
+                }}
+              >
+                Terms of Service
+              </span>
+              <span style={styles.termsPrefix}> and </span>
+              <span 
+                style={styles.termsLink}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowPrivacyModal(true);
+                }}
+              >
+                Privacy Policy
+              </span>
+            </div>
+          </div>
+
           <button 
             style={{
               ...styles.continueButton,
-              ...(!selectedRole || !user || savingRole ? styles.buttonDisabled : {})
+              ...((!selectedRole || !user || savingRole || !agreeToTerms) ? styles.buttonDisabled : {})
             }}
             onClick={handleContinue}
-            disabled={!selectedRole || !user || savingRole}
+            disabled={!selectedRole || !user || savingRole || !agreeToTerms}
           >
             {savingRole ? (
               <div style={styles.loadingContainer}>
@@ -392,21 +513,21 @@ function SignIn() {
               !user 
                 ? 'Sign in with Google to continue' 
                 : !selectedRole 
-                  ? 'Select a role to continue' 
-                  : `Continue as ${selectedRole === 'student' ? 'Student' : 'Teacher'}`
+                  ? 'Select a role to continue'
+                  : !agreeToTerms
+                    ? 'Agree to Terms to continue'
+                    : `Continue as ${selectedRole === 'student' ? 'Student' : 'Teacher'}`
             )}
           </button>
         </div>
-
-        <p style={styles.termsText}>
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </p>
       </div>
+
+      {/* Modals */}
+      {showTermsModal && <TermsModal />}
+      {showPrivacyModal && <PrivacyModal />}
     </div>
   );
 }
-
-// ... keep all your existing styles (they remain exactly the same as before)
 
 const styles = {
   container: {
@@ -626,6 +747,57 @@ const styles = {
     fontSize: 'clamp(10px, 2.5vw, 12px)',
     fontWeight: 'bold',
   },
+  termsContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: 'clamp(20px, 5vw, 24px)',
+    padding: '10px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    flexWrap: 'wrap',
+  },
+  checkboxWrapper: {
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circleCheckbox: {
+    width: '22px',
+    height: '22px',
+    borderRadius: '50%',
+    border: '2px solid #2563eb',
+    backgroundColor: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  circleCheckboxChecked: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  checkmark: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: 'bold',
+  },
+  termsTextWrapper: {
+    flex: 1,
+    fontSize: 'clamp(11px, 3vw, 13px)',
+    lineHeight: 1.4,
+  },
+  termsPrefix: {
+    color: '#555',
+  },
+  termsLink: {
+    color: '#2563eb',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    fontWeight: '500',
+  },
   continueButton: {
     backgroundColor: '#2563eb',
     color: 'white',
@@ -643,12 +815,91 @@ const styles = {
     backgroundColor: '#cccccc',
     cursor: 'not-allowed',
   },
-  termsText: {
-    fontSize: 'clamp(10px, 2.5vw, 12px)',
-    color: '#999',
-    marginTop: 'clamp(16px, 4vw, 24px)',
-    textAlign: 'center',
-    lineHeight: 1.4,
+  // Modal styles
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    padding: '20px',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    maxWidth: '500px',
+    width: '100%',
+    maxHeight: '80vh',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#111827',
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    fontSize: '24px',
+    cursor: 'pointer',
+    color: '#6b7280',
+    padding: '4px 8px',
+    borderRadius: '6px',
+    transition: 'background 0.2s',
+  },
+  modalBody: {
+    padding: '20px 24px',
+    overflowY: 'auto',
+    flex: 1,
+  },
+  modalText: {
+    fontSize: '14px',
+    color: '#374151',
+    lineHeight: '1.6',
+    marginBottom: '12px',
+  },
+  modalSubtitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#111827',
+    marginTop: '16px',
+    marginBottom: '8px',
+  },
+  modalList: {
+    margin: '8px 0 16px 20px',
+    padding: 0,
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  modalButton: {
+    backgroundColor: '#2563eb',
+    color: 'white',
+    padding: '8px 20px',
+    border: 'none',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
   },
 };
 

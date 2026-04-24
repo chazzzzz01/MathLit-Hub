@@ -1,14 +1,14 @@
+// src/hub/StudentHub.jsx
 import '../App.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { AiFillHome } from 'react-icons/ai';
-import { FiUser, FiMenu, FiX, FiChevronDown, FiEdit2 } from 'react-icons/fi';
+import { FiUser, FiMenu, FiX, FiChevronDown, FiEdit2, FiUsers } from 'react-icons/fi';
 import { GiAchievement } from 'react-icons/gi';
 import { IoGameController } from 'react-icons/io5';
 import { MdAssignment } from 'react-icons/md';
 import { useUser } from '../context/UserContext';
 import { classService } from '../services/classService';
-import CheeringAvatar from "../components/CheeringAvatar";
 
 function StudentHub() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -182,6 +182,13 @@ function StudentHub() {
     closeSidebar();
   };
 
+  // Handle Collaboration Center click - Navigates to collaboration page
+  const handleCollaborationClick = () => {
+    navigate("/studenthub/collaboration");
+    setOpenDropdown(null);
+    closeSidebar();
+  };
+
   const toggleSidebar = () => {
     if (isMobile) {
       setMobileMenuOpen(!mobileMenuOpen);
@@ -308,6 +315,17 @@ function StudentHub() {
                 )}
               </div>
             )}
+          </div>
+
+          {/* Collaboration Center Icon - Always accessible */}
+          <div 
+            style={styles.iconWrapper}
+            onClick={handleCollaborationClick}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <FiUsers size={24} color="white" />
+            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Collaboration</span>}
           </div>
 
           {/* Achievement Icon - Always accessible */}
@@ -493,8 +511,8 @@ function StudentHub() {
               joinedClasses,
               loadingClasses,
               hasClassAccess: hasClassAccess(),
-              refreshClasses, // Pass refresh function to child components
-              loadJoinedClasses // Also pass this for backward compatibility
+              refreshClasses,
+              loadJoinedClasses
             }} />
           </div>
         </div>

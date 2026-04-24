@@ -2,7 +2,7 @@ import '../App.css';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Outlet, useLocation } from 'react-router-dom';
 import { FiUser, FiMenu, FiX, FiHome, FiBarChart2, FiChevronDown, FiEdit2 } from 'react-icons/fi';
-import { MdPeople, MdTrendingUp } from 'react-icons/md';
+import { MdPeople } from 'react-icons/md';
 import { useUser } from '../context/UserContext';
 import { classService } from '../services/classService';
 
@@ -120,8 +120,9 @@ function TeacherHub() {
     }
   }, [location.state, user, setUser]);
 
-  // Redirect to home if at exactly /teacherhub
+  // IMPORTANT FIX: Modified redirect to handle all routes properly
   useEffect(() => {
+    // Only redirect if we're exactly at /teacherhub with no additional path
     if (location.pathname === '/teacherhub') {
       console.log('Redirecting to home');
       navigate('/teacherhub/home', { replace: true });
@@ -207,8 +208,7 @@ function TeacherHub() {
   const navItems = [
     { path: "/teacherhub/home", icon: FiHome, label: "Home" },
     { path: "/teacherhub/dashboard", icon: FiBarChart2, label: "Dashboard" },
-    { path: "/teacherhub/students", icon: MdPeople, label: "Students" },
-    { path: "/teacherhub/progress", icon: MdTrendingUp, label: "Progress" }
+    { path: "/teacherhub/collaboration", icon: MdPeople, label: "Collaboration Center" }
   ];
 
   // If no user, show loading
@@ -252,7 +252,7 @@ function TeacherHub() {
         </aside>
       )}
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay - FIXED: Now blue background */}
       {isMobile && mobileMenuOpen && (
         <div style={styles.mobileOverlay} onClick={() => setMobileMenuOpen(false)}>
           <div style={styles.mobileSidebar} onClick={(e) => e.stopPropagation()}>
@@ -262,7 +262,7 @@ function TeacherHub() {
                 style={styles.mobileCloseButton}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <FiX size={24} color="#2563EB" />
+                <FiX size={24} color="#ffffff" />
               </button>
             </div>
             <div style={styles.mobileNavItems}>
@@ -273,29 +273,22 @@ function TeacherHub() {
                     key={index}
                     style={{
                       ...styles.mobileNavItem,
-                      backgroundColor: isActive ? '#f0f7ff' : 'transparent',
+                      backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
                     }}
                     onClick={() => handleNavigation(item.path)}
                   >
-                    <item.icon size={22} color={isActive ? "#2563EB" : "#6b7280"} />
+                    <item.icon size={22} color="#ffffff" />
                     <span style={{
                       ...styles.mobileNavText,
-                      color: isActive ? '#2563EB' : '#333',
-                      fontWeight: isActive ? '600' : '500'
+                      color: '#ffffff',
+                      fontWeight: isActive ? '600' : '400'
                     }}>
                       {item.label}
                     </span>
                   </div>
                 );
               })}
-              <div style={styles.mobileDivider}></div>
-              <div 
-                style={styles.mobileNavItem}
-                onClick={handleLogout}
-              >
-                <FiUser size={22} color="#dc2626" />
-                <span style={{...styles.mobileNavText, color: '#dc2626'}}>Logout</span>
-              </div>
+              {/* REMOVED: Logout from sidebar - Now only available in profile dropdown */}
             </div>
           </div>
         </div>
@@ -768,7 +761,7 @@ const styles = {
     boxSizing: 'border-box',
   },
   
-  // Mobile Menu Styles
+  // Mobile Menu Styles - FIXED: Now blue background
   mobileOverlay: {
     position: 'fixed',
     top: 0,
@@ -785,24 +778,24 @@ const styles = {
     left: 0,
     width: '280px',
     height: '100vh',
-    backgroundColor: 'white',
-    boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+    backgroundColor: '#2563eb', // Changed from white to blue to match desktop sidebar
+    boxShadow: '2px 0 8px rgba(0,0,0,0.2)',
     animation: 'slideInLeft 0.3s ease',
     display: 'flex',
     flexDirection: 'column',
   },
   mobileSidebarHeader: {
     padding: '20px',
-    borderBottom: '1px solid #e0e0e0',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   mobileLogo: {
     fontSize: '20px',
     fontWeight: '700',
-    color: '#2563EB',
+    color: '#ffffff',
   },
   mobileCloseButton: {
     background: 'transparent',
@@ -815,7 +808,7 @@ const styles = {
     borderRadius: '8px',
     transition: 'background-color 0.2s',
     ':hover': {
-      backgroundColor: '#f0f0f0',
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
   },
   mobileNavItems: {
@@ -834,18 +827,18 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.2s',
     ':hover': {
-      backgroundColor: '#f0f7ff',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
       transform: 'translateX(4px)',
     },
   },
   mobileNavText: {
     fontSize: '16px',
     fontWeight: '500',
-    color: '#333',
+    color: '#ffffff',
   },
   mobileDivider: {
     height: '1px',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     margin: '12px 0',
   },
 };

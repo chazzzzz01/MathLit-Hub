@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+// src/menu/Dashboard.jsx
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
   FiUsers, FiBookOpen, FiTrendingUp, FiCalendar, 
@@ -6,29 +7,84 @@ import {
   FiBarChart2, FiTarget, FiList, FiGrid, FiChevronDown,
   FiUser, FiCheckCircle, FiDollarSign, FiAlertCircle,
   FiMessageSquare, FiClipboard, FiCheckSquare, FiBarChart,
-  FiPlusCircle, FiZap, FiCode, FiTrendingUp as FiTrending
+  FiPlusCircle, FiZap, FiCode, FiTrendingUp as FiTrending,
+  FiHexagon, FiBox, FiSend, FiBell
 } from 'react-icons/fi';
 import { classService } from '../services/classService';
+import { supabase } from '../lib/supabase';
 
 function Dashboard() {
-  const { user, userData } = useOutletContext();
+  const { user, userData, updateUserData, getUserXP, getUserIdentifier } = useOutletContext();
   const [selectedClass, setSelectedClass] = useState('all');
   const [classes, setClasses] = useState([]);
   const [studentsList, setStudentsList] = useState([]);
-  const [notes, setNotes] = useState('');
+  const [gameXP, setGameXP] = useState(0);
+  const [totalScores, setTotalScores] = useState(0);
+  const [missionProgress, setMissionProgress] = useState({
+    completedMissions: [],
+    totalMissions: 4,
+    totalXPEarned: 0
+  });
+  const [gameProgress, setGameProgress] = useState({
+    equation: { completed: false, highScore: 0, attempts: 0 },
+    battle: { completed: false, highScore: 0, attempts: 0 },
+    spaceShooter: { completed: false, highScore: 0, attempts: 0 }
+  });
   const [analytics, setAnalytics] = useState({
     totalStudents: 0,
     activeClasses: 0,
     averageProgress: 0,
     completionRate: 0,
-    totalMissions: 0,
-    completedMissions: 0,
     weeklyActivity: [0, 0, 0, 0, 0, 0, 0],
     topPerformers: [],
     classesData: [],
     dailyActivityLog: []
   });
   const [loading, setLoading] = useState(true);
+  const mountedRef = useRef(true);
+
+  // Announcement State
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [selectedClassForAnnouncement, setSelectedClassForAnnouncement] = useState('');
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
+  const [announcementSuccess, setAnnouncementSuccess] = useState('');
+
+  // --- Helper Functions for Progress Calculations ---
+  const calculateStudentMissionProgress = (completedMissions, totalMissions = 4) => {
+    if (!completedMissions) return 0;
+    const count = Array.isArray(completedMissions) ? completedMissions.length : 0;
+    return totalMissions > 0 ? Math.round((count / totalMissions) * 100) : 0;
+  };
+
+  const calculateStudentGameProgress = (gameProgressData) => {
+    if (!gameProgressData) return 0;
+    let totalProgress = 0;
+    const games = ['equation', 'battle', 'spaceShooter'];
+    games.forEach(gameId => {
+      const game = gameProgressData[gameId];
+      if (!game) return;
+      let gameProgressPercent = 0;
+      const completionWeight = 0.5;
+      const completionScore = game.completed ? 100 : 0;
+      const maxScores = { equation: 1000, battle: 1000, spaceShooter: 1000 };
+      const highScoreWeight = 0.3;
+      const highScorePercent = Math.min(100, (game.highScore / maxScores[gameId]) * 100);
+      const attemptsWeight = 0.2;
+      const attemptsScore = Math.min(100, (game.attempts / 3) * 100);
+      gameProgressPercent = (completionScore * completionWeight) + 
+                           (highScorePercent * highScoreWeight) + 
+                           (attemptsScore * attemptsWeight);
+      totalProgress += gameProgressPercent;
+    });
+    return games.length > 0 ? Math.round(totalProgress / games.length) : 0;
+  };
+
+  const calculateOverallProgress = (missionPercent, gamePercent) => {
+    return Math.round((missionPercent * 0.5) + (gamePercent * 0.5));
+  };
+  // --- End Helper Functions ---
 
   useEffect(() => {
     loadTeacherClasses();
@@ -41,6 +97,112 @@ function Dashboard() {
     }
   }, [selectedClass, classes]);
 
+  // Load user XP, scores, and progress from all sources
+  const loadUserProgress = useCallback(async () => {
+    if (!user?.email) return;
+
+    try {
+      // Load mission progress from userData
+      if (userData?.progress?.completedMissions) {
+        setMissionProgress({
+          completedMissions: userData.progress.completedMissions,
+          totalMissions: 4,
+          totalXPEarned: userData.xp || 0
+        });
+      } else {
+        const savedMissions = localStorage.getItem(`completedMissions_${user.email}`);
+        if (savedMissions) {
+          const completed = JSON.parse(savedMissions);
+          setMissionProgress(prev => ({
+            ...prev,
+            completedMissions: completed
+          }));
+        }
+      }
+
+      // Load game progress from userData or localStorage
+      let gameProg = userData?.gameProgress || {};
+      if (Object.keys(gameProg).length === 0) {
+        const savedGames = localStorage.getItem('gameProgress');
+        if (savedGames) {
+          gameProg = JSON.parse(savedGames);
+        }
+      }
+      setGameProgress(gameProg);
+
+      // Load XP and scores
+      let userXP = userData?.xp || 0;
+      let userTotalScores = userData?.totalScores || 0;
+
+      if (userXP === 0) {
+        const savedXP = localStorage.getItem(`userXP_${user.email}`);
+        if (savedXP && !isNaN(parseInt(savedXP))) {
+          userXP = parseInt(savedXP);
+        }
+      }
+
+      if (userTotalScores === 0) {
+        const savedScores = localStorage.getItem(`userTotalScores_${user.email}`);
+        if (savedScores && !isNaN(parseInt(savedScores))) {
+          userTotalScores = parseInt(savedScores);
+        } else {
+          // Calculate from game progress
+          userTotalScores = calculateTotalScores(gameProg);
+        }
+      }
+
+      setGameXP(userXP);
+      setTotalScores(userTotalScores);
+    } catch (error) {
+      console.error('Error loading user progress:', error);
+    }
+  }, [user?.email, userData]);
+
+  const calculateTotalScores = useCallback((gameProgressData) => {
+    if (!gameProgressData) return 0;
+    const equationScore = gameProgressData.equation?.highScore || 0;
+    const battleScore = gameProgressData.battle?.highScore || 0;
+    const spaceScore = gameProgressData.spaceShooter?.highScore || 0;
+    return equationScore + battleScore + spaceScore;
+  }, []);
+
+  // Calculate overall mission progress percentage
+  const getMissionProgressPercentage = useCallback(() => {
+    const totalMissions = missionProgress.totalMissions;
+    const completedCount = missionProgress.completedMissions.length;
+    return totalMissions > 0 ? Math.round((completedCount / totalMissions) * 100) : 0;
+  }, [missionProgress]);
+
+  // Calculate overall game progress percentage
+  const getGameProgressPercentage = useCallback(() => {
+    const games = ['equation', 'battle', 'spaceShooter'];
+    let totalProgress = 0;
+    
+    games.forEach(gameId => {
+      const game = gameProgress[gameId];
+      if (!game) return;
+      
+      let gameProgressPercent = 0;
+      const completionWeight = 0.5;
+      const completionScore = game.completed ? 100 : 0;
+      
+      const maxScores = { equation: 1000, battle: 1000, spaceShooter: 1000 };
+      const highScoreWeight = 0.3;
+      const highScorePercent = Math.min(100, (game.highScore / maxScores[gameId]) * 100);
+      
+      const attemptsWeight = 0.2;
+      const attemptsScore = Math.min(100, (game.attempts / 3) * 100);
+      
+      gameProgressPercent = (completionScore * completionWeight) + 
+                           (highScorePercent * highScoreWeight) + 
+                           (attemptsScore * attemptsWeight);
+      
+      totalProgress += gameProgressPercent;
+    });
+    
+    return games.length > 0 ? Math.round(totalProgress / games.length) : 0;
+  }, [gameProgress]);
+
   const loadTeacherClasses = async () => {
     if (!user?.dbId) {
       setLoading(false);
@@ -50,6 +212,7 @@ function Dashboard() {
     try {
       setLoading(true);
       const teacherClasses = await classService.getTeacherClasses(user.dbId);
+      console.log('Loaded classes:', teacherClasses);
       setClasses(teacherClasses || []);
     } catch (error) {
       console.error('Error loading classes:', error);
@@ -92,25 +255,49 @@ function Dashboard() {
             studentEmail = studentUser.email || '';
           }
           
-          const missions = await classService.getClassMissions(classItem.id);
-          const studentMissions = missions.filter(m => m.assigned_to === enrollment.student_id);
+          // Get student's game and mission progress
+          let studentXP = 0;
+          let studentTotalScores = 0;
+          let studentCompletedMissions = [];
+          let studentGameProgress = {};
           
-          const completedMissions = studentMissions.filter(m => m.status === 'completed').length || 0;
-          const totalMissions = studentMissions.length || 0;
+          if (studentEmail) {
+            const savedXP = localStorage.getItem(`userXP_${studentEmail}`);
+            if (savedXP && !isNaN(parseInt(savedXP))) {
+              studentXP = parseInt(savedXP);
+            }
+            
+            const savedScores = localStorage.getItem(`userTotalScores_${studentEmail}`);
+            if (savedScores && !isNaN(parseInt(savedScores))) {
+              studentTotalScores = parseInt(savedScores);
+            } else {
+              // Calculate from game progress if available
+              const savedGames = localStorage.getItem(`gameProgress_${studentEmail}`);
+              if (savedGames) {
+                const gameProg = JSON.parse(savedGames);
+                studentTotalScores = calculateTotalScores(gameProg);
+              }
+            }
+            
+            const savedMissions = localStorage.getItem(`completedMissions_${studentEmail}`);
+            if (savedMissions) {
+              studentCompletedMissions = JSON.parse(savedMissions);
+            }
+            
+            const savedGames = localStorage.getItem(`gameProgress_${studentEmail}`);
+            if (savedGames) {
+              studentGameProgress = JSON.parse(savedGames);
+            }
+          }
           
-          const allScores = studentMissions
-            .filter(item => item.score)
-            .map(item => item.score);
-          const averageScore = allScores.length > 0 
-            ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length) 
-            : 0;
+          // Calculate mission completion rate
+          const missionCompletionRate = calculateStudentMissionProgress(studentCompletedMissions);
           
-          // Calculate XP points (mock data - can be adjusted based on actual data)
-          const xpPoints = Math.round(enrollment.progress * 10);
+          // Calculate game completion rate
+          const gameCompletionRate = calculateStudentGameProgress(studentGameProgress);
           
-          // Calculate games completed (mock data)
-          const totalGames = Math.floor(Math.random() * 20) + 5;
-          const completedGames = Math.floor((enrollment.progress / 100) * totalGames);
+          // Calculate overall student progress (50% missions + 50% games) - This is the POINTS value
+          const overallStudentPoints = calculateOverallProgress(missionCompletionRate, gameCompletionRate);
           
           allStudents.push({
             id: enrollment.student_id,
@@ -119,22 +306,27 @@ function Dashboard() {
             className: classItem.name,
             classId: classItem.id,
             progress: enrollment.progress || 0,
-            totalMissions: totalMissions,
-            completedMissions: completedMissions,
-            missionCompletionRate: totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0,
-            averageScore: averageScore,
-            xpPoints: xpPoints,
-            totalGames: totalGames,
-            completedGames: completedGames,
-            gameCompletionRate: totalGames > 0 ? Math.round((completedGames / totalGames) * 100) : 0,
+            points: overallStudentPoints,
+            xpPoints: studentXP,
+            totalScores: studentTotalScores,
+            missionCompletionRate: missionCompletionRate,
+            gameCompletionRate: gameCompletionRate,
+            completedMissions: studentCompletedMissions.length,
+            totalMissions: 4,
+            completedGames: Object.values(studentGameProgress).filter(g => g?.completed).length,
+            totalGames: 3,
             lastActivity: enrollment.last_activity || enrollment.joined_at,
-            status: enrollment.status || 'active'
+            status: enrollment.status || 'active',
+            overallProgress: overallStudentPoints
           });
         }
       }
       
-      allStudents.sort((a, b) => b.progress - a.progress);
+      allStudents.sort((a, b) => b.overallProgress - a.overallProgress);
       setStudentsList(allStudents);
+      
+      // Load current user's progress
+      await loadUserProgress();
       
     } catch (error) {
       console.error('Error loading students data:', error);
@@ -164,9 +356,6 @@ function Dashboard() {
           activeClasses: 0,
           totalStudents: 0,
           averageProgress: 0,
-          completionRate: 0,
-          totalMissions: 0,
-          completedMissions: 0,
           weeklyActivity: [0, 0, 0, 0, 0, 0, 0],
           dailyActivityLog: []
         }));
@@ -177,8 +366,6 @@ function Dashboard() {
       let totalStudentsCount = 0;
       let totalProgressSum = 0;
       let totalClassesWithStudents = 0;
-      let totalMissionsCount = 0;
-      let totalCompletedMissions = 0;
       let allStudentsData = [];
       let classesAnalytics = [];
       let allActivityData = [];
@@ -186,9 +373,6 @@ function Dashboard() {
       for (const classItem of teacherClasses) {
         const students = await classService.getClassStudents(classItem.id);
         const studentsCount = students.length;
-        const missions = await classService.getClassMissions(classItem.id);
-        const missionsCount = missions.length;
-        const completedMissionsCount = missions.filter(m => m.status === 'completed').length;
         
         for (const student of students) {
           const lastActivityDate = student.last_activity || student.joined_at;
@@ -216,9 +400,6 @@ function Dashboard() {
           totalClassesWithStudents++;
         }
         
-        totalMissionsCount += missionsCount;
-        totalCompletedMissions += completedMissionsCount;
-        
         students.forEach(student => {
           allStudentsData.push({
             id: student.student_id,
@@ -237,9 +418,6 @@ function Dashboard() {
           code: classItem.code,
           studentsCount: studentsCount,
           averageProgress: Math.round(classAverageProgress),
-          missionsCount: missionsCount,
-          completedMissions: completedMissionsCount,
-          completionRate: missionsCount > 0 ? Math.round((completedMissionsCount / missionsCount) * 100) : 0
         });
       }
       
@@ -247,20 +425,50 @@ function Dashboard() {
         ? Math.round(totalProgressSum / totalClassesWithStudents)
         : 0;
       
-      const completionRate = totalMissionsCount > 0
-        ? Math.round((totalCompletedMissions / totalMissionsCount) * 100)
-        : 0;
-      
       const topPerformers = allStudentsData
         .sort((a, b) => b.progress - a.progress)
         .slice(0, 5)
-        .map((student, index) => ({
-          rank: index + 1,
-          name: student.name,
-          progress: student.progress,
-          className: student.className,
-          grade: getGradeFromProgress(student.progress)
-        }));
+        .map((student, index) => {
+          let studentXP = 0;
+          let studentScores = 0;
+          let studentMissions = [];
+          let studentGames = {};
+          
+          if (student.email) {
+            const savedXP = localStorage.getItem(`userXP_${student.email}`);
+            if (savedXP && !isNaN(parseInt(savedXP))) studentXP = parseInt(savedXP);
+            const savedScores = localStorage.getItem(`userTotalScores_${student.email}`);
+            if (savedScores && !isNaN(parseInt(savedScores))) studentScores = parseInt(savedScores);
+            const savedMissions = localStorage.getItem(`completedMissions_${student.email}`);
+            if (savedMissions) studentMissions = JSON.parse(savedMissions);
+            const savedGames = localStorage.getItem(`gameProgress_${student.email}`);
+            if (savedGames) studentGames = JSON.parse(savedGames);
+          }
+          
+          let gamesCompleted = 0;
+          if (studentGames) {
+            if (studentGames.equation?.completed) gamesCompleted++;
+            if (studentGames.battle?.completed) gamesCompleted++;
+            if (studentGames.spaceShooter?.completed) gamesCompleted++;
+          }
+          
+          const missionRate = calculateStudentMissionProgress(studentMissions);
+          const gameRate = calculateStudentGameProgress(studentGames);
+          const overall = calculateOverallProgress(missionRate, gameRate);
+          
+          return {
+            rank: index + 1,
+            name: student.name,
+            progress: student.progress,
+            className: student.className,
+            points: overall,
+            xpPoints: studentXP || Math.round((student.progress || 0) * 10),
+            totalScores: studentScores,
+            missionProgress: missionRate,
+            gameProgress: gameRate,
+            overallProgress: overall
+          };
+        });
       
       const weeklyActivity = calculateWeeklyActivity(allActivityData, totalStudentsCount);
       const dailyActivityLog = generateDailyActivityLog(allActivityData, totalStudentsCount);
@@ -269,9 +477,9 @@ function Dashboard() {
         totalStudents: totalStudentsCount,
         activeClasses: teacherClasses.length,
         averageProgress: averageProgress,
-        completionRate: completionRate,
-        totalMissions: totalMissionsCount,
-        completedMissions: totalCompletedMissions,
+        completionRate: 0,
+        totalMissions: 0,
+        completedMissions: 0,
         weeklyActivity: weeklyActivity,
         topPerformers: topPerformers,
         classesData: classesAnalytics,
@@ -283,15 +491,6 @@ function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getGradeFromProgress = (progress) => {
-    if (progress >= 90) return 'A+';
-    if (progress >= 80) return 'A';
-    if (progress >= 70) return 'B';
-    if (progress >= 60) return 'C';
-    if (progress >= 50) return 'D';
-    return 'F';
   };
 
   const calculateWeeklyActivity = (activityData, totalStudents) => {
@@ -356,12 +555,6 @@ function Dashboard() {
     return '#ef4444';
   };
 
-  const getPerformanceLabel = (progress) => {
-    if (progress >= 80) return 'Excellent';
-    if (progress >= 60) return 'Good';
-    return 'Average';
-  };
-
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -373,9 +566,142 @@ function Dashboard() {
     });
   };
 
-  // Mock data for course counts (from the image)
+  // --- Announcement Function with Custom Auth + Supabase ---
+  const handleSendAnnouncement = async () => {
+    if (!announcementTitle.trim() || !announcementMessage.trim()) {
+      alert('Please enter both a title and message for the announcement');
+      return;
+    }
+    
+    if (!selectedClassForAnnouncement) {
+      alert('Please select a class to send the announcement to');
+      return;
+    }
+
+    setSendingAnnouncement(true);
+    
+    try {
+      // Get Supabase session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw new Error(`Authentication error: ${sessionError.message}`);
+      }
+      
+      let supabaseUserId = session?.user?.id;
+      
+      // If no session, try to sign in with email from app user
+      if (!session && user?.email) {
+        console.log('No Supabase session, attempting to sign in with app user email:', user.email);
+        
+        // Check if user exists in Supabase by email
+        const { data: existingUser, error: userError } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', user.email)
+          .maybeSingle();
+        
+        if (userError) {
+          console.error('Error checking user in Supabase:', userError);
+        }
+        
+        if (existingUser) {
+          // User exists in Supabase but not authenticated - we need to sign in
+          // For now, we'll use the existing user's ID from the users table
+          supabaseUserId = existingUser.id;
+          console.log('Found existing Supabase user:', supabaseUserId);
+        } else {
+          // User doesn't exist in Supabase - we need to create them or use a default
+          console.warn('User not found in Supabase. Announcements require Supabase authentication.');
+          throw new Error('You need to be logged into Supabase to send announcements. Please contact your administrator.');
+        }
+      }
+      
+      if (!supabaseUserId) {
+        throw new Error('Cannot send announcement: No valid Supabase user ID found. Please log out and log back in.');
+      }
+      
+      console.log('Using Supabase user ID:', supabaseUserId);
+      console.log('App user dbId:', user?.dbId);
+      
+      // Find the class
+      const targetClass = classes.find(c => String(c.id) === String(selectedClassForAnnouncement));
+      
+      if (!targetClass) {
+        console.error('Available classes:', classes);
+        throw new Error(`Class not found with ID: ${selectedClassForAnnouncement}`);
+      }
+
+      console.log('Sending announcement to class:', targetClass);
+
+      // Prepare announcement data - use Supabase user ID from users table
+      const announcementData = {
+        class_id: Number(targetClass.id),
+        teacher_id: supabaseUserId, // Use Supabase user ID from users table
+        teacher_name: user?.name || 'Teacher',
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim()
+      };
+
+      console.log('Announcement data:', announcementData);
+
+      // Send to Supabase
+      const result = await classService.createAnnouncement(announcementData);
+      
+      console.log('Announcement sent successfully:', result);
+      
+      // Reset form
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setSelectedClassForAnnouncement('');
+      setShowAnnouncementModal(false);
+      setAnnouncementSuccess(`✅ Announcement sent to "${targetClass.name}"!`);
+      
+      setTimeout(() => setAnnouncementSuccess(''), 3000);
+      
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      
+      let errorMessage = 'Failed to send announcement. ';
+      
+      if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        errorMessage += 'You are not authorized. Please log out and log back in.';
+      } else if (error.message.includes('row-level security')) {
+        errorMessage += 'Permission denied. Please contact your administrator.';
+      } else if (error.message.includes('session')) {
+        errorMessage += 'Your session has expired. Please log out and log back in.';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setSendingAnnouncement(false);
+    }
+  };
+
+  // Mock data for course counts
   const coursesInProgress = 18;
   const coursesCompleted = 23;
+
+  // Get current user's XP and scores
+  const currentUserXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : gameXP;
+
+  // Calculate class overall progress (average of all students' overall progress)
+  const classOverallProgress = studentsList.length > 0
+    ? Math.round(studentsList.reduce((sum, student) => sum + (student.overallProgress || 0), 0) / studentsList.length)
+    : 0;
+
+  // Calculate class mission progress average
+  const classMissionProgress = studentsList.length > 0
+    ? Math.round(studentsList.reduce((sum, student) => sum + student.missionCompletionRate, 0) / studentsList.length)
+    : 0;
+
+  // Calculate class game progress average
+  const classGameProgress = studentsList.length > 0
+    ? Math.round(studentsList.reduce((sum, student) => sum + student.gameCompletionRate, 0) / studentsList.length)
+    : 0;
 
   if (loading) {
     return (
@@ -388,6 +714,84 @@ function Dashboard() {
 
   return (
     <div style={styles.container}>
+      {/* Announcement Success Toast */}
+      {announcementSuccess && (
+        <div style={styles.successToast}>
+          <FiCheckCircle size={18} />
+          <span>{announcementSuccess}</span>
+        </div>
+      )}
+
+      {/* Announcement Modal */}
+      {showAnnouncementModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowAnnouncementModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>
+                <FiBell size={18} /> Send Announcement
+              </h3>
+              <button style={styles.modalClose} onClick={() => setShowAnnouncementModal(false)}>×</button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Select Class</label>
+                <select 
+                  value={selectedClassForAnnouncement}
+                  onChange={(e) => setSelectedClassForAnnouncement(e.target.value)}
+                  style={styles.formSelect}
+                >
+                  <option value="">-- Select a class --</option>
+                  {classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.name} ({cls.students_count || 0} students)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Announcement Title</label>
+                <input 
+                  type="text"
+                  placeholder="e.g., Upcoming Quiz, Class Reminder, etc."
+                  value={announcementTitle}
+                  onChange={(e) => setAnnouncementTitle(e.target.value)}
+                  style={styles.formInput}
+                />
+              </div>
+              
+              <div style={styles.formGroup}>
+                <label style={styles.formLabel}>Message</label>
+                <textarea 
+                  placeholder="Write your announcement message here..."
+                  value={announcementMessage}
+                  onChange={(e) => setAnnouncementMessage(e.target.value)}
+                  style={styles.formTextarea}
+                  rows={5}
+                />
+              </div>
+            </div>
+            
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.cancelButton} 
+                onClick={() => setShowAnnouncementModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.sendButton} 
+                onClick={handleSendAnnouncement}
+                disabled={sendingAnnouncement}
+              >
+                {sendingAnnouncement ? 'Sending...' : <><FiSend size={14} /> Send Announcement</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Section with Welcome */}
       <div style={styles.header}>
         <div style={styles.welcomeSection}>
@@ -395,6 +799,10 @@ function Dashboard() {
           <p style={styles.welcomeDate}>
             {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', weekday: 'long' })}
           </p>
+          <div style={styles.userStatsBadges}>
+            <span style={styles.xpBadge}>⭐ {currentUserXP} XP</span>
+            <span style={styles.scoreBadge}>🎯 {totalScores} Total Score</span>
+          </div>
         </div>
         
         {/* Class Dropdown */}
@@ -475,6 +883,59 @@ function Dashboard() {
             </div>
           </div>
 
+          {/* CLASS OVERALL PROGRESS SECTION - Class Performance */}
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}>
+                <FiTrendingUp size={16} color="#8b5cf6" /> Class Overall Progress
+              </h3>
+              <span style={{...styles.sectionBadge, backgroundColor: '#e0e7ff', color: '#4338ca'}}>
+                {classOverallProgress}% Average
+              </span>
+            </div>
+            <div style={styles.classProgressContainer}>
+              <div style={styles.classProgressRing}>
+                <svg width="100" height="100" viewBox="0 0 120 120">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                  <circle
+                    cx="60"
+                    cy="60"
+                    r="50"
+                    fill="none"
+                    stroke="#8b5cf6"
+                    strokeWidth="8"
+                    strokeDasharray={`${2 * Math.PI * 50}`}
+                    strokeDashoffset={`${2 * Math.PI * 50 * (1 - classOverallProgress / 100)}`}
+                    transform="rotate(-90 60 60)"
+                    strokeLinecap="round"
+                  />
+                  <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
+                  <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Class Avg</text>
+                </svg>
+              </div>
+              <div style={styles.classProgressDetails}>
+                <div style={styles.classDetailItem}>
+                  <span style={styles.classDetailLabel}>Missions Avg:</span>
+                  <span style={styles.classDetailValue}>{classMissionProgress}%</span>
+                  <div style={styles.progressBarSmall}>
+                    <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
+                  </div>
+                </div>
+                <div style={styles.classDetailItem}>
+                  <span style={styles.classDetailLabel}>Games Avg:</span>
+                  <span style={styles.classDetailValue}>{classGameProgress}%</span>
+                  <div style={styles.progressBarSmall}>
+                    <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
+                  </div>
+                </div>
+                <div style={styles.classDetailItem}>
+                  <span style={styles.classDetailLabel}>Students:</span>
+                  <span style={styles.classDetailValue}>{studentsList.length}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Student Performance Summary */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
@@ -487,27 +948,27 @@ function Dashboard() {
                 <span style={styles.perfDotExcellent}></span>
                 <span>Excellent</span>
                 <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.progress >= 80).length}
+                  {studentsList.filter(s => s.overallProgress >= 80).length}
                 </span>
               </div>
               <div style={styles.performanceItem}>
                 <span style={styles.perfDotGood}></span>
                 <span>Good</span>
                 <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.progress >= 60 && s.progress < 80).length}
+                  {studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}
                 </span>
               </div>
               <div style={styles.performanceItem}>
                 <span style={styles.perfDotAverage}></span>
                 <span>Average</span>
                 <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.progress < 60).length}
+                  {studentsList.filter(s => s.overallProgress < 60).length}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Students Table - Updated with Mission, Games, XP, Scores, Progress, Date/Time, Status */}
+          {/* Students Table - With Points, XP Points, Scores, Mission & Game Progress */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
@@ -522,11 +983,12 @@ function Dashboard() {
                 <thead>
                   <tr>
                     <th style={styles.th}>Student</th>
-                    <th style={styles.th}>Mission</th>
-                    <th style={styles.th}>Games</th>
+                    <th style={styles.th}>Points</th>
                     <th style={styles.th}>XP Points</th>
                     <th style={styles.th}>Scores</th>
-                    <th style={styles.th}>Progress</th>
+                    <th style={styles.th}>Missions</th>
+                    <th style={styles.th}>Games</th>
+                    <th style={styles.th}>Overall</th>
                     <th style={styles.th}>Date with Time</th>
                     <th style={styles.th}>Status</th>
                   </tr>
@@ -546,39 +1008,50 @@ function Dashboard() {
                         </div>
                       </td>
                       <td style={styles.td}>
-                        <div style={styles.missionCell}>
-                          <FiCheckCircle size={12} color="#10b981" />
-                          <span>{student.completedMissions}/{student.totalMissions}</span>
-                          <span style={styles.smallPercent}>({student.missionCompletionRate}%)</span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.gameCell}>
-                          <FiCode size={12} color="#8b5cf6" />
-                          <span>{student.completedGames}/{student.totalGames}</span>
-                          <span style={styles.smallPercent}>({student.gameCompletionRate}%)</span>
+                        <div style={styles.pointsCell}>
+                          <span style={student.points >= 80 ? styles.pointsHigh : (student.points >= 60 ? styles.pointsMedium : styles.pointsLow)}>
+                            {student.points}
+                          </span>
                         </div>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.xpCell}>
-                          <FiZap size={12} color="#f59e0b" />
+                          <FiZap size={14} color="#f59e0b" />
                           <span style={styles.xpValue}>{student.xpPoints}</span>
                           <span style={styles.xpLabel}>XP</span>
                         </div>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.scoreCell}>
-                          <span style={student.averageScore >= 80 ? styles.scoreHigh : styles.scoreMedium}>
-                            {student.averageScore}%
+                          <span style={student.totalScores >= 800 ? styles.scoreHigh : (student.totalScores >= 500 ? styles.scoreMedium : styles.scoreLow)}>
+                            {student.totalScores}
                           </span>
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.missionCell}>
+                          <span style={styles.missionRate}>{student.missionCompletionRate}%</span>
+                          <div style={styles.progressBarSmall}>
+                            <div style={{...styles.progressFillSmall, width: `${student.missionCompletionRate}%`, backgroundColor: '#10b981'}} />
+                          </div>
+                          <span style={styles.smallText}>{student.completedMissions}/{student.totalMissions}</span>
+                        </div>
+                      </td>
+                      <td style={styles.td}>
+                        <div style={styles.gameCell}>
+                          <span style={styles.gameRate}>{student.gameCompletionRate}%</span>
+                          <div style={styles.progressBarSmall}>
+                            <div style={{...styles.progressFillSmall, width: `${student.gameCompletionRate}%`, backgroundColor: '#8b5cf6'}} />
+                          </div>
+                          <span style={styles.smallText}>{student.completedGames}/{student.totalGames}</span>
                         </div>
                       </td>
                       <td style={styles.td}>
                         <div style={styles.progressCell}>
                           <div style={styles.progressBar}>
-                            <div style={{...styles.progressFill, width: `${student.progress}%`}} />
+                            <div style={{...styles.progressFill, width: `${student.overallProgress}%`, backgroundColor: '#8b5cf6'}} />
                           </div>
-                          <span style={styles.progressText}>{student.progress}%</span>
+                          <span style={styles.progressText}>{student.overallProgress}%</span>
                         </div>
                       </td>
                       <td style={styles.td}>
@@ -599,21 +1072,6 @@ function Dashboard() {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Notes Section */}
-          <div style={styles.sectionCard}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>
-                <FiClipboard size={16} /> Notes
-              </h3>
-            </div>
-            <textarea 
-              style={styles.notesInput}
-              placeholder="Type your notes here..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
           </div>
         </div>
 
@@ -641,57 +1099,45 @@ function Dashboard() {
             </div>
           </div>
 
-          {/* Overall Progress Chart */}
+          {/* Detailed Progress Stats */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
-                <FiPieChart size={16} /> Overall Progress
+                <FiPieChart size={16} /> Progress Stats
               </h3>
             </div>
-            <div style={styles.progressChart}>
-              <div style={styles.progressCircleWrapper}>
-                <svg width="140" height="140" viewBox="0 0 140 140">
-                  <circle
-                    cx="70"
-                    cy="70"
-                    r="60"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="10"
-                  />
-                  <circle
-                    cx="70"
-                    cy="70"
-                    r="60"
-                    fill="none"
-                    stroke="#6366f1"
-                    strokeWidth="10"
-                    strokeDasharray={`${2 * Math.PI * 60}`}
-                    strokeDashoffset={`${2 * Math.PI * 60 * (1 - analytics.averageProgress / 100)}`}
-                    transform="rotate(-90 70 70)"
-                    strokeLinecap="round"
-                  />
-                  <text x="70" y="65" textAnchor="middle" fill="#1f2937" fontSize="20" fontWeight="bold">
-                    {analytics.averageProgress}%
-                  </text>
-                  <text x="70" y="85" textAnchor="middle" fill="#6b7280" fontSize="10">
-                    Avg Progress
-                  </text>
-                </svg>
+            <div style={styles.progressStats}>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Class Overall Progress</span>
+                <span style={styles.progressStatValue}>{classOverallProgress}%</span>
               </div>
-              <div style={styles.progressStats}>
-                <div style={styles.progressStatItem}>
-                  <span style={styles.progressStatLabel}>Completion Rate</span>
-                  <span style={styles.progressStatValue}>{analytics.completionRate}%</span>
-                </div>
-                <div style={styles.progressStatItem}>
-                  <span style={styles.progressStatLabel}>Total Missions</span>
-                  <span style={styles.progressStatValue}>{analytics.totalMissions}</span>
-                </div>
-                <div style={styles.progressStatItem}>
-                  <span style={styles.progressStatLabel}>Completed</span>
-                  <span style={styles.progressStatValue}>{analytics.completedMissions}</span>
-                </div>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Total Scores (All Students)</span>
+                <span style={styles.progressStatValue}>
+                  {studentsList.reduce((sum, s) => sum + s.totalScores, 0)}
+                </span>
+              </div>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Total XP Earned</span>
+                <span style={styles.progressStatValue}>
+                  {studentsList.reduce((sum, s) => sum + s.xpPoints, 0)}
+                </span>
+              </div>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Avg Mission Progress</span>
+                <span style={styles.progressStatValue}>{classMissionProgress}%</span>
+              </div>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Avg Game Progress</span>
+                <span style={styles.progressStatValue}>{classGameProgress}%</span>
+              </div>
+              <div style={styles.progressStatItem}>
+                <span style={styles.progressStatLabel}>Points Distribution</span>
+                <span style={styles.progressStatValue}>
+                  80-100: {studentsList.filter(s => s.points >= 80).length} | 
+                  60-79: {studentsList.filter(s => s.points >= 60 && s.points < 80).length} | 
+                  &lt;60: {studentsList.filter(s => s.points < 60).length}
+                </span>
               </div>
             </div>
           </div>
@@ -712,8 +1158,8 @@ function Dashboard() {
                     <div style={styles.topPerformerClass}>{student.className}</div>
                   </div>
                   <div style={styles.topPerformerScore}>
-                    <span style={styles.topPerformerProgress}>{student.progress}%</span>
-                    <span style={styles.topPerformerGrade}>{student.grade}</span>
+                    <span style={styles.topPerformerProgress}>{student.points || student.progress} pts</span>
+                    <span style={styles.topPerformerXP}>⭐{student.xpPoints} XP</span>
                   </div>
                 </div>
               ))}
@@ -726,14 +1172,8 @@ function Dashboard() {
               <h3 style={styles.sectionTitle}>Quick Actions</h3>
             </div>
             <div style={styles.quickActions}>
-              <button style={styles.actionButton}>
-                <FiPlusCircle size={16} /> Create New Class
-              </button>
-              <button style={styles.actionButton}>
-                <FiCheckSquare size={16} /> Assign Mission
-              </button>
-              <button style={styles.actionButton}>
-                <FiMessageSquare size={16} /> Send Announcement
+              <button style={styles.actionButton} onClick={() => setShowAnnouncementModal(true)}>
+                <FiBell size={16} /> Send Announcement
               </button>
             </div>
           </div>
@@ -789,6 +1229,27 @@ const styles = {
   welcomeDate: {
     fontSize: '13px',
     color: '#6b7280',
+  },
+  userStatsBadges: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '8px',
+  },
+  xpBadge: {
+    backgroundColor: '#fef3c7',
+    color: '#f59e0b',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    fontSize: '13px',
+  },
+  scoreBadge: {
+    backgroundColor: '#d1fae5',
+    color: '#059669',
+    padding: '4px 12px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    fontSize: '13px',
   },
   dropdownContainer: {
     minWidth: '220px',
@@ -940,6 +1401,51 @@ const styles = {
     fontWeight: '600',
     color: '#1f2937',
   },
+  classProgressContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '20px',
+    flexWrap: 'wrap',
+  },
+  classProgressRing: {
+    display: 'flex',
+    justifyContent: 'center',
+  },
+  classProgressDetails: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  classDetailItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  classDetailLabel: {
+    fontSize: '11px',
+    color: '#6b7280',
+    minWidth: '70px',
+  },
+  classDetailValue: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#1f2937',
+    minWidth: '40px',
+  },
+  progressBarSmall: {
+    height: '4px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '2px',
+    overflow: 'hidden',
+    flex: 1,
+  },
+  progressFillSmall: {
+    height: '100%',
+    borderRadius: '2px',
+    transition: 'width 0.3s ease',
+  },
   performanceSummary: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -1031,28 +1537,45 @@ const styles = {
     fontSize: '10px',
     color: '#9ca3af',
   },
-  missionCell: {
+  pointsCell: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    fontSize: '11px',
   },
-  gameCell: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    fontSize: '11px',
+  pointsHigh: {
+    padding: '4px 8px',
+    backgroundColor: '#d1fae5',
+    color: '#065f46',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  pointsMedium: {
+    padding: '4px 8px',
+    backgroundColor: '#fed7aa',
+    color: '#92400e',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
+  },
+  pointsLow: {
+    padding: '4px 8px',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: '600',
   },
   xpCell: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    fontSize: '12px',
+    gap: '6px',
+    fontSize: '13px',
     fontWeight: '600',
   },
   xpValue: {
     color: '#f59e0b',
     fontWeight: '700',
+    fontSize: '14px',
   },
   xpLabel: {
     fontSize: '9px',
@@ -1062,22 +1585,58 @@ const styles = {
   scoreCell: {
     display: 'flex',
     alignItems: 'center',
+    gap: '4px',
+    flexWrap: 'wrap',
   },
   scoreHigh: {
-    padding: '3px 6px',
+    padding: '4px 8px',
     backgroundColor: '#d1fae5',
     color: '#065f46',
-    borderRadius: '6px',
+    borderRadius: '8px',
     fontSize: '11px',
     fontWeight: '600',
   },
   scoreMedium: {
-    padding: '3px 6px',
+    padding: '4px 8px',
     backgroundColor: '#fed7aa',
     color: '#92400e',
-    borderRadius: '6px',
+    borderRadius: '8px',
     fontSize: '11px',
     fontWeight: '600',
+  },
+  scoreLow: {
+    padding: '4px 8px',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b',
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontWeight: '600',
+  },
+  missionCell: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    minWidth: '70px',
+  },
+  missionRate: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#10b981',
+  },
+  gameCell: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    minWidth: '70px',
+  },
+  gameRate: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#8b5cf6',
+  },
+  smallText: {
+    fontSize: '9px',
+    color: '#9ca3af',
   },
   progressCell: {
     display: 'flex',
@@ -1094,7 +1653,6 @@ const styles = {
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#10b981',
     borderRadius: '3px',
     transition: 'width 0.3s ease',
   },
@@ -1113,10 +1671,6 @@ const styles = {
     fontSize: '10px',
     color: '#6b7280',
   },
-  smallPercent: {
-    fontSize: '9px',
-    color: '#9ca3af',
-  },
   statusActive: {
     display: 'inline-block',
     padding: '3px 8px',
@@ -1134,19 +1688,6 @@ const styles = {
     borderRadius: '6px',
     fontSize: '10px',
     fontWeight: '500',
-  },
-  notesInput: {
-    width: '100%',
-    minHeight: '100px',
-    padding: '12px',
-    fontSize: '13px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '12px',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-    outline: 'none',
-    transition: 'border 0.2s',
-    boxSizing: 'border-box',
   },
   distributionContainer: {
     marginBottom: '8px',
@@ -1188,21 +1729,10 @@ const styles = {
     color: '#1f2937',
     textAlign: 'right',
   },
-  progressChart: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-    flexWrap: 'wrap',
-  },
-  progressCircleWrapper: {
-    display: 'flex',
-    justifyContent: 'center',
-  },
   progressStats: {
-    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '12px',
   },
   progressStatItem: {
     display: 'flex',
@@ -1216,9 +1746,10 @@ const styles = {
     color: '#6b7280',
   },
   progressStatValue: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '600',
     color: '#1f2937',
+    textAlign: 'right',
   },
   topPerformersList: {
     display: 'flex',
@@ -1265,9 +1796,10 @@ const styles = {
     color: '#10b981',
     display: 'block',
   },
-  topPerformerGrade: {
-    fontSize: '10px',
+  topPerformerXP: {
+    fontSize: '9px',
     color: '#f59e0b',
+    display: 'block',
   },
   quickActions: {
     display: 'flex',
@@ -1289,6 +1821,140 @@ const styles = {
     transition: 'all 0.2s',
     fontFamily: 'inherit',
   },
+  // Modal Styles
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    width: '90%',
+    maxWidth: '500px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1f2937',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    cursor: 'pointer',
+    color: '#9ca3af',
+    padding: '0',
+    lineHeight: 1,
+  },
+  modalBody: {
+    padding: '24px',
+  },
+  formGroup: {
+    marginBottom: '20px',
+  },
+  formLabel: {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '8px',
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    outline: 'none',
+    fontFamily: 'inherit',
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    outline: 'none',
+    fontFamily: 'inherit',
+  },
+  formTextarea: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    outline: 'none',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+  },
+  modalFooter: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    padding: '16px 24px',
+    borderTop: '1px solid #e5e7eb',
+  },
+  cancelButton: {
+    padding: '8px 20px',
+    backgroundColor: '#f3f4f6',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    color: '#374151',
+  },
+  sendButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 20px',
+    backgroundColor: '#6366f1',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    color: 'white',
+  },
+  successToast: {
+    position: 'fixed',
+    bottom: '30px',
+    right: '30px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 20px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: '500',
+    zIndex: 2000,
+    animation: 'slideInRight 0.3s ease',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+  },
 };
 
 // Add CSS animations
@@ -1297,6 +1963,17 @@ styleSheet.textContent = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
   }
   
   button:hover {
@@ -1308,9 +1985,17 @@ styleSheet.textContent = `
     border-color: #c7d2fe;
   }
   
-  textarea:focus {
+  textarea:focus, input:focus, select:focus {
     border-color: #6366f1;
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+  }
+  
+  .sendButton:hover {
+    background-color: #4f46e5;
+  }
+  
+  .cancelButton:hover {
+    background-color: #e5e7eb;
   }
   
   ::-webkit-scrollbar {
@@ -1320,12 +2005,12 @@ styleSheet.textContent = `
   
   ::-webkit-scrollbar-track {
     background: #f1f1f1;
-    border-radius: 3px;
+    borderRadius: 3px;
   }
   
   ::-webkit-scrollbar-thumb {
     background: #c1c1c1;
-    border-radius: 3px;
+    borderRadius: 3px;
   }
   
   ::-webkit-scrollbar-thumb:hover {

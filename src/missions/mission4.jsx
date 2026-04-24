@@ -1,8 +1,8 @@
-// src/missions/mission1.jsx
+// src/missions/mission4.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function Mission1({ user, userData, updateUserData, onComplete }) {
+function Mission4({ user, userData, updateUserData, onComplete }) {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -10,169 +10,181 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
   const [feedbackAvatar, setFeedbackAvatar] = useState(null);
   const [canProceed, setCanProceed] = useState(true);
   const [showAvatarMessage, setShowAvatarMessage] = useState(true);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [currentAvatarMessage, setCurrentAvatarMessage] = useState("👋 Hey there! Ready to learn about Linear Equations? Let's go!");
+  const [currentAvatarMessage, setCurrentAvatarMessage] = useState("📈 Welcome! Ready to learn about Slope and y-intercept?");
   const [isCompleting, setIsCompleting] = useState(false);
 
   const steps = [
     {
-      title: "INTRODUCTION TO LINEAR EQUATIONS 📐",
-      content: "A LINEAR EQUATION is a first-degree polynomial involving two variables, and its graph forms a straight line.",
-      description: "Its standard form is expressed as Ax + By = C. The equation of a line can be found using different methods:",
-      methods: [
-        "✨ Two given points",
-        "✨ Slope with a Point",
-        "✨ Slope-Intercept Form",
-        "✨ x- and y-Intercepts"
-      ],
+      title: "📈 SLOPE AND Y-INTERCEPT MISSION",
+      content: "Welcome to the Slope and y-intercept mission! Learn how to find the equation of a line using slope and y-intercept.",
+      description: "The slope-intercept form is: y = mx + b, where m is the slope and b is the y-intercept.",
+      showImage: true,
+      imagePath: "/image1.png",
       type: "info"
     },
     {
-      title: "Mission 1: Equation of a Line Using Two Points 🎯",
-      content: "Find the equation of the line that passes through the points (1, 2) and (5, -2).",
-      instruction: "Let's solve this step by step!",
-      showGraph: true,
-      imagePath: "/pics.png",
+      title: "Example: Slope and y-intercept",
+      content: "Example: Find the equation of a line whose graph has a slope of -3 and a y-intercept of 2.",
+      solution: "Step 1: Identify m = -3 and b = 2\nStep 2: Substitute into y = mx + b\ny = (-3)x + (2)\ny = -3x + 2\nFinal equation: y = -3x + 2 or 3x + y = 2 in standard form",
       type: "lesson"
     },
     {
-      title: "Step 1: Identify the Points",
-      question: "For the points (1, 2) and (5, -2), what are the values?",
+      title: "Question 1: Slope-Intercept Form",
+      question: "What is the general form of the slope-intercept equation?",
       options: [
-        "x₁=1, y₁=2, x₂=5, y₂=-2",
-        "x₁=2, y₁=1, x₂=-2, y₂=5",
-        "x₁=5, y₁=-2, x₂=1, y₂=2",
-        "x₁=1, y₁=5, x₂=2, y₂=-2"
-      ],
-      correct: 0,
-      explanation: "Correct! x₁=1, y₁=2, x₂=5, y₂=-2",
-      type: "quiz"
-    },
-    {
-      title: "Step 2: Use the Two-Point Formula",
-      content: "The two-point form formula is:",
-      formula: "y - y₁ = (y₂ - y₁)/(x₂ - x₁) × (x - x₁)",
-      question: "Substitute the values into the formula:",
-      options: [
-        "y-2 = (2-(-2))/(1-5) × (x-1)",
-        "y-2 = ((-2)-2)/(5-1) × (x-1)",
-        "y+2 = (2-(-2))/(5-1) × (x+1)",
-        "y-2 = (5-1)/((-2)-2) × (x-1)"
+        "Ax + By = C",
+        "y = mx + b",
+        "y - y₁ = m(x - x₁)",
+        "x = my + b"
       ],
       correct: 1,
-      explanation: "Correct! y-2 = ((-2)-2)/(5-1) × (x-1)",
+      explanation: "The slope-intercept form is y = mx + b, where m is slope and b is y-intercept.",
       type: "quiz"
     },
     {
-      title: "Step 3: Simplify the Slope",
-      content: "Calculate the slope: (y₂ - y₁)/(x₂ - x₁)",
-      question: "What is (-2 - 2)/(5 - 1)?",
+      title: "Question 2: y-intercept Meaning",
+      question: "In the equation y = mx + b, what does b represent?",
       options: [
-        "4/4 = 1",
-        "-4/4 = -1",
-        "0/4 = 0",
-        "-4/6 = -2/3"
+        "The slope of the line",
+        "The y-intercept, where the line crosses the y-axis",
+        "The x-intercept",
+        "The rate of change"
       ],
       correct: 1,
-      explanation: "Correct! (-2-2) = -4 and (5-1) = 4, so -4/4 = -1",
+      explanation: "b is the y-intercept, where the line crosses the y-axis.",
       type: "quiz"
     },
     {
-      title: "Step 4: Apply Distributive Property",
-      content: "Now we have: y - 2 = -1(x - 1)",
-      question: "After applying distributive property, what do we get?",
+      title: "Question 3: Negative Slope Meaning",
+      question: "If the slope is -3, what does it mean?",
       options: [
-        "y - 2 = -x - 1",
-        "y - 2 = -x + 1",
-        "y - 2 = x + 1",
-        "y - 2 = -x - 2"
+        "The line increases from left to right",
+        "The line decreases from left to right",
+        "The line is horizontal",
+        "The line is vertical"
       ],
       correct: 1,
-      explanation: "Correct! -1(x - 1) = -x + 1",
+      explanation: "A negative slope means the line decreases from left to right.",
       type: "quiz"
     },
     {
-      title: "Step 5: Apply Addition Property of Equality",
-      content: "We have: y - 2 = -x + 1",
-      question: "Add 2 to both sides. What is the final equation?",
+      title: "Question 4: Equation with Slope 2 and y-intercept 4",
+      question: "Which equation represents a line with slope 2 and y-intercept 4?",
       options: [
-        "y = -x - 1",
-        "y = x + 3",
-        "y = -x + 3",
-        "y = -x + 1"
+        "y = 4x + 2",
+        "y = 2x + 4",
+        "y = -2x + 4",
+        "y = 2x - 4"
+      ],
+      correct: 1,
+      explanation: "Substitute into y = mx + b → y = 2x + 4.",
+      type: "quiz"
+    },
+    {
+      title: "Question 5: Equation with Slope -3 and y-intercept 2",
+      question: "Find the equation of a line with slope -3 and y-intercept 2.",
+      options: [
+        "y = 3x + 2",
+        "y = -3x - 2",
+        "y = -3x + 2",
+        "y = 3x - 2"
       ],
       correct: 2,
-      explanation: "Correct! y - 2 + 2 = -x + 1 + 2 → y = -x + 3",
+      explanation: "Substitute values in the formula y = mx + b → y = -3x + 2.",
+      type: "quiz"
+    },
+    {
+      title: "Question 6: Equation with Slope 1 and y-intercept -5",
+      question: "What is the equation of a line with slope 1 and y-intercept -5?",
+      options: [
+        "y = x + 5",
+        "y = -x - 5",
+        "y = x - 5",
+        "y = -x + 5"
+      ],
+      correct: 2,
+      explanation: "Substitute into formula y = mx + b → y = 1x - 5.",
+      type: "quiz"
+    },
+    {
+      title: "Question 7: Identify Slope and y-intercept",
+      question: "What is the slope and y-intercept of y = 4x - 7?",
+      options: [
+        "m = 4, b = 7",
+        "m = -4, b = 7",
+        "m = 4, b = -7",
+        "m = -4, b = -7"
+      ],
+      correct: 2,
+      explanation: "Compare with y = mx + b → m = 4, b = -7.",
+      type: "quiz"
+    },
+    {
+      title: "Question 8: Analyze y = x + 2",
+      question: "Which statement is correct about the equation y = x + 2?",
+      options: [
+        "Slope is negative, y-intercept is 2",
+        "Slope is 1 (positive), y-intercept is 2",
+        "Slope is 0, y-intercept is 2",
+        "Slope is 2, y-intercept is 1"
+      ],
+      correct: 1,
+      explanation: "m = 1 (positive slope), b = 2.",
+      type: "quiz"
+    },
+    {
+      title: "Question 9: Real-world Application",
+      question: "Which equation represents a line that passes through the y-axis at 3 and rises 2 units for every 1 unit to the right?",
+      options: [
+        "y = 2x + 3",
+        "y = 3x + 2",
+        "y = -2x + 3",
+        "y = 2x - 3"
+      ],
+      correct: 0,
+      explanation: "'Rises 2' means slope is 2 and 'y-intercept 3' means b = 3, so y = 2x + 3.",
       type: "quiz"
     },
     {
       title: "Mission Complete! 🎉",
-      content: "Congratulations! You've found the equation of the line!",
-      result: "The equation is: y = -x + 3",
-      note: "This line passes through the points (1, 2) and (5, -2)",
+      content: "Congratulations! You've mastered the Slope and y-intercept mission!",
+      result: "You now know how to find equations using slope and y-intercept!",
+      note: "The slope-intercept form y = mx + b is one of the most useful forms in algebra!",
       type: "complete"
     }
   ];
 
   const avatarMessages = {
     happy: [
-      "🎉 Perfect! You're a math genius!",
-      "✨ Amazing work! Keep going!",
-      "🌟 Correct! You're on fire!",
-      "💪 Great job! That's the way!",
-      "🌸 You got it! So proud of you!",
-      "📚 Excellent! One step closer!",
-      "🏆 Nailed it! You're doing awesome!"
+      "📈 Excellent! You're mastering slope-intercept form!",
+      "✨ Perfect! y = mx + b is clear to you!",
+      "🌟 Great job! Keep going!",
+      "💫 You're becoming a linear equations expert!",
+      "📏 The slope and y-intercept are easy for you now!",
+      "📚 Excellent work! One step closer!",
+      "🏆 Amazing! You've got this!"
     ],
     wrong: [
-      "🤔 Oops! Try again, you can do it!",
-      "💡 Not quite right. Review the step!",
-      "📚 Almost there! Give it another try!",
-      "✨ Don't give up! Check the explanation!",
-      "🎯 Keep trying! You'll get it!",
-      "💪 It's okay! Let's try that again!",
-      "🌟 You got this! Read carefully!"
+      "🤔 Oops! Let's review slope-intercept form!",
+      "💡 Almost there! Remember: y = mx + b",
+      "📚 Not quite right. Check your values!",
+      "✨ Don't give up! Practice makes perfect!",
+      "🎯 Keep trying! You'll master slope-intercept form!",
+      "💪 Every mistake teaches us something! Try again!",
+      "🌟 Focus on identifying m (slope) and b (y-intercept)!"
     ],
     info: [
-      "💡 Did you know? Linear equations form straight lines!",
-      "📐 Let's learn about finding equations of lines!",
-      "🎯 Follow each step carefully!",
-      "✨ You're doing great! Keep it up!",
-      "🌟 Remember: Practice makes perfect!"
+      "💡 Remember: Slope-intercept form is y = mx + b!",
+      "📈 m is the slope (rise/run), b is the y-intercept!",
+      "🔢 A positive slope rises, negative slope falls!",
+      "✨ The y-intercept is where the line crosses the y-axis!",
+      "📚 Keep practicing your slope-intercept skills!"
     ]
   };
 
   const getRandomMessage = (type) => {
     const messages = avatarMessages[type];
     return messages[Math.floor(Math.random() * messages.length)];
-  };
-
-  const handleResetMission = () => {
-    setShowResetConfirm(true);
-  };
-
-  const confirmReset = () => {
-    setCurrentStep(0);
-    setAnswers({});
-    setShowConfetti(false);
-    setFeedbackAvatar(null);
-    setCanProceed(true);
-    setShowAvatarMessage(true);
-    setShowResetConfirm(false);
-    setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! You can do this! 💪");
-    
-    setTimeout(() => {
-      setShowAvatarMessage(false);
-    }, 3000);
-  };
-
-  const cancelReset = () => {
-    setShowResetConfirm(false);
-    setCurrentAvatarMessage("👍 Great choice! Let's continue with your progress!");
-    setShowAvatarMessage(true);
-    setTimeout(() => {
-      setShowAvatarMessage(false);
-    }, 2000);
   };
 
   const handleAnswer = (stepIndex, answerIndex) => {
@@ -226,7 +238,7 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else if (steps[currentStep + 1]?.type === 'lesson') {
-        setCurrentAvatarMessage("📖 Let's learn how to find the equation of a line!");
+        setCurrentAvatarMessage("📖 Let's learn how to use slope-intercept form!");
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else {
@@ -255,47 +267,35 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
     setIsCompleting(true);
     
     setShowConfetti(true);
-    setCurrentAvatarMessage("🏆 CONGRATULATIONS! You've mastered this mission! +100 XP! 🎉");
+    setCurrentAvatarMessage("🏆 CONGRATULATIONS! You've mastered the Slope and y-intercept mission! +500 XP! 🎉");
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
     
-    // Get current progress
     const currentProgress = userData?.progress || {};
     const completedMissions = currentProgress.completedMissions || [];
     const currentMissionsCompleted = currentProgress.missionsCompleted || 0;
-    const currentTotalXP = userData?.xp || 0; // Use userData.xp instead of progress.totalXP
+    const currentTotalXP = userData?.xp || 0;
     
-    // Check if mission is already completed to avoid double counting
-    if (!completedMissions.includes(1) && updateUserData) {
-      const newTotalXP = currentTotalXP + 100;
+    if (!completedMissions.includes(4) && updateUserData) {
+      const newTotalXP = currentTotalXP + 500;
       const newMissionsCompleted = currentMissionsCompleted + 1;
       
-      console.log('Updating XP:', {
-        oldXP: currentTotalXP,
-        newXP: newTotalXP,
-        oldCompleted: currentMissionsCompleted,
-        newCompleted: newMissionsCompleted
-      });
-      
-      // Update user data - IMPORTANT: Update both xp and progress
       updateUserData({
-        xp: newTotalXP,  // This is what StudentHub reads for XP display
+        xp: newTotalXP,
         progress: {
           ...currentProgress,
           missionsCompleted: newMissionsCompleted,
-          completedMissions: [...completedMissions, 1],
+          completedMissions: [...completedMissions, 4],
           lastMissionCompleted: new Date().toISOString(),
-          totalXP: newTotalXP  // Keep for consistency
+          totalXP: newTotalXP
         }
       });
       
-      // Dispatch custom event to notify about XP update
       window.dispatchEvent(new CustomEvent('xpUpdated', { 
-        detail: { newXP: newTotalXP, missionId: 1 }
+        detail: { newXP: newTotalXP, missionId: 4 }
       }));
     }
     
-    // Call onComplete callback after 3 seconds
     setTimeout(() => {
       if (onComplete) {
         onComplete();
@@ -314,15 +314,23 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
           <div style={styles.infoContent}>
             <p style={styles.contentText}>{step.content}</p>
             <p style={styles.descriptionText}>{step.description}</p>
-            <div style={styles.methodsContainer}>
-              {step.methods.map((method, idx) => (
-                <div key={idx} style={styles.methodBadge}>
-                  {method}
-                </div>
-              ))}
-            </div>
-            <div style={styles.illustration}>
-              📈📐✨
+            {step.showImage && step.imagePath && (
+              <div style={styles.imageContainer}>
+                <img 
+                  src={step.imagePath} 
+                  alt="Slope and y-intercept Concept"
+                  style={styles.infoImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%23f3f4f6'/%3E%3Ctext x='200' y='120' text-anchor='middle' fill='%23666'%3ESlope and y-intercept Concept%3C/text%3E%3Ctext x='200' y='145' text-anchor='middle' fill='%23999' font-size='12'%3EImage: y = mx + b Illustration%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                <p style={styles.imageCaption}>Figure 1: Slope-Intercept Form (y = mx + b)</p>
+              </div>
+            )}
+            <div style={styles.formulaBox}>
+              <p style={styles.formulaText}>Slope-Intercept Form: y = mx + b</p>
+              <p style={styles.formulaSubtext}>m = slope, b = y-intercept</p>
             </div>
           </div>
         );
@@ -331,27 +339,9 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
         return (
           <div style={styles.lessonContent}>
             <p style={styles.contentText}>{step.content}</p>
-            {step.showGraph && step.imagePath && (
-              <div style={styles.graphContainer}>
-                <img 
-                  src={step.imagePath} 
-                  alt="Line through points (1,2) and (5,-2)"
-                  style={styles.graphImage}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f3f4f6'/%3E%3Ctext x='200' y='150' text-anchor='middle' fill='%23666'%3EGraph: Line through (1,2) and (5,-2)%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-                <p style={styles.graphCaption}>Figure 1: Line passing through points (1, 2) and (5, -2)</p>
-              </div>
-            )}
             <div style={styles.exampleBox}>
-              <h3 style={styles.exampleTitle}>Example:</h3>
-              <p style={styles.exampleText}>Find the equation of the line that passes through the points (1, 2) and (5, -2)</p>
-            </div>
-            <p style={styles.instructionText}>{step.instruction}</p>
-            <div style={styles.formulaBox}>
-              <p style={styles.formulaText}>Two-Point Form: y - y₁ = (y₂ - y₁)/(x₂ - x₁) × (x - x₁)</p>
+              <h3 style={styles.exampleTitle}>Solution:</h3>
+              <pre style={styles.solutionText}>{step.solution}</pre>
             </div>
           </div>
         );
@@ -359,12 +349,9 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
       case "quiz":
         return (
           <div style={styles.quizContent}>
-            {step.content && <p style={styles.contentText}>{step.content}</p>}
-            {step.formula && (
-              <div style={styles.formulaBox}>
-                <p style={styles.formulaText}>{step.formula}</p>
-              </div>
-            )}
+            <div style={styles.questionNumber}>
+              Question {currentStep - 1} of {steps.length - 2}
+            </div>
             <p style={styles.questionText}>{step.question}</p>
             <div style={styles.optionsContainer}>
               {step.options.map((option, idx) => (
@@ -392,7 +379,7 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
               <div style={answers[currentStep] === step.correct ? styles.correctFeedback : styles.incorrectFeedback}>
                 {answers[currentStep] === step.correct ? 
                   `✅ ${step.explanation}` : 
-                  `❌ Not quite right. ${step.explanation}`}
+                  `❌ ${step.explanation}`}
               </div>
             )}
           </div>
@@ -403,13 +390,13 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
           <div style={styles.completeContent}>
             <p style={styles.completeText}>{step.content}</p>
             <div style={styles.resultBox}>
-              <span style={styles.resultIcon}>📐</span>
+              <span style={styles.resultIcon}>📈</span>
               <span style={styles.resultText}>{step.result}</span>
             </div>
             <p style={styles.noteText}>{step.note}</p>
             <div style={styles.rewardBox}>
               <span style={styles.rewardIcon}>🏆</span>
-              <span style={styles.rewardText}>+100 XP Earned!</span>
+              <span style={styles.rewardText}>+500 XP Earned!</span>
             </div>
             <button style={styles.finishButton} onClick={handleComplete} disabled={isCompleting}>
               {isCompleting ? "Completing..." : "Claim Your Reward"}
@@ -428,6 +415,9 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
     return '/avatar_happy.jpg';
   };
 
+  const progressPercentage = ((currentStep + 1) / steps.length) * 100;
+  const questionsCompleted = Math.max(0, currentStep - 1);
+
   return (
     <div style={styles.container}>
       {showConfetti && (
@@ -435,26 +425,9 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
           <div style={styles.confettiMessage}>
             🎉 Mission Complete! 🎉
             <br />
-            You earned 100 XP!
+            You earned 500 XP!
             <br />
-            The equation is y = -x + 3
-          </div>
-        </div>
-      )}
-
-      {showResetConfirm && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={styles.modalTitle}>🔄 Reset Mission?</h3>
-            <p style={styles.modalText}>Are you sure you want to reset this mission? All your progress will be lost.</p>
-            <div style={styles.modalButtons}>
-              <button style={styles.confirmResetBtn} onClick={confirmReset}>
-                Yes, Reset
-              </button>
-              <button style={styles.cancelResetBtn} onClick={cancelReset}>
-                Cancel
-              </button>
-            </div>
+            You've mastered Slope and y-intercept! 📈
           </div>
         </div>
       )}
@@ -463,18 +436,19 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
         <div 
           style={{
             ...styles.progressFill,
-            width: `${((currentStep + 1) / steps.length) * 100}%`
+            width: `${progressPercentage}%`
           }}
         />
       </div>
 
-      <div style={styles.card}>
-        <div style={styles.headerRow}>
-          <h2 style={styles.title}>{steps[currentStep].title}</h2>
-          <button style={styles.resetButton} onClick={handleResetMission} title="Reset Mission">
-            🔄 Reset Mission
-          </button>
+      {steps[currentStep].type === 'quiz' && (
+        <div style={styles.questionProgress}>
+          <span>📈 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
         </div>
+      )}
+
+      <div style={styles.card}>
+        <h2 style={styles.title}>{steps[currentStep].title}</h2>
         
         <div style={styles.scrollableContent}>
           {renderStepContent()}
@@ -502,7 +476,9 @@ function Mission1({ user, userData, updateUserData, onComplete }) {
         </div>
         
         <div style={styles.stepIndicator}>
-          Step {currentStep + 1} of {steps.length}
+          {steps[currentStep].type === 'quiz' 
+            ? `Question ${currentStep - 1} of ${steps.length - 2}` 
+            : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
       </div>
 
@@ -572,15 +548,23 @@ const styles = {
     height: '8px',
     backgroundColor: '#e5e7eb',
     borderRadius: '4px',
-    marginBottom: '20px',
+    marginBottom: '10px',
     overflow: 'hidden',
   },
   
   progressFill: {
     height: '100%',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f59e0b',
     transition: 'width 0.3s ease',
     borderRadius: '4px',
+  },
+  
+  questionProgress: {
+    textAlign: 'center',
+    marginBottom: '15px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#f59e0b',
   },
   
   card: {
@@ -602,43 +586,23 @@ const styles = {
     marginBottom: '15px',
   },
   
-  headerRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px',
-    flexWrap: 'wrap',
-    gap: '10px',
-    flexShrink: 0,
-  },
-  
   title: {
     fontSize: '24px',
     color: '#333',
     textAlign: 'center',
-    flex: 1,
-    margin: 0,
+    marginBottom: '15px',
+    flexShrink: 0,
   },
   
-  resetButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
+  infoContent: {
+    textAlign: 'center',
+    padding: '15px',
   },
   
   contentText: {
-    fontSize: '15px',
+    fontSize: '16px',
     color: '#666',
-    lineHeight: '1.5',
+    lineHeight: '1.6',
     marginBottom: '12px',
   },
   
@@ -647,63 +611,61 @@ const styles = {
     color: '#555',
     lineHeight: '1.5',
     marginBottom: '12px',
-    fontWeight: '500',
   },
   
-  methodsContainer: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '8px',
-    marginTop: '15px',
-    marginBottom: '15px',
-    justifyContent: 'center',
-  },
-  
-  methodBadge: {
-    backgroundColor: '#e0e7ff',
-    color: '#4338ca',
-    padding: '6px 14px',
-    borderRadius: '20px',
-    fontSize: '13px',
-    fontWeight: '500',
-  },
-  
-  infoContent: {
+  imageContainer: {
     textAlign: 'center',
-    padding: '15px',
-  },
-  
-  lessonContent: {
-    padding: '5px',
-  },
-  
-  graphContainer: {
-    textAlign: 'center',
-    marginBottom: '15px',
+    marginBottom: '20px',
     padding: '10px',
     backgroundColor: '#f9fafb',
     borderRadius: '8px',
   },
   
-  graphImage: {
+  infoImage: {
     maxWidth: '100%',
     height: 'auto',
     borderRadius: '8px',
     border: '1px solid #e5e7eb',
   },
   
-  graphCaption: {
-    fontSize: '11px',
+  imageCaption: {
+    fontSize: '12px',
     color: '#6b7280',
-    marginTop: '6px',
+    marginTop: '8px',
     fontStyle: 'italic',
+  },
+  
+  formulaBox: {
+    backgroundColor: '#fef3c7',
+    padding: '15px',
+    borderRadius: '8px',
+    textAlign: 'center',
+    marginTop: '15px',
+    border: '1px solid #f59e0b',
+  },
+  
+  formulaText: {
+    fontSize: '18px',
+    fontFamily: 'monospace',
+    color: '#d97706',
+    fontWeight: 'bold',
+  },
+  
+  formulaSubtext: {
+    fontSize: '12px',
+    color: '#666',
+    marginTop: '5px',
+  },
+  
+  lessonContent: {
+    padding: '5px',
   },
   
   exampleBox: {
     backgroundColor: '#fef3c7',
-    padding: '12px',
+    padding: '15px',
     borderRadius: '8px',
-    marginBottom: '12px',
+    marginTop: '15px',
     borderLeft: '4px solid #f59e0b',
   },
   
@@ -711,64 +673,48 @@ const styles = {
     fontSize: '16px',
     fontWeight: 'bold',
     color: '#d97706',
-    marginBottom: '8px',
+    marginBottom: '10px',
   },
   
-  exampleText: {
+  solutionText: {
     fontSize: '14px',
     color: '#333',
-  },
-  
-  instructionText: {
-    fontSize: '15px',
-    fontWeight: 'bold',
-    color: '#2563eb',
-    marginBottom: '12px',
-  },
-  
-  formulaBox: {
-    backgroundColor: '#f3f4f6',
-    padding: '12px',
-    borderRadius: '8px',
-    textAlign: 'center',
-    marginBottom: '12px',
-    border: '1px solid #e5e7eb',
-  },
-  
-  formulaText: {
-    fontSize: '14px',
+    whiteSpace: 'pre-wrap',
     fontFamily: 'monospace',
-    color: '#2563eb',
-    fontWeight: 'bold',
-  },
-  
-  illustration: {
-    fontSize: '40px',
-    marginTop: '15px',
+    lineHeight: '1.6',
   },
   
   quizContent: {
     padding: '5px',
   },
   
+  questionNumber: {
+    fontSize: '14px',
+    color: '#f59e0b',
+    fontWeight: 'bold',
+    marginBottom: '15px',
+    textAlign: 'center',
+  },
+  
   questionText: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: '12px',
+    marginBottom: '20px',
+    textAlign: 'center',
   },
   
   optionsContainer: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    marginBottom: '15px',
+    gap: '10px',
+    marginBottom: '20px',
   },
   
   optionLabel: {
     display: 'flex',
     alignItems: 'center',
-    padding: '10px',
+    padding: '12px',
     border: '1px solid #e5e7eb',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -791,25 +737,25 @@ const styles = {
   },
   
   optionText: {
-    fontSize: '13px',
+    fontSize: '14px',
     color: '#333',
   },
   
   correctFeedback: {
-    padding: '8px',
+    padding: '10px',
     backgroundColor: '#d1fae5',
     color: '#065f46',
     borderRadius: '8px',
-    marginTop: '8px',
+    marginTop: '10px',
     fontSize: '13px',
   },
   
   incorrectFeedback: {
-    padding: '8px',
+    padding: '10px',
     backgroundColor: '#fee2e2',
     color: '#991b1b',
     borderRadius: '8px',
-    marginTop: '8px',
+    marginTop: '10px',
     fontSize: '13px',
   },
   
@@ -819,40 +765,12 @@ const styles = {
   },
   
   completeText: {
-    fontSize: '16px',
+    fontSize: '18px',
     color: '#333',
-    marginBottom: '15px',
+    marginBottom: '20px',
   },
   
   resultBox: {
-    backgroundColor: '#dbeafe',
-    padding: '12px',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-  },
-  
-  resultIcon: {
-    fontSize: '22px',
-  },
-  
-  resultText: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#1e40af',
-  },
-  
-  noteText: {
-    fontSize: '12px',
-    color: '#666',
-    marginBottom: '15px',
-    fontStyle: 'italic',
-  },
-  
-  rewardBox: {
     backgroundColor: '#fef3c7',
     padding: '15px',
     borderRadius: '12px',
@@ -860,7 +778,35 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
+    gap: '10px',
+  },
+  
+  resultIcon: {
+    fontSize: '32px',
+  },
+  
+  resultText: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    color: '#d97706',
+  },
+  
+  noteText: {
+    fontSize: '14px',
+    color: '#666',
+    marginBottom: '20px',
+    fontStyle: 'italic',
+  },
+  
+  rewardBox: {
+    backgroundColor: '#fef3c7',
+    padding: '15px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
   },
   
   rewardIcon: {
@@ -874,7 +820,7 @@ const styles = {
   },
   
   finishButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f59e0b',
     color: 'white',
     padding: '12px 24px',
     border: 'none',
@@ -905,7 +851,7 @@ const styles = {
   },
   
   nextButton: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f59e0b',
     color: 'white',
     padding: '8px 18px',
     border: 'none',
@@ -916,7 +862,7 @@ const styles = {
   },
   
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#fcd34d',
     cursor: 'not-allowed',
     opacity: 0.6,
   },
@@ -952,7 +898,7 @@ const styles = {
     animation: 'bubblePop 0.3s ease-out',
     maxWidth: '220px',
     position: 'relative',
-    border: '2px solid #2563eb',
+    border: '2px solid #f59e0b',
   },
   
   bubbleText: {
@@ -976,7 +922,7 @@ const styles = {
     width: '36px',
     height: '36px',
     cursor: 'pointer',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#f59e0b',
     color: 'white',
     border: 'none',
     fontSize: '18px',
@@ -1029,74 +975,6 @@ const styles = {
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
     animation: 'bounce 0.5s',
   },
-  
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-    animation: 'fadeIn 0.2s',
-  },
-  
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    padding: '20px',
-    maxWidth: '350px',
-    width: '90%',
-    textAlign: 'center',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-    animation: 'bounce 0.3s',
-  },
-  
-  modalTitle: {
-    fontSize: '20px',
-    marginBottom: '12px',
-    color: '#ef4444',
-  },
-  
-  modalText: {
-    fontSize: '14px',
-    color: '#555',
-    marginBottom: '20px',
-    lineHeight: '1.5',
-  },
-  
-  modalButtons: {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'center',
-  },
-  
-  confirmResetBtn: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-  },
-  
-  cancelResetBtn: {
-    backgroundColor: '#6b7280',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-  },
 };
 
 // Add animations to document
@@ -1135,23 +1013,11 @@ styleSheet.innerHTML = `
   
   .optionLabel:hover {
     background-color: #f3f4f6;
-    border-color: #2563eb;
+    border-color: #f59e0b;
   }
   
   .avatarWrapper:hover {
     transform: scale(1.05);
-  }
-  
-  .resetButton:hover {
-    background-color: #dc2626;
-  }
-  
-  .confirmResetBtn:hover {
-    background-color: #dc2626;
-  }
-  
-  .cancelResetBtn:hover {
-    background-color: #5a6268;
   }
   
   .scrollableContent::-webkit-scrollbar {
@@ -1174,4 +1040,4 @@ styleSheet.innerHTML = `
 `;
 document.head.appendChild(styleSheet);
 
-export default Mission1;
+export default Mission4;
