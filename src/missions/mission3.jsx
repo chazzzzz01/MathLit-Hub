@@ -1,6 +1,7 @@
 // src/missions/mission3.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 function Mission3({ user, userData, updateUserData, onComplete }) {
   const navigate = useNavigate();
@@ -12,6 +13,33 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const [showAvatarMessage, setShowAvatarMessage] = useState(true);
   const [currentAvatarMessage, setCurrentAvatarMessage] = useState("📐 Welcome! Ready to learn about Slope and a Point?");
   const [isCompleting, setIsCompleting] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showRewardClaimed, setShowRewardClaimed] = useState(false);
+  const [isAlreadyCompleted, setIsAlreadyCompleted] = useState(false);
+
+  const MISSION_ID = 3;
+  const MISSION_XP = 400;
+
+  // Check if mission is already completed on load
+  useEffect(() => {
+    const checkCompletion = async () => {
+      if (user?.dbId) {
+        const { data } = await supabase
+          .from('mission_progress')
+          .select('status')
+          .eq('mission_id', MISSION_ID)
+          .eq('student_id', user.dbId)
+          .maybeSingle();
+        
+        if (data?.status === 'completed') {
+          setIsAlreadyCompleted(true);
+          setShowRewardClaimed(true);
+          setCurrentStep(11); // Go to complete screen (last step index)
+        }
+      }
+    };
+    checkCompletion();
+  }, [user?.dbId]);
 
   const steps = [
     {
@@ -193,6 +221,36 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
+  const handleResetMission = () => {
+    setShowResetConfirm(true);
+  };
+
+  const confirmReset = () => {
+    setCurrentStep(0);
+    setAnswers({});
+    setShowConfetti(false);
+    setFeedbackAvatar(null);
+    setCanProceed(true);
+    setShowAvatarMessage(true);
+    setShowResetConfirm(false);
+    setShowRewardClaimed(false);
+    setIsAlreadyCompleted(false);
+    setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! You can do this! 💪");
+    
+    setTimeout(() => {
+      setShowAvatarMessage(false);
+    }, 3000);
+  };
+
+  const cancelReset = () => {
+    setShowResetConfirm(false);
+    setCurrentAvatarMessage("👍 Great choice! Let's continue with your progress!");
+    setShowAvatarMessage(true);
+    setTimeout(() => {
+      setShowAvatarMessage(false);
+    }, 2000);
+  };
+
   const handleAnswer = (stepIndex, answerIndex) => {
     const step = steps[stepIndex];
     const isCorrect = answerIndex === step.correct;
@@ -268,22 +326,72 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     }
   };
 
-  const handleComplete = () => {
-    if (isCompleting) return;
+  // Save mission completion to database
+  const saveMissionCompletion = async () => {
+    try {
+      if (!user?.dbId) return false;
+      
+      const { error } = await supabase
+        .from('mission_progress')
+        .upsert({
+          mission_id: MISSION_ID,
+          student_id: user.dbId,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          xp_earned: MISSION_XP,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'mission_id,student_id'
+        });
+      
+      if (error) {
+        console.error('Error saving mission progress:', error);
+        return false;
+      }
+      
+      // Save to localStorage as backup
+      const storedCompleted = localStorage.getItem('completedMissions');
+      let completedIds = storedCompleted ? JSON.parse(storedCompleted) : [];
+      if (!completedIds.includes(MISSION_ID)) {
+        completedIds.push(MISSION_ID);
+        localStorage.setItem('completedMissions', JSON.stringify(completedIds));
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in saveMissionCompletion:', error);
+      return false;
+    }
+  };
+
+  // Function to go to mission list (back to all missions)
+  const goToMissionsList = () => {
+    if (onComplete) {
+      onComplete(); // Go back to missions list
+    } else {
+      navigate('/studenthub/missions');
+    }
+  };
+
+  const handleComplete = async () => {
+    if (isCompleting || isAlreadyCompleted) return;
     setIsCompleting(true);
     
     setShowConfetti(true);
-    setCurrentAvatarMessage("🏆 CONGRATULATIONS! You've mastered the Slope and a Point mission! +400 XP! 🎉");
+    setCurrentAvatarMessage(`🏆 CONGRATULATIONS! You've mastered the Slope and a Point mission! +${MISSION_XP} XP! 🎉`);
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
+    
+    // Save to database
+    await saveMissionCompletion();
     
     const currentProgress = userData?.progress || {};
     const completedMissions = currentProgress.completedMissions || [];
     const currentMissionsCompleted = currentProgress.missionsCompleted || 0;
     const currentTotalXP = userData?.xp || 0;
     
-    if (!completedMissions.includes(3) && updateUserData) {
-      const newTotalXP = currentTotalXP + 400;
+    if (!completedMissions.includes(MISSION_ID) && updateUserData) {
+      const newTotalXP = currentTotalXP + MISSION_XP;
       const newMissionsCompleted = currentMissionsCompleted + 1;
       
       updateUserData({
@@ -291,28 +399,32 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         progress: {
           ...currentProgress,
           missionsCompleted: newMissionsCompleted,
-          completedMissions: [...completedMissions, 3],
+          completedMissions: [...completedMissions, MISSION_ID],
           lastMissionCompleted: new Date().toISOString(),
           totalXP: newTotalXP
         }
       });
       
       window.dispatchEvent(new CustomEvent('xpUpdated', { 
-        detail: { newXP: newTotalXP, missionId: 3 }
+        detail: { newXP: newTotalXP, missionId: MISSION_ID }
+      }));
+      
+      window.dispatchEvent(new CustomEvent('missionCompleted', {
+        detail: { missionId: MISSION_ID }
       }));
     }
     
+    setShowRewardClaimed(true);
+    setIsAlreadyCompleted(true);
+    
     setTimeout(() => {
-      if (onComplete) {
-        onComplete();
-      } else {
-        navigate('/studenthub/missions');
-      }
-    }, 3000);
+      setShowConfetti(false);
+    }, 2000);
   };
 
   const renderStepContent = () => {
     const step = steps[currentStep];
+    const currentAnswer = answers[currentStep];
 
     switch (step.type) {
       case "info":
@@ -379,19 +491,46 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       case "complete":
         return (
           <div style={styles.completeContent}>
-            <p style={styles.completeText}>{step.content}</p>
-            <div style={styles.resultBox}>
-              <span style={styles.resultIcon}>📐</span>
-              <span style={styles.resultText}>{step.result}</span>
-            </div>
-            <p style={styles.noteText}>{step.note}</p>
-            <div style={styles.rewardBox}>
-              <span style={styles.rewardIcon}>🏆</span>
-              <span style={styles.rewardText}>+400 XP Earned!</span>
-            </div>
-            <button style={styles.finishButton} onClick={handleComplete} disabled={isCompleting}>
-              {isCompleting ? "Completing..." : "Claim Your Reward"}
-            </button>
+            {!showRewardClaimed ? (
+              <>
+                <p style={styles.completeText}>{step.content}</p>
+                <div style={styles.resultBox}>
+                  <span style={styles.resultIcon}>📐</span>
+                  <span style={styles.resultText}>{step.result}</span>
+                </div>
+                <p style={styles.noteText}>{step.note}</p>
+                <div style={styles.rewardBox}>
+                  <span style={styles.rewardIcon}>🏆</span>
+                  <span style={styles.rewardText}>+{MISSION_XP} XP Reward!</span>
+                </div>
+                <button 
+                  style={styles.claimButton} 
+                  onClick={handleComplete}
+                  disabled={isCompleting}
+                >
+                  {isCompleting ? "Claiming..." : "🎁 Claim Your Reward"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={styles.claimedBox}>
+                  <span style={styles.claimedIcon}>✅</span>
+                  <p style={styles.claimedText}>Mission Completed! +{MISSION_XP} XP Earned!</p>
+                </div>
+                <div style={styles.resultBox}>
+                  <span style={styles.resultIcon}>📐</span>
+                  <span style={styles.resultText}>{step.result}</span>
+                </div>
+                <div style={styles.actionButtons}>
+                  <button 
+                    style={styles.missionsListButton} 
+                    onClick={goToMissionsList}
+                  >
+                    📋 Back to All Missions
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         );
 
@@ -409,20 +548,52 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
   const questionsCompleted = Math.max(0, currentStep - 1);
 
+  // If already completed, show the completed screen directly
+  if (isAlreadyCompleted && currentStep !== steps.length - 1 && !showRewardClaimed) {
+    setTimeout(() => {
+      setCurrentStep(steps.length - 1);
+      setShowRewardClaimed(true);
+    }, 100);
+    return null;
+  }
+
   return (
     <div style={styles.container}>
       {showConfetti && (
         <div style={styles.confettiOverlay}>
           <div style={styles.confettiMessage}>
-            🎉 Mission Complete! 🎉
-            <br />
-            You earned 400 XP!
+            🎉 +{MISSION_XP} XP Earned! 🎉
             <br />
             You've mastered Slope and a Point! 📐
           </div>
         </div>
       )}
+
+      {showResetConfirm && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={styles.modalTitle}>🔄 Reset Mission?</h3>
+            <p style={styles.modalText}>Are you sure you want to reset this mission? All your progress will be lost.</p>
+            <div style={styles.modalButtons}>
+              <button style={styles.confirmResetBtn} onClick={confirmReset}>
+                Yes, Reset
+              </button>
+              <button style={styles.cancelResetBtn} onClick={cancelReset}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
+      <div style={styles.headerRow}>
+        {!showRewardClaimed && (
+          <button style={styles.resetButton} onClick={handleResetMission} title="Reset Mission">
+            🔄 Reset Mission
+          </button>
+        )}
+      </div>
+
       <div style={styles.progressBar}>
         <div 
           style={{
@@ -432,7 +603,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         />
       </div>
 
-      {steps[currentStep].type === 'quiz' && (
+      {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
         <div style={styles.questionProgress}>
           <span>📐 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
         </div>
@@ -445,14 +616,14 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
           {renderStepContent()}
         </div>
         
-        <div style={styles.buttonContainer}>
-          {currentStep > 0 && (
-            <button style={styles.prevButton} onClick={handlePrevious}>
-              ← Previous
-            </button>
-          )}
-          
-          {currentStep < steps.length - 1 && steps[currentStep].type !== 'complete' && (
+        {currentStep < steps.length - 1 && steps[currentStep].type !== 'complete' && !showRewardClaimed && (
+          <div style={styles.buttonContainer}>
+            {currentStep > 0 && (
+              <button style={styles.prevButton} onClick={handlePrevious}>
+                ← Previous
+              </button>
+            )}
+            
             <button 
               style={{
                 ...styles.nextButton,
@@ -463,11 +634,11 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
             >
               Next →
             </button>
-          )}
-        </div>
+          </div>
+        )}
         
         <div style={styles.stepIndicator}>
-          {steps[currentStep].type === 'quiz' 
+          {steps[currentStep].type === 'quiz' && !showRewardClaimed
             ? `Question ${currentStep - 1} of ${steps.length - 2}` 
             : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
@@ -532,6 +703,27 @@ const styles = {
     backgroundColor: '#f3f4f6',
     display: 'flex',
     flexDirection: 'column',
+  },
+  
+  headerRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '10px',
+  },
+  
+  resetButton: {
+    backgroundColor: '#ef4444',
+    color: 'white',
+    padding: '8px 16px',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
   },
   
   progressBar: {
@@ -782,8 +974,50 @@ const styles = {
     color: '#d97706',
   },
   
-  finishButton: {
+  claimButton: {
     backgroundColor: '#10b981',
+    color: 'white',
+    padding: '14px 24px',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    fontWeight: 'bold',
+    width: '100%',
+    transition: 'all 0.2s',
+  },
+  
+  claimedBox: {
+    backgroundColor: '#d1fae5',
+    padding: '15px',
+    borderRadius: '12px',
+    marginBottom: '15px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+  },
+  
+  claimedIcon: {
+    fontSize: '24px',
+  },
+  
+  claimedText: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#065f46',
+    margin: 0,
+  },
+  
+  actionButtons: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '15px',
+  },
+  
+  missionsListButton: {
+    backgroundColor: '#6b7280',
     color: 'white',
     padding: '12px 24px',
     border: 'none',
@@ -791,7 +1025,8 @@ const styles = {
     cursor: 'pointer',
     fontSize: '16px',
     fontWeight: 'bold',
-    transition: 'background 0.2s',
+    width: '100%',
+    transition: 'all 0.2s',
   },
   
   buttonContainer: {
@@ -938,6 +1173,74 @@ const styles = {
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
     animation: 'bounce 0.5s',
   },
+  
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    animation: 'fadeIn 0.2s',
+  },
+  
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '20px',
+    maxWidth: '350px',
+    width: '90%',
+    textAlign: 'center',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+    animation: 'bounce 0.3s',
+  },
+  
+  modalTitle: {
+    fontSize: '20px',
+    marginBottom: '12px',
+    color: '#ef4444',
+  },
+  
+  modalText: {
+    fontSize: '14px',
+    color: '#555',
+    marginBottom: '20px',
+    lineHeight: '1.5',
+  },
+  
+  modalButtons: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center',
+  },
+  
+  confirmResetBtn: {
+    backgroundColor: '#ef4444',
+    color: 'white',
+    padding: '8px 18px',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s',
+  },
+  
+  cancelResetBtn: {
+    backgroundColor: '#6b7280',
+    color: 'white',
+    padding: '8px 18px',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    transition: 'all 0.2s',
+  },
 };
 
 // Add animations to document
@@ -983,6 +1286,28 @@ styleSheet.innerHTML = `
     transform: scale(1.05);
   }
   
+  .resetButton:hover {
+    background-color: #dc2626;
+  }
+  
+  .confirmResetBtn:hover {
+    background-color: #dc2626;
+  }
+  
+  .cancelResetBtn:hover {
+    background-color: #5a6268;
+  }
+  
+  .claimButton:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+  }
+  
+  .missionsListButton:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+  }
+  
   .scrollableContent::-webkit-scrollbar {
     width: 6px;
   }
@@ -1001,6 +1326,10 @@ styleSheet.innerHTML = `
     background: #555;
   }
 `;
-document.head.appendChild(styleSheet);
+
+if (!document.querySelector('#mission3-styles')) {
+  styleSheet.id = 'mission3-styles';
+  document.head.appendChild(styleSheet);
+}
 
 export default Mission3;

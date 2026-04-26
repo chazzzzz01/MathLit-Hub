@@ -1451,4 +1451,4 @@ styleSheet.textContent = `
 `;
 document.head.appendChild(styleSheet);
 
-export default ClassView; 
+export default ClassView;

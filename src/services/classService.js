@@ -93,7 +93,7 @@ export const classService = {
     return user;
   },
 
-  // ========== HELPER: Get or create user with real Google data ==========
+  // ========== HELPER: Get or create user with real Google data (FIXED - NO DUPLICATES) ==========
   async getOrCreateUser(authUserId, email, name) {
     try {
       if (!authUserId) return null;
@@ -104,7 +104,7 @@ export const classService = {
       const finalEmail = realUser?.email || email || '';
       const finalName = realUser?.name || name || finalEmail?.split('@')[0] || '';
       
-      // First check if user exists
+      // Check if user exists
       let { data: existingUser, error: selectError } = await supabase
         .from('users')
         .select('*')
@@ -115,31 +115,27 @@ export const classService = {
         console.error('Error checking user:', selectError);
       }
       
+      // If user exists, return it (don't try to update - could cause issues)
       if (existingUser) {
-        // If user exists but has placeholder data, update it
-        if (existingUser.name === 'User' || existingUser.name === '' || existingUser.name === null ||
-            existingUser.email === '' || existingUser.email === null) {
-          
-          const { data: updatedUser, error: updateError } = await supabase
-            .from('users')
-            .update({
-              name: finalName,
-              email: finalEmail,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', authUserId)
-            .select()
-            .single();
-          
-          if (!updateError && updatedUser) {
-            console.log('✅ Updated user with real Google data:', updatedUser);
-            return updatedUser;
-          }
-        }
+        console.log('✅ Existing user found:', existingUser.id);
         return existingUser;
       }
       
-      // Create new user with real Google data
+      // Double check to prevent race condition
+      const { data: doubleCheck, error: doubleCheckError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUserId)
+        .maybeSingle();
+      
+      if (doubleCheck) {
+        console.log('✅ User found on double check:', doubleCheck.id);
+        return doubleCheck;
+      }
+      
+      // Create new user
+      console.log('📝 Creating new user:', authUserId);
+      
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
@@ -154,11 +150,21 @@ export const classService = {
         .single();
       
       if (insertError) {
+        if (insertError.code === '23505') {
+          console.log('⚠️ Duplicate user detected, fetching...');
+          const { data: retryUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUserId)
+            .maybeSingle();
+          
+          if (retryUser) return retryUser;
+        }
         console.error('Error creating user:', insertError);
         return null;
       }
       
-      console.log('✅ Created user with real Google data:', newUser);
+      console.log('✅ Created new user:', newUser.id);
       return newUser;
     } catch (error) {
       console.error('Error in getOrCreateUser:', error);
@@ -166,7 +172,7 @@ export const classService = {
     }
   },
 
-  // ========== HELPER: Get or create student with real Google data ==========
+  // ========== HELPER: Get or create student with real Google data (FIXED - NO DUPLICATES) ==========
   async getOrCreateStudent(authUserId, email, name) {
     try {
       if (!authUserId) return null;
@@ -175,7 +181,7 @@ export const classService = {
       const user = await this.getOrCreateUser(authUserId, email, name);
       if (!user) return null;
       
-      // Check if student exists
+      // IMPORTANT: Check if student already exists using user_id (not email)
       let { data: existingStudent, error: selectError } = await supabase
         .from('students')
         .select('*')
@@ -186,31 +192,27 @@ export const classService = {
         console.error('Error checking student:', selectError);
       }
       
+      // If student exists, return it immediately (NO UPDATE ATTEMPT)
       if (existingStudent) {
-        // Update if placeholder data
-        if (existingStudent.name === 'Student' || existingStudent.name === 'User' || 
-            existingStudent.name === '' || existingStudent.email === '') {
-          
-          const { data: updatedStudent, error: updateError } = await supabase
-            .from('students')
-            .update({
-              name: user.name,
-              email: user.email,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingStudent.id)
-            .select()
-            .single();
-          
-          if (!updateError && updatedStudent) {
-            console.log('✅ Updated student with real Google data:', updatedStudent);
-            return updatedStudent;
-          }
-        }
+        console.log('✅ Existing student found:', existingStudent.id);
         return existingStudent;
       }
       
-      // Create new student with real Google data
+      // CRITICAL: Check ONE MORE TIME to prevent race condition
+      const { data: doubleCheck, error: doubleCheckError } = await supabase
+        .from('students')
+        .select('*')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+      
+      if (doubleCheck) {
+        console.log('✅ Student found on double check:', doubleCheck.id);
+        return doubleCheck;
+      }
+      
+      // Only create if absolutely no student exists
+      console.log('📝 Creating new student for user:', authUserId);
+      
       const { data: newStudent, error: insertError } = await supabase
         .from('students')
         .insert({
@@ -224,11 +226,25 @@ export const classService = {
         .single();
       
       if (insertError) {
+        // If unique violation, fetch the existing one
+        if (insertError.code === '23505') {
+          console.log('⚠️ Duplicate detected, fetching existing student...');
+          const { data: retryStudent } = await supabase
+            .from('students')
+            .select('*')
+            .eq('user_id', authUserId)
+            .maybeSingle();
+          
+          if (retryStudent) {
+            console.log('✅ Found existing student after duplicate:', retryStudent.id);
+            return retryStudent;
+          }
+        }
         console.error('Error creating student:', insertError);
         return null;
       }
       
-      console.log('✅ Created student with real Google data:', newStudent);
+      console.log('✅ Created new student:', newStudent.id);
       return newStudent;
     } catch (error) {
       console.error('Error in getOrCreateStudent:', error);
@@ -427,7 +443,7 @@ export const classService = {
     try {
       if (!authUserId) return [];
       
-      const student = await this.getOrCreateStudent(authUserId);
+      const student = await this.getStudentByUserId(authUserId);
       if (!student) return [];
       
       const { data: enrollments, error: enrollError } = await supabase
@@ -502,6 +518,7 @@ export const classService = {
     }
   },
 
+  // ========== JOIN CLASS (FIXED - PREVENT DUPLICATE ENROLLMENTS) ==========
   async joinClass(authUserId, classCode) {
     try {
       if (!authUserId || !classCode) {
@@ -509,15 +526,33 @@ export const classService = {
       }
 
       const realUser = await this.getRealUserFromAuth();
+      
+      // Get or create student (this now prevents duplicates)
       const student = await this.getOrCreateStudent(authUserId, realUser?.email, realUser?.name);
       if (!student) throw new Error('Could not create or find student record');
       
       const classData = await this.getClassByCode(classCode);
       if (!classData) throw new Error(`Class not found with code: ${classCode}`);
 
+      // CRITICAL: Check for existing enrollment before attempting to join
       const isAlreadyJoined = await this.isStudentInClass(student.id, classData.id);
-      if (isAlreadyJoined) throw new Error('You are already a member of this class!');
+      if (isAlreadyJoined) {
+        throw new Error('You are already a member of this class!');
+      }
 
+      // Double check with direct query to prevent race condition
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('class_students')
+        .select('id')
+        .eq('class_id', classData.id)
+        .eq('student_id', student.id)
+        .maybeSingle();
+      
+      if (existingEnrollment) {
+        throw new Error('You are already enrolled in this class');
+      }
+
+      // Create enrollment with unique constraint handling
       const { data, error } = await supabase
         .from('class_students')
         .insert({
@@ -529,7 +564,12 @@ export const classService = {
         .select()
         .single();
 
-      if (error) throw new Error(`Failed to join class: ${error.message}`);
+      if (error) {
+        if (error.code === '23505') { // Unique violation
+          throw new Error('You are already a member of this class!');
+        }
+        throw new Error(`Failed to join class: ${error.message}`);
+      }
 
       await this.updateStudentCount(classData.id);
 
@@ -545,115 +585,31 @@ export const classService = {
     }
   },
 
-  // ========== GET CLASS WITH STUDENTS (with real Google names) ==========
-  async getClassWithStudents(classId) {
-    try {
-      if (!classId) return null;
-      
-      console.log('📋 Fetching class with students for ID:', classId);
-      
-      const { data: classData, error: classError } = await supabase
-        .from('classes')
-        .select('*')
-        .eq('id', classId)
-        .maybeSingle();
-
-      if (classError) {
-        console.error('Error getting class:', classError);
-        return null;
-      }
-      
-      if (!classData) return null;
-      
-      if (classData.teacher_id) {
-        const { data: teacher } = await supabase
-          .from('users')
-          .select('id, name, email')
-          .eq('id', classData.teacher_id)
-          .maybeSingle();
-        
-        if (teacher) classData.teacher = teacher;
-      }
-      
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('class_students')
-        .select('*')
-        .eq('class_id', classId);
-      
-      if (enrollError) {
-        classData.students = [];
-        return classData;
-      }
-      
-      if (!enrollments || enrollments.length === 0) {
-        classData.students = [];
-        return classData;
-      }
-      
-      const studentIds = enrollments.map(e => e.student_id);
-      
-      const { data: students } = await supabase
-        .from('students')
-        .select('*')
-        .in('id', studentIds);
-      
-      const userIds = students?.map(s => s.user_id).filter(id => id) || [];
-      
-      let users = [];
-      if (userIds.length > 0) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('id, name, email, avatar_url')
-          .in('id', userIds);
-        
-        if (userData) users = userData;
-      }
-      
-      const userMap = {};
-      users.forEach(user => { userMap[user.id] = user; });
-      
-      const studentMap = {};
-      students?.forEach(student => { studentMap[student.id] = student; });
-      
-      const studentsWithDetails = enrollments.map(enrollment => {
-        const student = studentMap[enrollment.student_id];
-        const authUser = student ? userMap[student.user_id] : null;
-        
-        return {
-          id: enrollment.id,
-          class_id: enrollment.class_id,
-          student_id: enrollment.student_id,
-          joined_at: enrollment.joined_at,
-          progress: enrollment.progress || 0,
-          updated_at: enrollment.updated_at,
-          users: {
-            id: authUser?.id,
-            name: authUser?.name || student?.name || 'Student',
-            email: authUser?.email || student?.email || '',
-            avatar_url: authUser?.avatar_url || null
-          }
-        };
-      });
-      
-      classData.students = studentsWithDetails;
-      return classData;
-    } catch (error) {
-      console.error('Error in getClassWithStudents:', error);
-      return null;
-    }
-  },
-
-  // ========== GET CLASS STUDENTS - Returns real Google names for Classes.jsx ==========
+  // ========== GET CLASS STUDENTS (FIXED - RETURN PROPER DATA) ==========
   async getClassStudents(classId) {
     try {
       if (!classId) return [];
       
       console.log('📋 Getting students for class:', classId);
       
-      // Get enrollments
+      // Get enrollments with student details in ONE QUERY
       const { data: enrollments, error: enrollError } = await supabase
         .from('class_students')
-        .select('*')
+        .select(`
+          id,
+          class_id,
+          student_id,
+          joined_at,
+          progress,
+          updated_at,
+          students:student_id (
+            id,
+            user_id,
+            email,
+            name,
+            created_at
+          )
+        `)
         .eq('class_id', classId);
       
       if (enrollError) {
@@ -663,62 +619,42 @@ export const classService = {
       
       if (!enrollments || enrollments.length === 0) return [];
       
-      // Get student IDs
-      const studentIds = enrollments.map(e => e.student_id);
+      // Get unique user IDs from students
+      const userIds = [...new Set(
+        enrollments
+          .map(e => e.students?.user_id)
+          .filter(id => id)
+      )];
       
-      // Get students
-      const { data: students, error: studentError } = await supabase
-        .from('students')
-        .select('*')
-        .in('id', studentIds);
-      
-      if (studentError) {
-        console.error('Error getting students:', studentError);
-        return [];
-      }
-      
-      // Get user IDs from students
-      const userIds = students?.map(s => s.user_id).filter(id => id) || [];
-      
-      // Get users from auth users table (this has real Google names!)
-      let users = [];
+      // Get user details (real Google names)
+      let usersMap = {};
       if (userIds.length > 0) {
-        const { data: userData, error: userError } = await supabase
+        const { data: users, error: userError } = await supabase
           .from('users')
           .select('id, name, email, avatar_url')
           .in('id', userIds);
         
-        if (!userError && userData) {
-          users = userData;
-          console.log('✅ Found users with real Google names:', users.map(u => ({ name: u.name, email: u.email })));
+        if (!userError && users) {
+          usersMap = Object.fromEntries(users.map(u => [u.id, u]));
+          console.log('✅ Found users with real names:', Object.keys(usersMap).length);
         }
       }
       
-      // Create lookup maps
-      const userMap = {};
-      users.forEach(user => { userMap[user.id] = user; });
-      
-      const studentMap = {};
-      students?.forEach(student => { studentMap[student.id] = student; });
-      
       // Get points for each student
+      const { data: points } = await supabase
+        .from('student_points')
+        .select('student_id, points')
+        .eq('class_id', classId);
+      
       const pointsMap = {};
-      for (const student of (students || [])) {
-        const { data: pointData } = await supabase
-          .from('student_points')
-          .select('points')
-          .eq('student_id', student.id)
-          .eq('class_id', classId)
-          .maybeSingle();
-        
-        pointsMap[student.id] = pointData?.points || 0;
+      if (points) {
+        points.forEach(p => { pointsMap[p.student_id] = p.points; });
       }
       
-      // Combine all data - THIS IS WHAT CLASSES.JSX EXPECTS
+      // Combine all data
       const result = enrollments.map(enrollment => {
-        const student = studentMap[enrollment.student_id];
-        const authUser = student ? userMap[student.user_id] : null;
-        const points = pointsMap[enrollment.student_id] || 0;
+        const student = enrollment.students;
+        const user = student ? usersMap[student.user_id] : null;
         
         return {
           id: enrollment.id,
@@ -727,24 +663,60 @@ export const classService = {
           joined_at: enrollment.joined_at,
           progress: enrollment.progress || 0,
           updated_at: enrollment.updated_at,
-          points: points,
-          // This users object is what Classes.jsx uses to display names and emails
+          points: pointsMap[enrollment.student_id] || 0,
           users: {
-            id: authUser?.id,
-            name: authUser?.name || student?.name || 'Student',
-            email: authUser?.email || student?.email || '',
-            avatar_url: authUser?.avatar_url || null
+            id: user?.id,
+            name: user?.name || student?.name || 'Student',
+            email: user?.email || student?.email || '',
+            avatar_url: user?.avatar_url || null
           }
         };
       });
       
-      console.log('📋 Returning students with real Google names:', 
-        result.map(r => ({ name: r.users?.name, email: r.users?.email, points: r.points })));
-      
+      console.log('📋 Returning students:', result.length);
       return result;
+      
     } catch (error) {
       console.error('Error in getClassStudents:', error);
       return [];
+    }
+  },
+
+  // ========== GET CLASS WITH STUDENTS (FIXED - PROPER DATA) ==========
+  async getClassWithStudents(classId) {
+    try {
+      if (!classId) return null;
+      
+      console.log('📋 Fetching class with students for ID:', classId);
+      
+      // Get class with teacher
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select(`
+          *,
+          teacher:teacher_id (
+            id,
+            name,
+            email
+          )
+        `)
+        .eq('id', classId)
+        .maybeSingle();
+
+      if (classError || !classData) {
+        console.error('Error getting class:', classError);
+        return null;
+      }
+      
+      // Get students using getClassStudents
+      const students = await this.getClassStudents(classId);
+      classData.students = students;
+      
+      return classData;
+      
+    } catch (error) {
+      console.error('Error in getClassWithStudents:', error);
+      return null;
     }
   },
 
@@ -829,7 +801,7 @@ export const classService = {
     }
   },
 
-  // ========== TEAM ASSIGNMENT MANAGEMENT (FIXED - NO AUTH CHECK) ==========
+  // ========== TEAM ASSIGNMENT MANAGEMENT ==========
   
   async getClassTeamAssignments(classId) {
     try {

@@ -76,6 +76,28 @@ function Homepage() {
     }
   }, [userData, user?.dbId]);
 
+  // Listen for class deletion events from other components
+  useEffect(() => {
+    const handleClassDeleted = (event) => {
+      console.log('Class deleted event received in Homepage:', event.detail);
+      // Remove the deleted class from state immediately
+      setJoinedClasses(prevClasses => prevClasses.filter(c => c.class_id !== event.detail.classId));
+      // If we're viewing the deleted class, close it
+      if (selectedClass && selectedClass.id === event.detail.classId) {
+        closeClassView();
+      }
+      // Show success message
+      setJoinSuccess('Class has been removed successfully!');
+      setTimeout(() => setJoinSuccess(''), 3000);
+    };
+    
+    window.addEventListener('classDeleted', handleClassDeleted);
+    
+    return () => {
+      window.removeEventListener('classDeleted', handleClassDeleted);
+    };
+  }, [selectedClass]);
+
   const loadJoinedClasses = async () => {
     try {
       setLoadingClasses(true);
@@ -318,7 +340,7 @@ function Homepage() {
     setShowRemoveModal(true);
   };
 
-  // Handle confirm remove
+  // Handle confirm remove - FIXED to properly remove from UI
   const handleConfirmRemove = async () => {
     if (!user?.dbId || !classToRemove) return;
     
@@ -331,12 +353,19 @@ function Homepage() {
       );
       
       if (result.success) {
+        // IMMEDIATELY remove from joinedClasses state
+        setJoinedClasses(prevClasses => 
+          prevClasses.filter(c => c.class_id !== classToRemove.class_id)
+        );
+        
+        // Dispatch event to notify other components
+        const event = new CustomEvent('classDeleted', { 
+          detail: { classId: classToRemove.class_id, timestamp: Date.now() }
+        });
+        window.dispatchEvent(event);
+        
         setJoinSuccess(`Successfully removed from ${classToRemove.class.name}`);
         setShowRemoveModal(false);
-        setClassToRemove(null);
-        
-        // Reload joined classes and refresh context
-        await refreshClasses();
         
         // If we're viewing the removed class, close it
         if (selectedClass && selectedClass.id === classToRemove.class_id) {
@@ -353,6 +382,7 @@ function Homepage() {
       setJoinError('Failed to remove from class. Please try again.');
     } finally {
       setIsRemoving(false);
+      setClassToRemove(null);
     }
   };
 

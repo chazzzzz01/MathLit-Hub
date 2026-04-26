@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
-import { FiPlus, FiBookOpen, FiUsers, FiCopy, FiCheck, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiBookOpen, FiUsers, FiCopy, FiCheck, FiTrash2, FiArrowLeft, FiX, FiCheckCircle } from 'react-icons/fi';
 import { classService } from '../services/classService';
 
 function Home() {
@@ -12,6 +12,14 @@ function Home() {
   const [classes, setClasses] = useState([]);
   const [copiedCode, setCopiedCode] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // Delete confirmation modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [classToDelete, setClassToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Toast notification state
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   // Load classes from Supabase
   const loadClasses = async () => {
@@ -24,7 +32,7 @@ function Home() {
       console.log('Loaded classes from Supabase:', teacherClasses);
     } catch (error) {
       console.error('Error loading classes:', error);
-      alert('Failed to load classes. Please refresh the page.');
+      showToast('Failed to load classes. Please refresh the page.', 'error');
     } finally {
       setLoading(false);
     }
@@ -35,6 +43,14 @@ function Home() {
       loadClasses();
     }
   }, [user?.dbId]);
+
+  // Show toast notification
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 3000);
+  };
 
   // Generate a random class code
   const generateClassCode = () => {
@@ -48,12 +64,12 @@ function Home() {
 
   const handleCreateClass = async () => {
     if (!className.trim()) {
-      alert('Please enter a class name');
+      showToast('Please enter a class name', 'error');
       return;
     }
     
     if (!user?.dbId) {
-      alert('User not authenticated. Please sign in again.');
+      showToast('User not authenticated. Please sign in again.', 'error');
       return;
     }
     
@@ -72,35 +88,66 @@ function Home() {
       // Update local state
       setClasses([newClass, ...classes]);
       
-      alert(`Class "${className}" created successfully!\n\nClass Code: ${newClassCode}\n\nShare this code with students to join.`);
+      showToast(`Class "${className}" created successfully! Code: ${newClassCode}`, 'success');
       setShowCreateClass(false);
       setClassName('');
       setClassCode('');
     } catch (error) {
       console.error('Error creating class:', error);
-      alert('Failed to create class. Please try again.');
+      showToast('Failed to create class. Please try again.', 'error');
     }
   };
 
-  const handleDeleteClass = async (classId, event) => {
+  // Handle delete class click - Show modal instead of confirm
+  const handleDeleteClick = (classItem, event) => {
     event.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this class? This action cannot be undone.')) {
-      try {
-        await classService.deleteClass(classId);
-        const updatedClasses = classes.filter(c => c.id !== classId);
-        setClasses(updatedClasses);
-        alert('Class deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting class:', error);
-        alert('Failed to delete class. Please try again.');
-      }
+    setClassToDelete(classItem);
+    setShowDeleteModal(true);
+  };
+
+  // Handle confirm delete
+  const handleConfirmDelete = async () => {
+    if (!classToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await classService.deleteClass(classToDelete.id);
+      
+      // Remove from local state
+      const updatedClasses = classes.filter(c => c.id !== classToDelete.id);
+      setClasses(updatedClasses);
+      
+      // Dispatch event to notify other components
+      const event = new CustomEvent('classDeleted', { 
+        detail: { classId: classToDelete.id, timestamp: Date.now() }
+      });
+      window.dispatchEvent(event);
+      
+      // Show success toast
+      showToast(`Class "${classToDelete.name}" deleted successfully!`, 'success');
+      
+      setShowDeleteModal(false);
+      setClassToDelete(null);
+    } catch (error) {
+      console.error('Error deleting class:', error);
+      showToast('Failed to delete class. Please try again.', 'error');
+    } finally {
+      setIsDeleting(false);
     }
+  };
+
+  // Handle cancel delete
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setClassToDelete(null);
+    setIsDeleting(false);
   };
 
   const copyToClipboard = (code, event) => {
     event.stopPropagation();
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
+    showToast(`Class code "${code}" copied to clipboard!`, 'success');
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -121,6 +168,14 @@ function Home() {
 
   return (
     <div style={styles.container}>
+      {/* Toast Notification */}
+      {toast.show && (
+        <div style={{...styles.toast, ...(toast.type === 'error' ? styles.toastError : styles.toastSuccess)}}>
+          <FiCheckCircle size={20} />
+          <span style={styles.toastMessage}>{toast.message}</span>
+        </div>
+      )}
+
       <div style={styles.contentWrapper}>
         {/* Welcome Header */}
         <div style={styles.welcomeHeader}>
@@ -145,7 +200,19 @@ function Home() {
               </button>
             ) : (
               <div style={styles.createClassForm}>
-                <h3 style={styles.formTitle}>Create a New Class</h3>
+                <div style={styles.formHeader}>
+                  <h3 style={styles.formTitle}>Create a New Class</h3>
+                  <button 
+                    style={styles.formCloseButton}
+                    onClick={() => {
+                      setShowCreateClass(false);
+                      setClassName('');
+                      setClassCode('');
+                    }}
+                  >
+                    <FiX size={20} />
+                  </button>
+                </div>
                 <input
                   type="text"
                   placeholder="Class Name *"
@@ -222,7 +289,7 @@ function Home() {
                       <h3 style={styles.className}>{classItem.name}</h3>
                       <button 
                         style={styles.deleteButton}
-                        onClick={(e) => handleDeleteClass(classItem.id, e)}
+                        onClick={(e) => handleDeleteClick(classItem, e)}
                         title="Delete class"
                       >
                         <FiTrash2 size={16} color="#ef4444" />
@@ -265,6 +332,58 @@ function Home() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && classToDelete && (
+        <div style={styles.modalOverlay} onClick={handleCancelDelete}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Delete Class</h2>
+              <button style={styles.modalClose} onClick={handleCancelDelete}>
+                <FiX size={20} />
+              </button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.warningIcon}>⚠️</div>
+              <h3 style={styles.warningTitle}>Are you sure?</h3>
+              <p style={styles.warningText}>
+                You are about to delete <strong>"{classToDelete.name}"</strong>
+              </p>
+              <p style={styles.warningDescription}>
+                This action cannot be undone. All students, missions, and data associated with this class will be permanently deleted.
+              </p>
+              <div style={styles.classPreviewBox}>
+                <div style={styles.previewIcon}>📚</div>
+                <div style={styles.previewInfo}>
+                  <div style={styles.previewName}>{classToDelete.name}</div>
+                  <div style={styles.previewCode}>Code: {classToDelete.code}</div>
+                  <div style={styles.previewStudents}>
+                    <FiUsers size={12} /> {classToDelete.students_count || 0} Students
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.cancelButton} 
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.deleteConfirmButton}
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Yes, Delete Class'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,6 +395,7 @@ const styles = {
     backgroundColor: '#f9fafb',
     padding: '0',
     margin: '0',
+    position: 'relative',
   },
   contentWrapper: {
     maxWidth: '1200px',
@@ -300,6 +420,33 @@ const styles = {
     borderTop: '4px solid #2563eb',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
+  },
+  // Toast Notification Styles
+  toast: {
+    position: 'fixed',
+    top: '24px',
+    right: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '14px 20px',
+    borderRadius: '12px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+    zIndex: 2000,
+    animation: 'slideInRight 0.3s ease',
+    backdropFilter: 'blur(10px)',
+  },
+  toastSuccess: {
+    backgroundColor: '#10b981',
+    color: 'white',
+  },
+  toastError: {
+    backgroundColor: '#ef4444',
+    color: 'white',
+  },
+  toastMessage: {
+    fontSize: '14px',
+    fontWeight: '500',
   },
   welcomeHeader: {
     marginBottom: '48px',
@@ -327,7 +474,7 @@ const styles = {
   },
   createClassButton: {
     width: '100%',
-    backgroundColor: '#2563eb',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
     padding: '20px 32px',
@@ -341,24 +488,37 @@ const styles = {
     gap: '12px',
     transition: 'all 0.3s ease',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    ':hover': {
-      backgroundColor: '#1d4ed8',
-      transform: 'translateY(-2px)',
-      boxShadow: '0 6px 12px rgba(37,99,235,0.3)',
-    },
   },
   createClassForm: {
     backgroundColor: 'white',
     padding: '32px',
     borderRadius: '16px',
     boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+    animation: 'fadeIn 0.3s ease',
+  },
+  formHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '24px',
   },
   formTitle: {
     fontSize: '24px',
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: '24px',
-    textAlign: 'center',
+    margin: 0,
+  },
+  formCloseButton: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '8px',
+    color: '#9ca3af',
+    transition: 'all 0.2s',
   },
   input: {
     width: '100%',
@@ -369,9 +529,7 @@ const styles = {
     marginBottom: '16px',
     outline: 'none',
     boxSizing: 'border-box',
-    ':focus': {
-      borderColor: '#2563eb',
-    },
+    transition: 'border-color 0.2s',
   },
   codeInputContainer: {
     display: 'flex',
@@ -386,9 +544,7 @@ const styles = {
     borderRadius: '8px',
     outline: 'none',
     textTransform: 'uppercase',
-    ':focus': {
-      borderColor: '#2563eb',
-    },
+    transition: 'border-color 0.2s',
   },
   generateButton: {
     padding: '12px 20px',
@@ -400,9 +556,6 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#e5e7eb',
-    },
   },
   generateCodeButton: {
     width: '100%',
@@ -416,9 +569,6 @@ const styles = {
     cursor: 'pointer',
     marginBottom: '24px',
     transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#e5e7eb',
-    },
   },
   formButtons: {
     display: 'flex',
@@ -426,7 +576,7 @@ const styles = {
   },
   submitButton: {
     flex: 1,
-    backgroundColor: '#2563eb',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
     padding: '12px',
@@ -434,10 +584,7 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#1d4ed8',
-    },
+    transition: 'opacity 0.2s',
   },
   cancelButton: {
     flex: 1,
@@ -450,9 +597,6 @@ const styles = {
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#e5e7eb',
-    },
   },
   classesSection: {
     marginTop: '48px',
@@ -478,10 +622,6 @@ const styles = {
     transition: 'transform 0.2s, box-shadow 0.2s',
     cursor: 'pointer',
     position: 'relative',
-    ':hover': {
-      transform: 'translateY(-4px)',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    },
   },
   classIcon: {
     width: '48px',
@@ -512,15 +652,12 @@ const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '4px',
+    padding: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '6px',
     transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#fee2e2',
-    },
   },
   classCodeContainer: {
     display: 'flex',
@@ -553,9 +690,6 @@ const styles = {
     justifyContent: 'center',
     borderRadius: '4px',
     transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: '#e5e7eb',
-    },
   },
   classStats: {
     display: 'flex',
@@ -596,6 +730,130 @@ const styles = {
     fontSize: '14px',
     color: '#9ca3af',
   },
+  // Modal Styles
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backdropFilter: 'blur(5px)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    maxWidth: '450px',
+    width: '90%',
+    overflow: 'hidden',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+    animation: 'fadeIn 0.3s ease',
+  },
+  modalHeader: {
+    padding: '20px 24px',
+    borderBottom: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#1f2937',
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '8px',
+    color: '#9ca3af',
+    transition: 'all 0.2s',
+  },
+  modalBody: {
+    padding: '24px',
+    textAlign: 'center',
+  },
+  warningIcon: {
+    fontSize: '64px',
+    marginBottom: '16px',
+  },
+  warningTitle: {
+    fontSize: '22px',
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: '12px',
+  },
+  warningText: {
+    fontSize: '16px',
+    color: '#374151',
+    marginBottom: '8px',
+  },
+  warningDescription: {
+    fontSize: '13px',
+    color: '#6b7280',
+    marginBottom: '20px',
+    lineHeight: 1.5,
+  },
+  classPreviewBox: {
+    backgroundColor: '#f9fafb',
+    borderRadius: '12px',
+    padding: '16px',
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+  },
+  previewIcon: {
+    fontSize: '32px',
+  },
+  previewInfo: {
+    flex: 1,
+    textAlign: 'left',
+  },
+  previewName: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '4px',
+  },
+  previewCode: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginBottom: '4px',
+  },
+  previewStudents: {
+    fontSize: '11px',
+    color: '#9ca3af',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+  },
+  deleteConfirmButton: {
+    padding: '10px 24px',
+    background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'transform 0.2s',
+  },
 };
 
 // Add global animations
@@ -615,6 +873,70 @@ styleSheet.textContent = `
       opacity: 1;
       transform: translateY(0);
     }
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  .createClassButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+  
+  .classCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  }
+  
+  .deleteButton:hover {
+    background-color: #fee2e2;
+  }
+  
+  .copyButton:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .submitButton:hover {
+    opacity: 0.9;
+  }
+  
+  .cancelButton:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .generateButton:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .generateCodeButton:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .formCloseButton:hover {
+    background-color: #f3f4f6;
+    color: #ef4444;
+  }
+  
+  .modalClose:hover {
+    background-color: #f3f4f6;
+    color: #ef4444;
+  }
+  
+  .deleteConfirmButton:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+  
+  .input:focus, .codeInput:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
   }
 `;
 document.head.appendChild(styleSheet);

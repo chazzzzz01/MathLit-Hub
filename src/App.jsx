@@ -27,6 +27,7 @@ import Mission1 from "./missions/mission1";
 import Mission2 from "./missions/mission2";  
 import Mission3 from "./missions/mission3";
 import Mission4 from "./missions/mission4";
+import Mission5 from "./missions/mission5";
 import '/src/App.css'
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
             <Route path="missions/2" element={<Mission2 />} /> 
             <Route path="missions/3" element={<Mission3 />} />
             <Route path="missions/4" element={<Mission4 />} />
+            <Route path="missions/5" element={<Mission5 />} />
             <Route path="games" element={<Games />} />
             <Route path="achievement" element={<Achievement />} />
             <Route path="collaboration" element={<CollaborationStudent />} />

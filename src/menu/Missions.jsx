@@ -1,12 +1,17 @@
+// src/menu/Missions.jsx
 import React, { useState, useEffect } from 'react';
-import { useOutletContext, useNavigate } from 'react-router-dom';
+import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import Mission1 from '../missions/mission1';
 import Mission2 from '../missions/mission2';
 import Mission3 from '../missions/mission3';
 import Mission4 from '../missions/mission4';
+import Mission5 from '../missions/mission5';
+import { supabase } from '../lib/supabase';
 
 function Missions() {
   const { user, userData, updateUserData } = useOutletContext();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [showMessage, setShowMessage] = useState(true);
   const [messageIndex, setMessageIndex] = useState(0);
   const [selectedMission, setSelectedMission] = useState(null);
@@ -15,7 +20,7 @@ function Missions() {
   const [lockMessage, setLockMessage] = useState("");
   const [localCompletedMissions, setLocalCompletedMissions] = useState([]);
   const [localTotalXP, setLocalTotalXP] = useState(0);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
   const messages = [
     "👋 Hey there! Ready for some missions?",
@@ -34,7 +39,19 @@ function Missions() {
     return () => clearInterval(interval);
   }, [messages.length]);
 
-  // Sync local state with userData
+  // Check URL params for direct mission access
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const missionParam = params.get('mission');
+    if (missionParam) {
+      const missionId = parseInt(missionParam);
+      if (missionId >= 1 && missionId <= 5) {
+        setSelectedMission(missionId);
+      }
+    }
+  }, [location]);
+
+  // Sync local state with userData and fetch from database
   useEffect(() => {
     if (userData?.progress?.completedMissions) {
       setLocalCompletedMissions(userData.progress.completedMissions);
@@ -42,7 +59,104 @@ function Missions() {
     if (userData?.xp !== undefined) {
       setLocalTotalXP(userData.xp);
     }
-  }, [userData]);
+    
+    // Fetch completed missions from database
+    if (user?.dbId) {
+      fetchCompletedMissionsFromDatabase();
+    }
+  }, [userData, user?.dbId]);
+
+  // Fetch completed missions from mission_progress table
+  const fetchCompletedMissionsFromDatabase = async () => {
+    try {
+      if (!user?.dbId) return;
+      
+      const { data, error } = await supabase
+        .from('mission_progress')
+        .select('mission_id, xp_earned')
+        .eq('student_id', user.dbId)
+        .eq('status', 'completed');
+      
+      if (error) {
+        console.error('Error fetching missions from database:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const completedIds = data.map(item => item.mission_id);
+        const totalXP = data.reduce((sum, item) => sum + (item.xp_earned || 0), 0);
+        
+        setLocalCompletedMissions(completedIds);
+        setLocalTotalXP(totalXP);
+        
+        // Update localStorage
+        if (user?.email) {
+          localStorage.setItem(`userXP_${user.email}`, totalXP.toString());
+          localStorage.setItem('userXP', totalXP.toString());
+        }
+        
+        console.log('Completed missions from DB:', completedIds, 'Total XP:', totalXP);
+      }
+    } catch (error) {
+      console.error('Error in fetchCompletedMissionsFromDatabase:', error);
+    }
+  };
+
+  // Save mission completion to database
+  const saveMissionCompletionToDatabase = async (missionId, xpEarned) => {
+    try {
+      if (!user?.dbId) return false;
+      
+      // Check if already exists
+      const { data: existing, error: checkError } = await supabase
+        .from('mission_progress')
+        .select('id')
+        .eq('mission_id', missionId)
+        .eq('student_id', user.dbId)
+        .maybeSingle();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing mission:', checkError);
+      }
+      
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from('mission_progress')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            xp_earned: xpEarned,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+        
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from('mission_progress')
+          .insert({
+            mission_id: missionId,
+            student_id: user.dbId,
+            status: 'completed',
+            completed_at: new Date().toISOString(),
+            xp_earned: xpEarned,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        
+        if (error) throw error;
+      }
+      
+      console.log(`Mission ${missionId} saved to database with ${xpEarned} XP`);
+      return true;
+      
+    } catch (error) {
+      console.error('Error saving mission to database:', error);
+      return false;
+    }
+  };
 
   const handleMissionClick = (missionId) => {
     // Check if mission is already completed
@@ -68,18 +182,47 @@ function Missions() {
       setShowLockModal(true);
       return;
     }
+    if (missionId === 5 && !isMission4Completed()) {
+      setLockMessage("Complete Mission 4 (Slope and y-intercept) first to unlock the X and Y Form mission!");
+      setShowLockModal(true);
+      return;
+    }
     setSelectedMission(missionId);
   };
 
-  const handleBackToMissions = () => {
+  // Handle back from mission - can accept nextMissionId to open next mission directly
+  const handleBackToMissions = async (nextMissionId = null) => {
+    if (nextMissionId) {
+      // Open the next mission directly
+      setSelectedMission(nextMissionId);
+      return;
+    }
+    
     setSelectedMission(null);
-    // Refresh local state when returning from mission
-    if (userData?.progress?.completedMissions) {
-      setLocalCompletedMissions(userData.progress.completedMissions);
+    
+    // Refresh data from database
+    setIsLoading(true);
+    await fetchCompletedMissionsFromDatabase();
+    
+    // Also refresh userData if updateUserData is available
+    if (updateUserData && user?.dbId) {
+      // Fetch fresh user data
+      const { data: freshUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.dbId)
+        .maybeSingle();
+      
+      if (freshUser) {
+        updateUserData({
+          ...userData,
+          xp: freshUser.xp || localTotalXP,
+          progress: freshUser.progress || { completedMissions: localCompletedMissions }
+        });
+      }
     }
-    if (userData?.xp !== undefined) {
-      setLocalTotalXP(userData.xp);
-    }
+    
+    setIsLoading(false);
   };
 
   const closeLockModal = () => {
@@ -92,71 +235,107 @@ function Missions() {
     setShowResetConfirm(true);
   };
 
-  const confirmResetProgress = () => {
-    if (updateUserData) {
-      // Reset user progress completely
-      updateUserData({
-        xp: 0,
-        progress: {
-          missionsCompleted: 0,
-          completedMissions: [],
-          lastMissionCompleted: null,
-          totalXP: 0
-        }
-      });
-      // Update local state immediately
+  const confirmResetProgress = async () => {
+    if (!user?.dbId) {
+      alert("User not found. Please sign in again.");
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Delete all mission progress from database
+      const { error: deleteError } = await supabase
+        .from('mission_progress')
+        .delete()
+        .eq('student_id', user.dbId);
+      
+      if (deleteError) {
+        console.error('Error deleting mission progress:', deleteError);
+      }
+      
+      // Reset user progress in database (users table)
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          xp: 0,
+          progress: {
+            missionsCompleted: 0,
+            completedMissions: [],
+            lastMissionCompleted: null,
+            totalXP: 0
+          }
+        })
+        .eq('id', user.dbId);
+      
+      if (updateError) {
+        console.error('Error updating user:', updateError);
+      }
+      
+      // Update localStorage
+      if (updateUserData) {
+        updateUserData({
+          xp: 0,
+          progress: {
+            missionsCompleted: 0,
+            completedMissions: [],
+            lastMissionCompleted: null,
+            totalXP: 0
+          }
+        });
+      }
+      
+      // Reset local state
       setLocalCompletedMissions([]);
       setLocalTotalXP(0);
-    }
-    setShowResetConfirm(false);
-    setShowMessage(true);
-    setMessageIndex(0);
-    setTimeout(() => {
+      
+      // Clear localStorage XP
+      if (user?.email) {
+        localStorage.setItem(`userXP_${user.email}`, '0');
+        localStorage.setItem('userXP', '0');
+      }
+      
+      setShowResetConfirm(false);
+      setShowMessage(true);
+      setMessageIndex(0);
+      
       alert("✅ Your progress has been reset successfully!");
-    }, 100);
+      
+    } catch (error) {
+      console.error('Error resetting progress:', error);
+      alert("Failed to reset progress. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const cancelResetProgress = () => {
     setShowResetConfirm(false);
   };
 
-  // Check mission completion status using local state
-  const isMission1Completed = () => {
-    return localCompletedMissions.includes(1);
-  };
-
-  const isMission2Completed = () => {
-    return localCompletedMissions.includes(2);
-  };
-
-  const isMission3Completed = () => {
-    return localCompletedMissions.includes(3);
-  };
-
-  const isMission4Completed = () => {
-    return localCompletedMissions.includes(4);
-  };
+  // Check mission completion status
+  const isMission1Completed = () => localCompletedMissions.includes(1);
+  const isMission2Completed = () => localCompletedMissions.includes(2);
+  const isMission3Completed = () => localCompletedMissions.includes(3);
+  const isMission4Completed = () => localCompletedMissions.includes(4);
+  const isMission5Completed = () => localCompletedMissions.includes(5);
 
   const missions = [
     { id: 1, title: "Linear Equations", description: "Learn to find equation of a line using two points", xp: 100, locked: false },
-    { id: 2, title: "Math Wizard", description: "Master linear equation concepts with 10 challenging questions", xp: 250, locked: !isMission1Completed() && !localCompletedMissions.includes(1) },
-    { id: 3, title: "Slope and a Point", description: "Learn to find equation of a line using slope and a point", xp: 400, locked: !isMission2Completed() && !localCompletedMissions.includes(2) },
-    { id: 4, title: "Slope and y-intercept", description: "Learn to find equation of a line using slope and y-intercept", xp: 500, locked: !isMission3Completed() && !localCompletedMissions.includes(3) },
+    { id: 2, title: "Math Wizard", description: "Master linear equation concepts with 10 challenging questions", xp: 250, locked: !isMission1Completed() },
+    { id: 3, title: "Slope and a Point", description: "Learn to find equation of a line using slope and a point", xp: 400, locked: !isMission2Completed() },
+    { id: 4, title: "Slope and y-intercept", description: "Learn to find equation of a line using slope and y-intercept", xp: 500, locked: !isMission3Completed() },
+    { id: 5, title: "X and Y Intercepts", description: "Learn to find equation of a line using intercepts", xp: 600, locked: !isMission4Completed() },
   ];
 
-  // Calculate total XP from completed missions
-  const calculateTotalXP = () => {
-    let total = 0;
-    localCompletedMissions.forEach(missionId => {
-      const mission = missions.find(m => m.id === missionId);
-      if (mission) {
-        total += mission.xp;
-      }
-    });
-    return total;
-  };
-
-  const displayTotalXP = localTotalXP || calculateTotalXP();
+  if (isLoading) {
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading missions...</p>
+      </div>
+    );
+  }
 
   // If a mission is selected, show the mission component
   if (selectedMission === 1) {
@@ -166,6 +345,7 @@ function Missions() {
         userData={userData}
         updateUserData={updateUserData}
         onComplete={handleBackToMissions}
+        saveToDatabase={saveMissionCompletionToDatabase}
       />
     );
   }
@@ -177,6 +357,7 @@ function Missions() {
         userData={userData}
         updateUserData={updateUserData}
         onComplete={handleBackToMissions}
+        saveToDatabase={saveMissionCompletionToDatabase}
       />
     );
   }
@@ -188,6 +369,7 @@ function Missions() {
         userData={userData}
         updateUserData={updateUserData}
         onComplete={handleBackToMissions}
+        saveToDatabase={saveMissionCompletionToDatabase}
       />
     );
   }
@@ -199,13 +381,26 @@ function Missions() {
         userData={userData}
         updateUserData={updateUserData}
         onComplete={handleBackToMissions}
+        saveToDatabase={saveMissionCompletionToDatabase}
+      />
+    );
+  }
+
+  if (selectedMission === 5) {
+    return (
+      <Mission5 
+        user={user}
+        userData={userData}
+        updateUserData={updateUserData}
+        onComplete={handleBackToMissions}
+        saveToDatabase={saveMissionCompletionToDatabase}
       />
     );
   }
 
   return (
     <div style={styles.container}>
-      {/* Lock Modal - Shows when trying to access locked or completed mission */}
+      {/* Lock Modal */}
       {showLockModal && (
         <div style={styles.modalOverlay} onClick={closeLockModal}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
@@ -237,8 +432,8 @@ function Missions() {
             </ul>
             <p style={styles.modalWarning}>This action cannot be undone!</p>
             <div style={styles.modalButtons}>
-              <button style={styles.confirmResetBtn} onClick={confirmResetProgress}>
-                Yes, Reset Everything
+              <button style={styles.confirmResetBtn} onClick={confirmResetProgress} disabled={isLoading}>
+                {isLoading ? 'Resetting...' : 'Yes, Reset Everything'}
               </button>
               <button style={styles.cancelResetBtn} onClick={cancelResetProgress}>
                 Cancel
@@ -313,18 +508,9 @@ function Missions() {
             <span style={styles.statEmoji}>⭐</span>
             <div>
               <p style={styles.statLabel}>Total XP Earned</p>
-              <p style={styles.statValue}>{displayTotalXP} XP</p>
+              <p style={styles.statValue}>{localTotalXP} XP</p>
             </div>
           </div>
-          {userData?.progress?.lastMissionCompleted && (
-            <div style={styles.statItem}>
-              <span style={styles.statEmoji}>📅</span>
-              <div>
-                <p style={styles.statLabel}>Last Mission</p>
-                <p style={styles.statValue}>{new Date(userData.progress.lastMissionCompleted).toLocaleDateString()}</p>
-              </div>
-            </div>
-          )}
         </div>
         
         {/* Progress Bar */}
@@ -344,7 +530,35 @@ function Missions() {
         </div>
       </div>
 
-      {/* FLOATING ASSISTANT on Right Side */}
+      {/* XP Breakdown Card */}
+      <div style={styles.xpBreakdownCard}>
+        <h3 style={styles.statsTitle}>🏆 XP Breakdown</h3>
+        <div style={styles.xpBreakdownList}>
+          {missions.map(mission => (
+            <div key={mission.id} style={styles.xpBreakdownItem}>
+              <div style={styles.xpBreakdownLeft}>
+                <span style={styles.xpBreakdownIcon}>
+                  {localCompletedMissions.includes(mission.id) ? '✅' : '⭕'}
+                </span>
+                <span style={styles.xpBreakdownName}>{mission.title}</span>
+              </div>
+              <div style={styles.xpBreakdownRight}>
+                <span style={styles.xpBreakdownValue}>
+                  {localCompletedMissions.includes(mission.id) ? `+${mission.xp} XP` : 'Not completed'}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={styles.xpBreakdownTotal}>
+          <span>Total XP Available</span>
+          <span style={styles.xpBreakdownTotalValue}>
+            {missions.reduce((sum, m) => sum + m.xp, 0)} XP
+          </span>
+        </div>
+      </div>
+
+      {/* Floating Assistant */}
       <div style={styles.avatarContainer}>
         <div style={styles.bubbleContainer}>
           {showMessage ? (
@@ -384,7 +598,22 @@ const styles = {
     backgroundColor: '#f3f4f6',
     position: 'relative',
   },
-
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minHeight: '100vh',
+    gap: '20px',
+  },
+  loadingSpinner: {
+    width: '50px',
+    height: '50px',
+    border: '4px solid #e5e7eb',
+    borderTopColor: '#2563eb',
+    borderRadius: '50%',
+    animation: 'spin 0.8s linear infinite',
+  },
   headerRow: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -393,18 +622,15 @@ const styles = {
     gap: '15px',
     marginBottom: '20px',
   },
-
   title: {
     fontSize: '32px',
     color: '#333',
     marginBottom: '10px',
   },
-
   subtitle: {
     fontSize: '16px',
     color: '#666',
   },
-
   resetProgressButton: {
     backgroundColor: '#ef4444',
     color: 'white',
@@ -419,14 +645,12 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
   },
-
   missionsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
     gap: '20px',
     marginBottom: '30px',
   },
-
   missionCard: {
     backgroundColor: 'white',
     padding: '20px',
@@ -434,31 +658,26 @@ const styles = {
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
     transition: 'transform 0.2s, box-shadow 0.2s',
   },
-
   completedMission: {
     backgroundColor: '#f0fdf4',
     border: '1px solid #22c55e',
   },
-
   lockedMission: {
     backgroundColor: '#f3f4f6',
     border: '1px solid #d1d5db',
     opacity: 0.8,
   },
-
   missionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '10px',
   },
-
   missionTitle: {
     fontSize: '20px',
     color: '#333',
     margin: 0,
   },
-
   xpBadge: {
     backgroundColor: '#f59e0b',
     color: 'white',
@@ -467,14 +686,12 @@ const styles = {
     fontSize: '12px',
     fontWeight: 'bold',
   },
-
   missionDescription: {
     color: '#666',
     fontSize: '14px',
     marginBottom: '15px',
     lineHeight: '1.5',
   },
-
   completeButton: {
     backgroundColor: '#2563eb',
     color: 'white',
@@ -487,13 +704,11 @@ const styles = {
     fontWeight: 'bold',
     transition: 'all 0.2s',
   },
-
   lockedButton: {
     backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
     opacity: 0.7,
   },
-
   completedBadge: {
     backgroundColor: '#22c55e',
     color: 'white',
@@ -503,53 +718,45 @@ const styles = {
     fontSize: '14px',
     fontWeight: 'bold',
   },
-
   statsCard: {
     backgroundColor: 'white',
     padding: '20px',
     borderRadius: '12px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    marginBottom: '20px',
   },
-
   statsTitle: {
     fontSize: '18px',
     color: '#333',
     marginBottom: '15px',
   },
-
   progressStats: {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
     marginBottom: '20px',
   },
-
   statItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
   },
-
   statEmoji: {
     fontSize: '24px',
   },
-
   statLabel: {
     fontSize: '12px',
     color: '#999',
     marginBottom: '2px',
   },
-
   statValue: {
     fontSize: '16px',
     fontWeight: 'bold',
     color: '#333',
   },
-
   progressBarContainer: {
     marginTop: '15px',
   },
-
   progressBarLabel: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -557,22 +764,68 @@ const styles = {
     color: '#666',
     marginBottom: '5px',
   },
-
   progressBarTrack: {
     height: '8px',
     backgroundColor: '#e5e7eb',
     borderRadius: '4px',
     overflow: 'hidden',
   },
-
   progressBarFill: {
     height: '100%',
     backgroundColor: '#2563eb',
     borderRadius: '4px',
     transition: 'width 0.3s ease',
   },
-
-  // Avatar Assistant Styles
+  xpBreakdownCard: {
+    backgroundColor: 'white',
+    padding: '20px',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+  },
+  xpBreakdownList: {
+    marginBottom: '16px',
+  },
+  xpBreakdownItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 0',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  xpBreakdownLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  xpBreakdownIcon: {
+    fontSize: '16px',
+  },
+  xpBreakdownName: {
+    fontSize: '14px',
+    color: '#374151',
+  },
+  xpBreakdownRight: {
+    textAlign: 'right',
+  },
+  xpBreakdownValue: {
+    fontSize: '13px',
+    fontWeight: '500',
+    color: '#f59e0b',
+  },
+  xpBreakdownTotal: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: '12px',
+    marginTop: '8px',
+    borderTop: '2px solid #e5e7eb',
+    fontWeight: 'bold',
+  },
+  xpBreakdownTotalValue: {
+    fontSize: '18px',
+    fontWeight: '800',
+    color: '#f59e0b',
+  },
   avatarContainer: {
     position: 'fixed',
     bottom: '20px',
@@ -581,12 +834,10 @@ const styles = {
     alignItems: 'flex-end',
     zIndex: 1000,
   },
-
   bubbleContainer: {
     marginRight: '10px',
     marginBottom: '10px',
   },
-
   speechBubble: {
     backgroundColor: 'white',
     padding: '12px 15px',
@@ -597,13 +848,11 @@ const styles = {
     position: 'relative',
     border: '2px solid #2563eb',
   },
-
   bubbleText: {
     fontSize: '14px',
     color: '#333',
     lineHeight: '1.4',
   },
-
   closeBubble: {
     marginLeft: '10px',
     cursor: 'pointer',
@@ -613,7 +862,6 @@ const styles = {
     color: '#999',
     padding: '2px 5px',
   },
-
   reopenBubble: {
     borderRadius: '50%',
     width: '40px',
@@ -628,7 +876,6 @@ const styles = {
     boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     transition: 'all 0.2s',
   },
-
   avatarWrapper: {
     width: '90px',
     height: '90px',
@@ -641,15 +888,12 @@ const styles = {
     cursor: 'pointer',
     transition: 'transform 0.2s',
   },
-
   avatarImage: {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
     display: 'block',
   },
-
-  // Modal styles
   modalOverlay: {
     position: 'fixed',
     top: 0,
@@ -663,7 +907,6 @@ const styles = {
     zIndex: 2000,
     animation: 'fadeIn 0.2s',
   },
-
   modalContent: {
     backgroundColor: 'white',
     borderRadius: '16px',
@@ -674,25 +917,21 @@ const styles = {
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
     animation: 'bounce 0.3s',
   },
-
   modalIcon: {
     fontSize: '48px',
     marginBottom: '10px',
   },
-
   modalTitle: {
     fontSize: '22px',
     marginBottom: '15px',
     color: '#ef4444',
   },
-
   modalText: {
     fontSize: '14px',
     color: '#555',
     marginBottom: '15px',
     lineHeight: '1.5',
   },
-
   modalList: {
     textAlign: 'left',
     marginBottom: '15px',
@@ -700,7 +939,6 @@ const styles = {
     color: '#666',
     fontSize: '13px',
   },
-
   modalWarning: {
     fontSize: '12px',
     color: '#ef4444',
@@ -710,13 +948,11 @@ const styles = {
     backgroundColor: '#fee2e2',
     borderRadius: '8px',
   },
-
   modalButtons: {
     display: 'flex',
     gap: '15px',
     justifyContent: 'center',
   },
-
   modalCloseBtn: {
     backgroundColor: '#2563eb',
     color: 'white',
@@ -728,7 +964,6 @@ const styles = {
     fontWeight: 'bold',
     transition: 'all 0.2s',
   },
-
   confirmResetBtn: {
     backgroundColor: '#ef4444',
     color: 'white',
@@ -740,7 +975,6 @@ const styles = {
     fontWeight: 'bold',
     transition: 'all 0.2s',
   },
-
   cancelResetBtn: {
     backgroundColor: '#6b7280',
     color: 'white',
@@ -754,68 +988,49 @@ const styles = {
   },
 };
 
-// Add animations to document
+// Add animations
 const styleSheet = document.createElement("style");
 styleSheet.innerHTML = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
   @keyframes float {
     0% { transform: translateY(0px); }
     50% { transform: translateY(-8px); }
     100% { transform: translateY(0px); }
   }
-
   @keyframes bubblePop {
     0% { transform: scale(0); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
   }
-
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
-
   @keyframes bounce {
     0% { transform: scale(0.8); opacity: 0; }
     50% { transform: scale(1.05); }
     100% { transform: scale(1); opacity: 1; }
   }
-
-  button:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
-    transition: all 0.2s;
-  }
-
-  button:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  .missionCard:hover:not(.lockedMission) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  }
-
-  .avatarWrapper:hover {
-    transform: scale(1.05);
-  }
-
   .resetProgressButton:hover {
     background-color: #dc2626;
   }
-
   .confirmResetBtn:hover {
     background-color: #dc2626;
   }
-
   .cancelResetBtn:hover {
     background-color: #5a6268;
   }
-
   .modalCloseBtn:hover {
     background-color: #1e4db9;
   }
+  .completeButton:hover:not(:disabled) {
+    opacity: 0.9;
+    transform: translateY(-1px);
+  }
 `;
 
-// Only add styleSheet if it doesn't already exist
 if (!document.querySelector('#missions-styles')) {
   styleSheet.id = 'missions-styles';
   document.head.appendChild(styleSheet);

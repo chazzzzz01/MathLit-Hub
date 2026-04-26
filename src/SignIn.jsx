@@ -344,6 +344,43 @@ function SignIn() {
     </div>
   );
 
+  // Component for handling image errors with a reliable fallback
+  const SafeImage = ({ src, alt, style }) => {
+    const [imgSrc, setImgSrc] = useState(src);
+    const [error, setError] = useState(false);
+
+    // Data URI fallback avatar (initials-based)
+    const getInitialsAvatar = () => {
+      if (!user?.name) return "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Ccircle cx='30' cy='30' r='30' fill='%234A90E2'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='white' font-size='24' font-family='Arial' font-weight='bold'%3E?%3C/text%3E%3C/svg%3E";
+      
+      const initials = user.name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+      
+      return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Ccircle cx='30' cy='30' r='30' fill='%234A90E2'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='white' font-size='24' font-family='Arial' font-weight='bold'%3E${initials}%3C/text%3E%3C/svg%3E`;
+    };
+
+    const handleError = () => {
+      if (!error) {
+        setError(true);
+        // Use initials avatar as fallback instead of via.placeholder.com
+        setImgSrc(getInitialsAvatar());
+      }
+    };
+
+    return (
+      <img 
+        src={imgSrc} 
+        alt={alt} 
+        style={style}
+        onError={handleError}
+      />
+    );
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.card}>
@@ -354,14 +391,10 @@ function SignIn() {
         
         {user && (
           <div style={styles.userInfo}>
-            <img 
+            <SafeImage 
               src={user.picture} 
               alt={user.name}
               style={styles.userAvatar}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "https://via.placeholder.com/80";
-              }}
             />
             <div style={styles.userDetails}>
               <h3 style={styles.userName}>{user.name}</h3>
@@ -408,6 +441,10 @@ function SignIn() {
                   src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
                   alt="Google logo" 
                   style={styles.googleIcon}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.style.display = 'none';
+                  }}
                 />
                 Sign in with Google
               </>
