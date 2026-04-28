@@ -9,7 +9,7 @@ import {
 import { IoGameController } from 'react-icons/io5';
 import { getGameTotalScores } from './Games';
 import { classService } from '../services/classService';
-import ClassView from './ClassView';
+import ClassView from './ClassView.jsx';
 
 function Homepage() {
   const { user, userData, refreshClasses: contextRefreshClasses } = useOutletContext() || {};
