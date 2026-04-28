@@ -21,5 +21,10 @@ export default defineConfig({
   },
   resolve: {
     extensions: ['.js', '.jsx', '.json']  // Add this to help resolve imports
+  },
+  css: {
+    postcss: {
+      plugins: []  // Disable PostCSS to prevent config loading error
+    }
   }
 })
