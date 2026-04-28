@@ -1,11 +1,11 @@
-// src/menu/ClassView.jsx
+// src/menu/ClassView.jsx - FULLY RESPONSIVE
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FiBookOpen, FiClock, FiStar, FiUsers, 
   FiCalendar, FiTrendingUp, FiCheck, FiCopy,
   FiAward, FiTarget, FiDollarSign, FiPieChart,
-  FiBell, FiMail, FiArrowLeft, FiZap, FiBox, FiHexagon
+  FiBell, FiMail, FiArrowLeft, FiZap, FiBox, FiHexagon, FiUser
 } from 'react-icons/fi';
 import { IoGameController } from 'react-icons/io5';
 import { classService } from '../services/classService';
@@ -23,6 +23,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
+  const [teacherName, setTeacherName] = useState('Loading...');
   const [totalScores, setTotalScores] = useState({
     totalHighScore: 0,
     totalLastScores: 0,
@@ -77,12 +78,47 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       loadAnnouncements();
     } else if (passedClassData) {
       loadClassDataFromProps();
+      loadAnnouncements();
     }
   }, [classId, passedClassData]);
 
   const loadClassDataFromProps = async () => {
     try {
       setLoading(true);
+      
+      // Fetch complete class details including teacher information
+      const fullClassData = await classService.getClassById(passedClassData.id);
+      
+      // Extract teacher name properly
+      let teacher = 'Teacher';
+      if (fullClassData) {
+        if (fullClassData.teacher_name) {
+          teacher = fullClassData.teacher_name;
+        } else if (fullClassData.teacher && fullClassData.teacher.name) {
+          teacher = fullClassData.teacher.name;
+        } else if (fullClassData.teacher && fullClassData.teacher.user && fullClassData.teacher.user.name) {
+          teacher = fullClassData.teacher.user.name;
+        }
+      }
+      
+      // If still no teacher, check passed data
+      if (teacher === 'Teacher' && passedClassData) {
+        if (passedClassData.teacher_name) {
+          teacher = passedClassData.teacher_name;
+        } else if (passedClassData.teacher && passedClassData.teacher.name) {
+          teacher = passedClassData.teacher.name;
+        }
+      }
+      
+      console.log('🎓 Teacher name found:', teacher);
+      setTeacherName(teacher);
+      
+      // Update class data with teacher info
+      setClassData({
+        ...passedClassData,
+        teacher_name: teacher,
+        teacher: { name: teacher }
+      });
       
       const classMissions = await classService.getClassMissions(passedClassData.id);
       setMissions(classMissions);
@@ -114,7 +150,33 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       setLoading(true);
       
       const classDetails = await classService.getClassById(classId);
-      setClassData(classDetails);
+      
+      if (!classDetails) {
+        console.error('Class not found');
+        setTeacherName('Teacher');
+        return;
+      }
+      
+      // Extract teacher name properly
+      let teacher = 'Teacher';
+      if (classDetails.teacher_name) {
+        teacher = classDetails.teacher_name;
+      } else if (classDetails.teacher && classDetails.teacher.name) {
+        teacher = classDetails.teacher.name;
+      } else if (classDetails.teacher && classDetails.teacher.user && classDetails.teacher.user.name) {
+        teacher = classDetails.teacher.user.name;
+      }
+      
+      console.log('🎓 Teacher name found:', teacher);
+      setTeacherName(teacher);
+      
+      // Update class data with teacher name
+      const updatedClassData = {
+        ...classDetails,
+        teacher_name: teacher,
+        teacher: classDetails.teacher || { name: teacher }
+      };
+      setClassData(updatedClassData);
       
       const classMissions = await classService.getClassMissions(classId);
       setMissions(classMissions);
@@ -136,6 +198,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       
     } catch (error) {
       console.error('Error loading class data:', error);
+      setTeacherName('Teacher');
     } finally {
       setLoading(false);
     }
@@ -224,7 +287,14 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     try {
       const data = await classService.getClassAnnouncements(classId || passedClassData?.id);
       console.log('Loaded announcements:', data);
-      setAnnouncements(data || []);
+      
+      // Enrich announcements with teacher names
+      const enrichedAnnouncements = (data || []).map(announcement => ({
+        ...announcement,
+        teacher_name: announcement.teacher_name || teacherName || 'Teacher'
+      }));
+      
+      setAnnouncements(enrichedAnnouncements);
     } catch (error) {
       console.error('Error loading announcements:', error);
       setAnnouncements([]);
@@ -315,11 +385,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       lastPlayed: game.lastPlayed,
       progressPercent
     };
-  };
-
-  // Get individual game progress for a student
-  const getGameProgressDetails = (gameProgress, gameId) => {
-    return calculateGameProgressDetails(gameProgress, gameId);
   };
 
   const copyToClipboard = () => {
@@ -424,7 +489,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       <div style={styles.header}>
         <button style={styles.backButton} onClick={handleBack}>
           <FiArrowLeft size={20} />
-          Back to Classes
+          <span style={styles.backButtonText}>Back to Classes</span>
         </button>
         <button style={styles.shareButton} onClick={copyToClipboard}>
           {copiedCode ? <FiCheck size={18} /> : <FiCopy size={18} />}
@@ -432,7 +497,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </button>
       </div>
 
-      {/* Class Info - Responsive */}
+      {/* Class Info with Teacher Name */}
       <div style={styles.classInfo}>
         <div style={styles.classIcon}>
           <span style={styles.classIconEmoji}>{getClassIcon(classData.name)}</span>
@@ -440,8 +505,18 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         <div style={styles.classDetails}>
           <h1 style={styles.className}>{classData.name}</h1>
           <div style={styles.classMeta}>
-            <span style={styles.metaItem}><FiUsers size={14} />{students.length} Students</span>
-            <span style={styles.metaItem}><FiCalendar size={14} />Created: {formatDate(classData.created_at)}</span>
+            <span style={styles.metaItem}>
+              <FiUser size={14} />
+              <strong style={styles.teacherNameHighlight}>Teacher: {teacherName}</strong>
+            </span>
+            <span style={styles.metaItem}>
+              <FiUsers size={14} />
+              {students.length} Students
+            </span>
+            <span style={styles.metaItem}>
+              <FiCalendar size={14} />
+              Created: {formatDate(classData.created_at)}
+            </span>
           </div>
           {classData.description && (
             <p style={styles.classDescription}>{classData.description}</p>
@@ -517,7 +592,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
 
       {/* Tab Content - Scrollable */}
       <div style={styles.tabContent}>
-        {/* Overview Tab */}
+        {/* Overview Tab with Teacher Info */}
         {activeTab === 'overview' && (
           <div>
             <div style={styles.overviewSection}>
@@ -528,8 +603,15 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
             </div>
             
             <div style={styles.overviewSection}>
-              <h3 style={styles.sectionTitle}>Class Performance</h3>
+              <h3 style={styles.sectionTitle}>Class Information</h3>
               <div style={styles.quickStats}>
+                <div style={styles.quickStatItem}>
+                  <FiUser size={20} color="#2563eb" />
+                  <div>
+                    <div style={styles.quickStatValue}>{teacherName}</div>
+                    <div style={styles.quickStatLabel}>Class Teacher</div>
+                  </div>
+                </div>
                 <div style={styles.quickStatItem}>
                   <FiClock size={20} color="#2563eb" />
                   <div>
@@ -563,7 +645,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
           </div>
         )}
 
-        {/* Announcements Tab */}
+        {/* Announcements Tab with Teacher Name */}
         {activeTab === 'announcements' && (
           <div style={styles.scrollableContent}>
             {loadingAnnouncements ? (
@@ -583,7 +665,8 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                         <h4 style={styles.announcementTitle}>{announcement.title}</h4>
                         <div style={styles.announcementMeta}>
                           <span style={styles.announcementTeacher}>
-                            From: {announcement.teacher_name}
+                            <FiUser size={12} style={{ marginRight: '4px' }} />
+                            From: <strong>{announcement.teacher_name || teacherName}</strong>
                           </span>
                           <span style={styles.announcementDate}>
                             {formatAnnouncementDate(announcement.created_at)}
@@ -601,7 +684,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
               <div style={styles.emptyState}>
                 <div style={styles.emptyIcon}>📢</div>
                 <h3>No Announcements Yet</h3>
-                <p>Check back later for updates from your teacher!</p>
+                <p>Check back later for updates from {teacherName}!</p>
               </div>
             )}
           </div>
@@ -648,7 +731,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
               <div style={styles.emptyState}>
                 <div style={styles.emptyIcon}>📭</div>
                 <h3>No Missions Yet</h3>
-                <p>Check back later for new missions from your teacher!</p>
+                <p>Check back later for new missions from {teacherName}!</p>
               </div>
             )}
           </div>
@@ -834,20 +917,23 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '20px 24px',
+    padding: '16px 20px',
     flexWrap: 'wrap',
-    gap: '16px',
+    gap: '12px',
     backgroundColor: 'white',
     borderBottom: '1px solid #e5e7eb',
     position: 'sticky',
     top: 0,
     zIndex: 100,
+    '@media (max-width: 640px)': {
+      padding: '12px 16px',
+    },
   },
   backButton: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '8px 16px',
+    padding: '8px 14px',
     backgroundColor: '#f3f4f6',
     border: 'none',
     borderRadius: '8px',
@@ -856,12 +942,21 @@ const styles = {
     fontWeight: '600',
     color: '#374151',
     transition: 'all 0.2s',
+    '@media (max-width: 640px)': {
+      padding: '6px 12px',
+      fontSize: '13px',
+    },
+  },
+  backButtonText: {
+    '@media (max-width: 480px)': {
+      display: 'none',
+    },
   },
   shareButton: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '8px 16px',
+    padding: '8px 14px',
     backgroundColor: '#2563eb',
     color: 'white',
     border: 'none',
@@ -870,17 +965,32 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     transition: 'all 0.2s',
+    '@media (max-width: 640px)': {
+      padding: '6px 12px',
+      fontSize: '12px',
+    },
+    '@media (max-width: 480px)': {
+      flex: 1,
+      justifyContent: 'center',
+    },
   },
   classInfo: {
     display: 'flex',
     alignItems: 'center',
-    gap: '24px',
-    margin: '24px',
-    padding: '24px',
+    gap: '20px',
+    margin: '20px',
+    padding: '20px',
     backgroundColor: 'white',
     borderRadius: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     flexWrap: 'wrap',
+    '@media (max-width: 640px)': {
+      margin: '16px',
+      padding: '16px',
+      gap: '16px',
+      flexDirection: 'column',
+      textAlign: 'center',
+    },
   },
   classIcon: {
     width: '72px',
@@ -891,54 +1001,94 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    '@media (max-width: 640px)': {
+      width: '60px',
+      height: '60px',
+    },
   },
   classIconEmoji: {
     fontSize: '36px',
+    '@media (max-width: 640px)': {
+      fontSize: '30px',
+    },
   },
   classDetails: {
     flex: 1,
-    minWidth: '200px',
+    minWidth: '180px',
+    '@media (max-width: 640px)': {
+      width: '100%',
+    },
   },
   className: {
     fontSize: 'clamp(20px, 5vw, 28px)',
     fontWeight: '800',
     color: '#1f2937',
-    marginBottom: '10px',
+    marginBottom: '8px',
+    '@media (max-width: 640px)': {
+      textAlign: 'center',
+    },
   },
   classMeta: {
     display: 'flex',
-    gap: '20px',
+    gap: '16px',
     flexWrap: 'wrap',
-    marginBottom: '12px',
+    marginBottom: '10px',
+    '@media (max-width: 640px)': {
+      gap: '12px',
+      justifyContent: 'center',
+    },
   },
   metaItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    fontSize: '14px',
+    fontSize: '13px',
     color: '#6b7280',
     fontWeight: '500',
+    '@media (max-width: 480px)': {
+      fontSize: '12px',
+    },
+  },
+  teacherNameHighlight: {
+    color: '#2563eb',
+    fontWeight: '600',
   },
   classDescription: {
     fontSize: '14px',
     color: '#6b7280',
     lineHeight: 1.5,
     marginTop: '8px',
+    '@media (max-width: 640px)': {
+      fontSize: '13px',
+      textAlign: 'center',
+    },
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '16px',
-    margin: '0 24px 24px 24px',
+    margin: '0 20px 20px 20px',
+    '@media (max-width: 640px)': {
+      margin: '0 16px 16px 16px',
+      gap: '12px',
+    },
+    '@media (max-width: 480px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '10px',
+    },
   },
   statCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    padding: '16px',
+    padding: '14px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+      gap: '10px',
+    },
   },
   statIcon: {
     width: '44px',
@@ -949,32 +1099,47 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    '@media (max-width: 640px)': {
+      width: '38px',
+      height: '38px',
+      '& svg': {
+        width: '20px',
+        height: '20px',
+      },
+    },
   },
   statInfo: {
     flex: 1,
     minWidth: '0',
   },
   statNumber: {
-    fontSize: 'clamp(20px, 4vw, 28px)',
+    fontSize: 'clamp(18px, 4vw, 28px)',
     fontWeight: '800',
     color: '#1f2937',
     marginBottom: '2px',
     lineHeight: 1.2,
   },
   statLabel: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#6b7280',
     fontWeight: '500',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+    '@media (max-width: 480px)': {
+      fontSize: '9px',
+    },
   },
   progressSection: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    padding: '20px',
-    margin: '0 24px 24px 24px',
+    padding: '18px',
+    margin: '0 20px 20px 20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    '@media (max-width: 640px)': {
+      margin: '0 16px 16px 16px',
+      padding: '16px',
+    },
   },
   progressLabel: {
     display: 'flex',
@@ -984,6 +1149,9 @@ const styles = {
     marginBottom: '12px',
     flexWrap: 'wrap',
     gap: '8px',
+    '@media (max-width: 480px)': {
+      fontSize: '13px',
+    },
   },
   progressPercent: {
     color: '#10b981',
@@ -1002,9 +1170,12 @@ const styles = {
     transition: 'width 0.3s ease',
   },
   tabsWrapper: {
-    margin: '0 24px',
+    margin: '0 20px',
     overflowX: 'auto',
     WebkitOverflowScrolling: 'touch',
+    '@media (max-width: 640px)': {
+      margin: '0 16px',
+    },
   },
   tabs: {
     display: 'flex',
@@ -1016,7 +1187,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    padding: '12px 16px',
+    padding: '10px 14px',
     backgroundColor: 'transparent',
     border: 'none',
     cursor: 'pointer',
@@ -1025,9 +1196,20 @@ const styles = {
     color: '#6b7280',
     transition: 'all 0.2s ease',
     whiteSpace: 'nowrap',
+    '@media (max-width: 640px)': {
+      padding: '8px 12px',
+      fontSize: '12px',
+    },
+    '@media (max-width: 480px)': {
+      padding: '6px 10px',
+      gap: '4px',
+    },
   },
   tabText: {
     display: 'inline-block',
+    '@media (max-width: 480px)': {
+      display: 'none',
+    },
   },
   tabBadge: {
     backgroundColor: '#e5e7eb',
@@ -1046,46 +1228,72 @@ const styles = {
   tabContent: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    margin: '0 24px 24px 24px',
+    margin: '0 20px 20px 20px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    '@media (max-width: 640px)': {
+      margin: '0 16px 16px 16px',
+      padding: '16px',
+    },
   },
   scrollableContent: {
     maxHeight: 'calc(100vh - 400px)',
     overflowY: 'auto',
     paddingRight: '8px',
+    '@media (max-width: 640px)': {
+      maxHeight: 'calc(100vh - 360px)',
+    },
   },
   overviewSection: {
     marginBottom: '28px',
+    '@media (max-width: 640px)': {
+      marginBottom: '20px',
+    },
   },
   sectionTitle: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: '16px',
+    '@media (max-width: 640px)': {
+      fontSize: '16px',
+      marginBottom: '12px',
+    },
   },
   overviewText: {
     fontSize: '14px',
     color: '#6b7280',
     lineHeight: 1.6,
+    '@media (max-width: 640px)': {
+      fontSize: '13px',
+    },
   },
   quickStats: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '12px',
+    '@media (max-width: 640px)': {
+      gridTemplateColumns: '1fr',
+    },
   },
   quickStatItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '14px',
+    padding: '12px',
     backgroundColor: '#f9fafb',
     borderRadius: '12px',
+    '@media (max-width: 640px)': {
+      padding: '10px',
+    },
   },
   quickStatValue: {
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: '700',
     color: '#1f2937',
+    '@media (max-width: 640px)': {
+      fontSize: '16px',
+    },
   },
   quickStatLabel: {
     fontSize: '11px',
@@ -1095,18 +1303,27 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    '@media (max-width: 640px)': {
+      gap: '12px',
+    },
   },
   announcementCard: {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     padding: '16px',
     transition: 'all 0.2s ease',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+    },
   },
   announcementHeader: {
     display: 'flex',
     gap: '12px',
     marginBottom: '12px',
     flexWrap: 'wrap',
+    '@media (max-width: 640px)': {
+      gap: '10px',
+    },
   },
   announcementIcon: {
     width: '36px',
@@ -1117,6 +1334,10 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    '@media (max-width: 640px)': {
+      width: '32px',
+      height: '32px',
+    },
   },
   announcementTitleSection: {
     flex: 1,
@@ -1127,15 +1348,21 @@ const styles = {
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: '4px',
+    '@media (max-width: 640px)': {
+      fontSize: '14px',
+    },
   },
   announcementMeta: {
     display: 'flex',
     gap: '12px',
     flexWrap: 'wrap',
+    alignItems: 'center',
   },
   announcementTeacher: {
     fontSize: '11px',
     color: '#6b7280',
+    display: 'flex',
+    alignItems: 'center',
   },
   announcementDate: {
     fontSize: '11px',
@@ -1143,22 +1370,34 @@ const styles = {
   },
   announcementBody: {
     paddingLeft: '48px',
+    '@media (max-width: 640px)': {
+      paddingLeft: '42px',
+    },
   },
   announcementMessage: {
     fontSize: '13px',
     color: '#4b5563',
     lineHeight: 1.5,
     whiteSpace: 'pre-wrap',
+    '@media (max-width: 640px)': {
+      fontSize: '12px',
+    },
   },
   missionsList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
+    '@media (max-width: 640px)': {
+      gap: '12px',
+    },
   },
   missionCard: {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     padding: '16px',
+    '@media (max-width: 640px)': {
+      padding: '14px',
+    },
   },
   missionHeader: {
     display: 'flex',
@@ -1172,6 +1411,9 @@ const styles = {
     fontSize: '16px',
     fontWeight: '700',
     color: '#1f2937',
+    '@media (max-width: 640px)': {
+      fontSize: '14px',
+    },
   },
   missionStatus: {
     padding: '3px 8px',
@@ -1211,11 +1453,18 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     transition: 'all 0.2s',
+    width: '100%',
+    '@media (min-width: 640px)': {
+      width: 'auto',
+    },
   },
   gamesGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
     gap: '16px',
+    '@media (max-width: 640px)': {
+      gridTemplateColumns: '1fr',
+    },
   },
   gameCard: {
     backgroundColor: '#f9fafb',
@@ -1224,10 +1473,16 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s',
     textAlign: 'center',
+    '@media (max-width: 640px)': {
+      padding: '16px',
+    },
   },
   gameIcon: {
     fontSize: '40px',
     marginBottom: '10px',
+    '@media (max-width: 640px)': {
+      fontSize: '36px',
+    },
   },
   gameTitle: {
     fontSize: '16px',
@@ -1269,6 +1524,13 @@ const styles = {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     flexWrap: 'wrap',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+      gap: '10px',
+      flexDirection: 'column',
+      alignItems: 'center',
+      textAlign: 'center',
+    },
   },
   studentAvatar: {
     width: '44px',
@@ -1282,10 +1544,18 @@ const styles = {
     fontSize: '18px',
     fontWeight: '700',
     flexShrink: 0,
+    '@media (max-width: 640px)': {
+      width: '38px',
+      height: '38px',
+      fontSize: '16px',
+    },
   },
   studentInfo: {
     flex: 1,
     minWidth: '180px',
+    '@media (max-width: 640px)': {
+      width: '100%',
+    },
   },
   studentHeader: {
     display: 'flex',
@@ -1294,11 +1564,17 @@ const styles = {
     flexWrap: 'wrap',
     gap: '8px',
     marginBottom: '2px',
+    '@media (max-width: 640px)': {
+      justifyContent: 'center',
+    },
   },
   studentName: {
     fontSize: '15px',
     fontWeight: '700',
     color: '#1f2937',
+    '@media (max-width: 640px)': {
+      fontSize: '14px',
+    },
   },
   studentXPBadge: {
     fontSize: '11px',
@@ -1313,12 +1589,18 @@ const styles = {
     color: '#6b7280',
     marginBottom: '10px',
     wordBreak: 'break-all',
+    '@media (max-width: 640px)': {
+      fontSize: '10px',
+    },
   },
   studentProgressWrapper: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     marginBottom: '10px',
+    '@media (max-width: 640px)': {
+      justifyContent: 'center',
+    },
   },
   studentProgressBar: {
     flex: 1,
@@ -1348,6 +1630,9 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     flexWrap: 'wrap',
+    '@media (max-width: 640px)': {
+      justifyContent: 'center',
+    },
   },
   gameProgressIcon: {
     fontSize: '16px',
@@ -1388,19 +1673,30 @@ const styles = {
     padding: '40px 20px',
     backgroundColor: '#f9fafb',
     borderRadius: '16px',
+    '@media (max-width: 640px)': {
+      padding: '30px 16px',
+    },
   },
   emptyIcon: {
     fontSize: '48px',
     marginBottom: '12px',
+    '@media (max-width: 640px)': {
+      fontSize: '40px',
+    },
   },
 };
 
-// Add CSS animations
+// Add CSS animations and hover effects
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  
+  button {
+    transition: all 0.2s ease;
+    cursor: pointer;
   }
   
   .backButton:hover {
@@ -1432,20 +1728,57 @@ styleSheet.textContent = `
     color: #2563eb;
   }
   
+  /* Touch-friendly tap highlights for mobile */
   @media (max-width: 768px) {
+    button, .gameCard, .tab, .announcementCard, .missionCard, .studentCard {
+      -webkit-tap-highlight-color: rgba(0,0,0,0.05);
+    }
+    
+    button:active, .gameCard:active, .tab:active {
+      transform: scale(0.98);
+      transition: transform 0.05s ease;
+    }
+    
+    /* Minimum touch target size */
+    button, .tab, .startButton, .gameButton, .backButton, .shareButton {
+      min-height: 44px;
+    }
+    
+    /* Better scrollbar for mobile */
+    .scrollableContent {
+      scrollbar-width: thin;
+    }
+    
+    .scrollableContent::-webkit-scrollbar {
+      width: 4px;
+    }
+    
+    .scrollableContent::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    .scrollableContent::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+  }
+  
+  /* iPad and tablet optimizations */
+  @media (min-width: 768px) and (max-width: 1024px) {
     .statsGrid {
-      margin: 0 16px 16px 16px;
+      grid-template-columns: repeat(2, 1fr);
     }
-    .classInfo {
-      margin: 16px;
-      padding: 16px;
+    
+    .gamesGrid {
+      grid-template-columns: repeat(2, 1fr);
     }
-    .tabContent {
-      margin: 0 16px 16px 16px;
-      padding: 16px;
-    }
-    .tabsWrapper {
-      margin: 0 16px;
+  }
+  
+  /* Prevent zoom on input focus for mobile */
+  @media (max-width: 768px) {
+    input, select, textarea {
+      font-size: 16px !important;
     }
   }
 `;

@@ -9,6 +9,7 @@ function Home() {
   const [showCreateClass, setShowCreateClass] = useState(false);
   const [className, setClassName] = useState('');
   const [classCode, setClassCode] = useState('');
+  const [classDescription, setClassDescription] = useState(''); // Add description state (optional)
   const [classes, setClasses] = useState([]);
   const [copiedCode, setCopiedCode] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,14 +77,16 @@ function Home() {
     try {
       const newClassCode = classCode || generateClassCode();
       
+      // Prepare class data WITHOUT description if your table doesn't have it
+      // If you added the description column to Supabase, uncomment the description line
+      const classData = {
+        name: className.trim(),
+        code: newClassCode.toUpperCase(),
+        // description: classDescription.trim() || null, // UNCOMMENT ONLY IF YOU ADDED THE COLUMN
+      };
+      
       // Create class in Supabase
-      const newClass = await classService.createClass(
-        {
-          name: className,
-          code: newClassCode
-        },
-        user.dbId
-      );
+      const newClass = await classService.createClass(classData, user.dbId);
       
       // Update local state
       setClasses([newClass, ...classes]);
@@ -92,9 +95,18 @@ function Home() {
       setShowCreateClass(false);
       setClassName('');
       setClassCode('');
+      setClassDescription(''); // Reset description if using it
     } catch (error) {
       console.error('Error creating class:', error);
-      showToast('Failed to create class. Please try again.', 'error');
+      
+      // More specific error messages
+      if (error.message?.includes('column')) {
+        showToast('Database schema issue. Please contact support.', 'error');
+      } else if (error.message?.includes('already exists')) {
+        showToast('Class code already exists. Please use a different code.', 'error');
+      } else {
+        showToast(error.message || 'Failed to create class. Please try again.', 'error');
+      }
     }
   };
 
@@ -208,6 +220,7 @@ function Home() {
                       setShowCreateClass(false);
                       setClassName('');
                       setClassCode('');
+                      setClassDescription('');
                     }}
                   >
                     <FiX size={20} />
@@ -221,6 +234,16 @@ function Home() {
                   style={styles.input}
                   autoFocus
                 />
+                {/* Optional Description Field - COMMENT OUT OR REMOVE IF YOU HAVEN'T ADDED THE COLUMN */}
+                {/*
+                <input
+                  type="text"
+                  placeholder="Description (optional)"
+                  value={classDescription}
+                  onChange={(e) => setClassDescription(e.target.value)}
+                  style={styles.input}
+                />
+                */}
                 <div style={styles.codeInputContainer}>
                   <input
                     type="text"
@@ -260,6 +283,7 @@ function Home() {
                       setShowCreateClass(false);
                       setClassName('');
                       setClassCode('');
+                      setClassDescription('');
                     }}
                   >
                     Cancel

@@ -64,148 +64,393 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   };
 
   // ============================================================
-  // FETCH TEAM ANSWERS - AGGREGATE FROM INDIVIDUAL STUDENT ANSWERS
+  // FETCH STUDENT ANSWERS FOR A SPECIFIC SESSION
   // ============================================================
-  const fetchTeamAnswers = async () => {
+  const fetchStudentAnswers = async (sessionIdParam) => {
+    if (!sessionIdParam) {
+      console.log('No session ID provided');
+      return [];
+    }
+    
+    try {
+      const { data: answers, error } = await supabase
+        .from('student_answers')
+        .select(`
+          id,
+          student_id,
+          answer,
+          created_at,
+          updated_at,
+          students (
+            id,
+            name,
+            user_id
+          )
+        `)
+        .eq('session_id', sessionIdParam)
+        .order('created_at', { ascending: true });
+      
+      if (error) {
+        console.error('Error fetching student answers:', error);
+        return [];
+      }
+      
+      console.log(`Fetched ${answers?.length || 0} answers for session ${sessionIdParam}`);
+      return answers || [];
+    } catch (error) {
+      console.error('Error in fetchStudentAnswers:', error);
+      return [];
+    }
+  };
+
+  // ============================================================
+  // GET TEAM ASSIGNMENTS FOR ALL STUDENTS
+  // ============================================================
+  const getTeamAssignments = async () => {
+    try {
+      const { data: assignments, error } = await supabase
+        .from('team_assignments')
+        .select('student_id, team, role')
+        .eq('class_id', classId);
+      
+      if (error) {
+        console.error('Error fetching team assignments:', error);
+        return {};
+      }
+      
+      const teamMap = {};
+      assignments?.forEach(assignment => {
+        teamMap[assignment.student_id] = {
+          team: assignment.team,
+          role: assignment.role
+        };
+      });
+      
+      console.log('Team assignments map:', teamMap);
+      return teamMap;
+    } catch (error) {
+      console.error('Error in getTeamAssignments:', error);
+      return {};
+    }
+  };
+
+  // ============================================================
+  // PROCESS ANSWERS BY TEAM
+  // ============================================================
+  const processAnswersByTeam = (answers, teamAssignments) => {
+    const teamAAnswers = [];
+    const teamBAnswers = [];
+    const unassignedAnswers = [];
+    
+    answers?.forEach(answer => {
+      const assignment = teamAssignments[answer.student_id];
+      const studentName = answer.students?.name || 'Unknown Student';
+      
+      const answerData = {
+        id: answer.id,
+        studentId: answer.student_id,
+        studentName: studentName,
+        answer: answer.answer,
+        submittedAt: answer.created_at,
+        updatedAt: answer.updated_at
+      };
+      
+      if (assignment?.team === 'A') {
+        teamAAnswers.push(answerData);
+        console.log(`Team A answer from ${studentName}: "${answer.answer}"`);
+      } else if (assignment?.team === 'B') {
+        teamBAnswers.push(answerData);
+        console.log(`Team B answer from ${studentName}: "${answer.answer}"`);
+      } else {
+        unassignedAnswers.push(answerData);
+        console.warn(`Unassigned student ${studentName} submitted answer: "${answer.answer}"`);
+      }
+    });
+    
+    return { teamAAnswers, teamBAnswers, unassignedAnswers };
+  };
+
+  // ============================================================
+  // GET MOST COMMON ANSWER (MAJORITY VOTE)
+  // ============================================================
+  const getMajorityAnswer = (answers) => {
+    if (!answers || answers.length === 0) return null;
+    
+    // Filter out empty answers
+    const validAnswers = answers.filter(a => a.answer && a.answer.trim());
+    if (validAnswers.length === 0) return null;
+    
+    // Count frequency of each answer
+    const frequency = {};
+    validAnswers.forEach(item => {
+      const normalizedAnswer = item.answer.trim().toLowerCase();
+      frequency[normalizedAnswer] = (frequency[normalizedAnswer] || 0) + 1;
+    });
+    
+    // Find the answer with highest frequency
+    let maxCount = 0;
+    let majorityAnswer = null;
+    
+    for (const [answer, count] of Object.entries(frequency)) {
+      if (count > maxCount) {
+        maxCount = count;
+        majorityAnswer = answer;
+      }
+    }
+    
+    // Return the original answer text (not normalized)
+    const originalAnswer = validAnswers.find(
+      a => a.answer.trim().toLowerCase() === majorityAnswer
+    );
+    
+    return originalAnswer ? originalAnswer.answer : majorityAnswer;
+  };
+
+  // ============================================================
+  // FETCH AND PROCESS ALL ANSWERS FOR CURRENT SESSION
+  // ============================================================
+  const fetchAndProcessAnswers = async () => {
     if (!sessionId) {
-      console.log('No session ID yet, skipping answer fetch');
+      console.log('No active session ID, skipping answer fetch');
       return;
     }
     
     try {
-      console.log(`📡 Fetching answers for session ${sessionId}...`);
+      console.log(`📡 Fetching answers for session: ${sessionId}`);
       
-      const { data: answers, error } = await supabase
-        .from('student_answers')
-        .select(`
-          *,
-          students!inner (
-            id,
-            name,
-            team,
-            role
-          )
-        `)
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: false });
+      // Step 1: Get all answers for this session
+      const answers = await fetchStudentAnswers(sessionId);
       
-      if (error) {
-        console.error('Error fetching answers:', error);
-        return;
+      // Step 2: Get team assignments
+      const teamAssignments = await getTeamAssignments();
+      
+      // Step 3: Process answers by team
+      const { teamAAnswers, teamBAnswers, unassignedAnswers } = processAnswersByTeam(answers, teamAssignments);
+      
+      if (unassignedAnswers.length > 0) {
+        console.warn(`⚠️ ${unassignedAnswers.length} answers from unassigned students`);
       }
       
-      console.log(`📝 Retrieved ${answers?.length || 0} answers from database`);
-      
-      const teamAAnswerMap = new Map();
-      const teamBAnswerMap = new Map();
-      
-      answers?.forEach(answer => {
-        const studentTeam = answer.students?.team;
-        const studentId = answer.student_id;
-        const answerText = answer.answer;
-        const studentName = answer.students?.name;
-        const studentRole = answer.students?.role;
-        const submittedAt = answer.created_at;
-        const updatedAt = answer.updated_at;
-        
-        if (studentTeam === 'A') {
-          if (!teamAAnswerMap.has(studentId) || new Date(updatedAt) > new Date(teamAAnswerMap.get(studentId).submittedAt)) {
-            teamAAnswerMap.set(studentId, { 
-              studentId, 
-              name: studentName, 
-              role: studentRole, 
-              answer: answerText, 
-              submittedAt,
-              updatedAt
-            });
-          }
-        } else if (studentTeam === 'B') {
-          if (!teamBAnswerMap.has(studentId) || new Date(updatedAt) > new Date(teamBAnswerMap.get(studentId).submittedAt)) {
-            teamBAnswerMap.set(studentId, { 
-              studentId, 
-              name: studentName, 
-              role: studentRole, 
-              answer: answerText, 
-              submittedAt,
-              updatedAt
-            });
-          }
-        }
+      // Step 4: Update individual student answers state
+      setStudentAnswers({
+        A: teamAAnswers,
+        B: teamBAnswers
       });
       
-      const teamAList = Array.from(teamAAnswerMap.values());
-      const teamBList = Array.from(teamBAnswerMap.values());
+      // Step 5: Calculate team answers by majority vote
+      const teamAMajorityAnswer = getMajorityAnswer(teamAAnswers);
+      const teamBMajorityAnswer = getMajorityAnswer(teamBAnswers);
       
-      teamAList.sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
-      teamBList.sort((a, b) => new Date(a.submittedAt) - new Date(b.submittedAt));
+      console.log(`🏆 Team A majority answer: "${teamAMajorityAnswer}" (from ${teamAAnswers.length} students)`);
+      console.log(`🏆 Team B majority answer: "${teamBMajorityAnswer}" (from ${teamBAnswers.length} students)`);
       
-      setStudentAnswers({ A: teamAList, B: teamBList });
-      
-      const teamAAnswerValues = teamAList.map(item => item.answer).filter(a => a && a.trim());
-      const teamBAnswerValues = teamBList.map(item => item.answer).filter(a => a && a.trim());
-      
-      const teamAFinalAnswer = getMostCommonAnswer(teamAAnswerValues);
-      const teamBFinalAnswer = getMostCommonAnswer(teamBAnswerValues);
-      
+      // Step 6: Update team answers with animation triggers
       const previousTeamA = teamAnswers.A;
       const previousTeamB = teamAnswers.B;
       
-      if (previousTeamA !== teamAFinalAnswer) {
-        console.log(`🔄 Team A answer changed from "${previousTeamA}" to "${teamAFinalAnswer}"`);
+      if (previousTeamA !== teamAMajorityAnswer) {
         setAnswerUpdateTrigger(prev => prev + 1);
         setLastUpdated('A');
         setTimeout(() => setLastUpdated(null), 500);
       }
       
-      if (previousTeamB !== teamBFinalAnswer) {
-        console.log(`🔄 Team B answer changed from "${previousTeamB}" to "${teamBFinalAnswer}"`);
+      if (previousTeamB !== teamBMajorityAnswer) {
         setAnswerUpdateTrigger(prev => prev + 1);
         setLastUpdated('B');
         setTimeout(() => setLastUpdated(null), 500);
       }
       
-      setTeamAnswers({ 
-        A: teamAFinalAnswer, 
-        B: teamBFinalAnswer 
-      });
-      setSubmittedStatus({ 
-        A: teamAFinalAnswer !== null, 
-        B: teamBFinalAnswer !== null 
+      setTeamAnswers({
+        A: teamAMajorityAnswer,
+        B: teamBMajorityAnswer
       });
       
+      setSubmittedStatus({
+        A: teamAMajorityAnswer !== null,
+        B: teamBMajorityAnswer !== null
+      });
+      
+      console.log('✅ Answers processed successfully');
+      
     } catch (error) {
-      console.error('Error in fetchTeamAnswers:', error);
+      console.error('Error in fetchAndProcessAnswers:', error);
     }
-  };
-
-  const getMostCommonAnswer = (answers) => {
-    if (!answers || answers.length === 0) return null;
-    
-    const validAnswers = answers.filter(a => a && a.trim());
-    if (validAnswers.length === 0) return null;
-    
-    const frequency = {};
-    validAnswers.forEach(answer => {
-      const normalized = answer.trim().toLowerCase();
-      frequency[normalized] = (frequency[normalized] || 0) + 1;
-    });
-    
-    let mostCommon = null;
-    let maxCount = 0;
-    
-    for (const [answer, count] of Object.entries(frequency)) {
-      if (count > maxCount) {
-        maxCount = count;
-        mostCommon = answer;
-      }
-    }
-    
-    const originalAnswer = validAnswers.find(a => a.trim().toLowerCase() === mostCommon);
-    return originalAnswer || mostCommon;
   };
 
   // ============================================================
-  // FETCH READY STATUS FROM SUPABASE
+  // AUTO-ASSIGN UNASSIGNED STUDENTS TO TEAMS
+  // ============================================================
+  const autoAssignTeams = async () => {
+    try {
+      console.log('🔄 Auto-assigning teams for class:', classId);
+      
+      // Get all students in this class
+      const { data: classStudents, error: classError } = await supabase
+        .from('class_students')
+        .select('student_id')
+        .eq('class_id', classId);
+      
+      if (classError) {
+        console.error('Error fetching class students:', classError);
+        return;
+      }
+      
+      if (!classStudents || classStudents.length === 0) {
+        console.log('No students found in this class');
+        return;
+      }
+      
+      // Get existing team assignments
+      const { data: existingAssignments, error: existingError } = await supabase
+        .from('team_assignments')
+        .select('student_id')
+        .eq('class_id', classId);
+      
+      if (existingError) {
+        console.error('Error fetching existing assignments:', existingError);
+        return;
+      }
+      
+      const existingIds = new Set(existingAssignments?.map(a => a.student_id) || []);
+      const unassignedStudents = classStudents.filter(cs => !existingIds.has(cs.student_id));
+      
+      if (unassignedStudents.length === 0) {
+        console.log('All students already have team assignments');
+        return;
+      }
+      
+      console.log(`Found ${unassignedStudents.length} unassigned students`);
+      
+      // Assign unassigned students to teams alternately
+      const newAssignments = unassignedStudents.map((student, index) => ({
+        student_id: student.student_id,
+        class_id: classId,
+        team: index % 2 === 0 ? 'A' : 'B',
+        role: index % 3 === 0 ? 'analyzer' : index % 3 === 1 ? 'solver' : 'checker',
+        updated_at: new Date().toISOString()
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('team_assignments')
+        .insert(newAssignments);
+      
+      if (insertError) {
+        console.error('Error inserting assignments:', insertError);
+        return;
+      }
+      
+      console.log(`✅ Auto-assigned ${newAssignments.length} students to teams`);
+      
+      // Refresh the component data
+      if (onPointsAwarded) {
+        await onPointsAwarded();
+      }
+      
+    } catch (error) {
+      console.error('Error in autoAssignTeams:', error);
+    }
+  };
+
+  // ============================================================
+  // CLEAN UP OLD GAME SESSIONS
+  // ============================================================
+  const cleanupOldGameSessions = async () => {
+    try {
+      console.log('🧹 Cleaning up old game sessions for class:', classId);
+      
+      const { data: existingSessions, error: fetchError } = await supabase
+        .from('game_sessions')
+        .select('id')
+        .eq('class_id', classId)
+        .in('status', ['active', 'pending']);
+      
+      if (fetchError) {
+        console.error('Error fetching old sessions:', fetchError);
+        return;
+      }
+      
+      if (existingSessions && existingSessions.length > 0) {
+        console.log(`Found ${existingSessions.length} old sessions to clean up`);
+        
+        for (const session of existingSessions) {
+          // Delete answers first (foreign key constraint)
+          const { error: deleteAnswersError } = await supabase
+            .from('student_answers')
+            .delete()
+            .eq('session_id', session.id);
+          
+          if (deleteAnswersError) {
+            console.error(`Error deleting answers for session ${session.id}:`, deleteAnswersError);
+          }
+        }
+        
+        // Delete game sessions
+        const { error: deleteError } = await supabase
+          .from('game_sessions')
+          .delete()
+          .eq('class_id', classId)
+          .in('status', ['active', 'pending']);
+        
+        if (deleteError) {
+          console.error('Error deleting old sessions:', deleteError);
+        } else {
+          console.log('✅ Old game sessions cleaned up');
+        }
+      }
+    } catch (error) {
+      console.error('Error cleaning up:', error);
+    }
+  };
+
+  // ============================================================
+  // CREATE GAME SESSION
+  // ============================================================
+  const createGameSession = async () => {
+    const roundStartTime = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .insert([{
+        class_id: classId,
+        current_round: 1,
+        current_question: {
+          text: question.text,
+          answer: question.answer,
+          explanation: question.explanation,
+          timeLimit: 20,
+          started_at: roundStartTime
+        },
+        team_answers: {},
+        status: 'active',
+        started_at: roundStartTime,
+        updated_at: roundStartTime
+      }])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error creating game session:', error);
+      throw error;
+    }
+    console.log('✅ New game session created:', data.id);
+    return { id: data.id };
+  };
+
+  // ============================================================
+  // UPDATE GAME SESSION
+  // ============================================================
+  const updateGameSession = async (sessionIdParam, updates) => {
+    try {
+      await supabase
+        .from('game_sessions')
+        .update(updates)
+        .eq('id', sessionIdParam);
+    } catch (error) {
+      console.error('Error updating game session:', error);
+    }
+  };
+
+  // ============================================================
+  // FETCH READY STATUS
   // ============================================================
   const fetchReadyStatus = async () => {
     try {
@@ -216,18 +461,16 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       
       if (error) throw error;
       
-      const readyStatuses = allReadyStatuses?.filter(rs => rs.is_ready === true) || [];
-      
       const teamAReady = [];
       const teamBReady = [];
       
       teamA.forEach(student => {
-        const isReady = readyStatuses?.some(rs => rs.student_id === student.id);
+        const isReady = allReadyStatuses?.some(rs => rs.student_id === student.id && rs.is_ready);
         if (isReady) teamAReady.push(student.id);
       });
       
       teamB.forEach(student => {
-        const isReady = readyStatuses?.some(rs => rs.student_id === student.id);
+        const isReady = allReadyStatuses?.some(rs => rs.student_id === student.id && rs.is_ready);
         if (isReady) teamBReady.push(student.id);
       });
       
@@ -241,6 +484,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     }
   };
 
+  // Clear old ready statuses when component mounts
   useEffect(() => {
     const clearOldReadyStatuses = async () => {
       console.log('Clearing old ready statuses for class:', classId);
@@ -255,47 +499,39 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         console.log('Cleared old ready statuses successfully');
       }
     };
-    
     clearOldReadyStatuses();
   }, [classId]);
 
+  // Subscribe to ready status changes
   useEffect(() => {
     if (!classId) return;
     
     fetchReadyStatus();
     
     const subscription = supabase
-      .channel('student_ready_status_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'student_ready_status',
-          filter: `class_id=eq.${classId}`
-        },
-        (payload) => {
-          console.log('🔔 Ready status changed:', payload);
-          fetchReadyStatus();
-        }
-      )
+      .channel(`ready_${classId}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'student_ready_status', 
+        filter: `class_id=eq.${classId}` 
+      }, () => {
+        console.log('🔔 Ready status changed');
+        fetchReadyStatus();
+      })
       .subscribe();
-    
-    readinessSubscriptionRef.current = subscription;
     
     const interval = setInterval(fetchReadyStatus, 3000);
     
     return () => {
-      if (readinessSubscriptionRef.current) {
-        supabase.removeChannel(readinessSubscriptionRef.current);
-      }
+      subscription.unsubscribe();
       clearInterval(interval);
     };
   }, [classId, teamA, teamB]);
 
   const allTeamAReady = teamA.length > 0 && teamAReadyStudents.length === teamA.length;
   const allTeamBReady = teamB.length > 0 && teamBReadyStudents.length === teamB.length;
-  const allTeamsReady = allTeamAReady && allTeamBReady;
+  const allTeamsReady = (teamA.length === 0 || allTeamAReady) && (teamB.length === 0 || allTeamBReady);
 
   useEffect(() => {
     setCanStartRound(allTeamsReady);
@@ -303,9 +539,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
   const handleStartRound = () => {
     if (!canStartRound) {
-      if (!allTeamAReady && teamA.length > 0) {
+      if (teamA.length > 0 && !allTeamAReady) {
         alert(`Team A: ${teamAReadyStudents.length}/${teamA.length} members ready. Please wait for all team members to click "I'm Ready".`);
-      } else if (!allTeamBReady && teamB.length > 0) {
+      } else if (teamB.length > 0 && !allTeamBReady) {
         alert(`Team B: ${teamBReadyStudents.length}/${teamB.length} members ready. Please wait for all team members to click "I'm Ready".`);
       } else {
         alert('Please wait for all team members to click "I\'m Ready" before starting the round.');
@@ -320,10 +556,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     if (readyCountdown > 0) {
       const timer = setTimeout(() => setReadyCountdown(readyCountdown - 1), 1000);
       return () => clearTimeout(timer);
-    } else if (readyCountdown === 0) {
-      startGameRound();
-      setReadyCountdown(null);
     }
+    startGameRound();
+    setReadyCountdown(null);
   }, [readyCountdown]);
 
   // ============================================================
@@ -331,259 +566,164 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   // ============================================================
   const startGameRound = async () => {
     setError(null);
-    
     try {
-      const roundStartTime = new Date().toISOString();
+      // Step 1: Auto-assign any unassigned students to teams
+      console.log('Step 1: Auto-assigning teams...');
+      await autoAssignTeams();
       
-      console.log('Starting round with class ID:', classId);
+      // Step 2: Clean up old game sessions
+      console.log('Step 2: Cleaning up old sessions...');
+      await cleanupOldGameSessions();
       
-      const { data, error } = await supabase
-        .from('game_sessions')
-        .insert([{
-          class_id: classId,
-          current_round: 1,
-          current_question: {
-            text: question.text,
-            answer: question.answer,
-            explanation: question.explanation,
-            timeLimit: 20,
-            started_at: roundStartTime
-          },
-          team_answers: {},
-          status: 'active',
-          started_at: roundStartTime,
-          updated_at: roundStartTime
-        }])
-        .select()
-        .single();
+      // Step 3: Create new game session
+      console.log('Step 3: Creating new game session...');
+      const { id: newSessionId } = await createGameSession();
       
-      if (error) throw error;
-      
-      if (!data || !data.id) {
-        throw new Error('Failed to create game session');
-      }
-      
-      console.log('✅ Game session created:', data.id);
-      
-      setSessionId(data.id);
+      setSessionId(newSessionId);
       setIsReadyPhase(false);
       setIsActive(true);
       setTimeLeft(20);
       
-      startTimer(20, data.id, roundStartTime);
+      startTimer(20, newSessionId, new Date().toISOString());
       
-      const { error: deleteError } = await supabase
-        .from('student_ready_status')
-        .delete()
-        .eq('class_id', classId);
+      // Step 4: Clear ready statuses
+      await supabase.from('student_ready_status').delete().eq('class_id', classId);
       
-      if (deleteError) {
-        console.error('Error clearing ready statuses:', deleteError);
-      } else {
-        console.log('Cleared all ready statuses after round start');
-      }
+      // Step 5: Set up answer listeners and polling
+      setupAnswerListeners(newSessionId);
       
-      setupAnswerListeners(data.id);
+      // Step 6: Initial fetch for answers
+      setTimeout(() => fetchAndProcessAnswers(), 500);
+      
+      console.log('✅ Round started successfully!');
       
     } catch (error) {
       console.error('Error starting game round:', error);
       setError(error.message);
-      alert(`Failed to start round: ${error.message}. Please try again.`);
+      alert(`Failed to start round: ${error.message}`);
     }
   };
 
   const setupAnswerListeners = (sessionIdParam) => {
     console.log(`🔔 Setting up answer listeners for session ${sessionIdParam}`);
     
-    fetchTeamAnswers();
+    // Initial fetch
+    fetchAndProcessAnswers();
     
-    if (answerPollIntervalRef.current) {
-      clearInterval(answerPollIntervalRef.current);
-    }
+    // Poll every 2 seconds for new answers
+    if (answerPollIntervalRef.current) clearInterval(answerPollIntervalRef.current);
     answerPollIntervalRef.current = setInterval(() => {
-      if (isActive) {
-        fetchTeamAnswers();
+      if (isActive && sessionIdParam) {
+        console.log('🔄 Polling for answers...');
+        fetchAndProcessAnswers();
       }
     }, 2000);
     
-    if (answersSubscriptionRef.current) {
-      supabase.removeChannel(answersSubscriptionRef.current);
-    }
+    // Real-time subscription for instant updates
+    if (answersSubscriptionRef.current) supabase.removeChannel(answersSubscriptionRef.current);
     
     const subscription = supabase
       .channel(`answers_${sessionIdParam}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'student_answers',
-          filter: `session_id=eq.${sessionIdParam}`
-        },
-        (payload) => {
-          console.log('🔔 NEW ANSWER INSERTED!', payload);
-          fetchTeamAnswers();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'student_answers',
-          filter: `session_id=eq.${sessionIdParam}`
-        },
-        (payload) => {
-          console.log('🔔 ANSWER UPDATED!', payload);
-          fetchTeamAnswers();
-        }
-      )
-      .subscribe((status) => {
-        console.log(`📡 Answer subscription status: ${status}`);
-      });
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'student_answers', 
+        filter: `session_id=eq.${sessionIdParam}` 
+      }, (payload) => {
+        console.log('🔔 New answer submitted!', payload.new);
+        fetchAndProcessAnswers();
+      })
+      .subscribe();
     
     answersSubscriptionRef.current = subscription;
   };
 
   const startTimer = (duration, sessionIdParam, roundStartTime) => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     
     let timeRemaining = duration;
     if (roundStartTime) {
-      const startTime = new Date(roundStartTime).getTime();
-      const now = new Date().getTime();
-      const elapsedSeconds = Math.floor((now - startTime) / 1000);
-      timeRemaining = Math.max(0, duration - elapsedSeconds);
+      const elapsed = Math.floor((new Date() - new Date(roundStartTime)) / 1000);
+      timeRemaining = Math.max(0, duration - elapsed);
     }
-    
     setTimeLeft(timeRemaining);
-    
-    if (timeRemaining <= 0) {
-      endRound();
-      return;
+    if (timeRemaining <= 0) { 
+      endRound(); 
+      return; 
     }
     
-    const interval = setInterval(() => {
+    timerIntervalRef.current = setInterval(() => {
       if (timeRemaining > 0) {
         timeRemaining--;
         setTimeLeft(timeRemaining);
       }
-      
       if (timeRemaining <= 0) {
-        clearInterval(interval);
-        timerIntervalRef.current = null;
+        clearInterval(timerIntervalRef.current);
         endRound();
       }
     }, 1000);
-    
-    timerIntervalRef.current = interval;
   };
 
   const endRound = async () => {
     if (!isActive && roundEnded) return;
-    
     console.log('🏁 Ending round...');
     
-    await fetchTeamAnswers();
+    // Final fetch to get all answers
+    await fetchAndProcessAnswers();
     
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    
-    if (answerPollIntervalRef.current) {
-      clearInterval(answerPollIntervalRef.current);
-      answerPollIntervalRef.current = null;
-    }
-    
-    if (answersSubscriptionRef.current) {
-      supabase.removeChannel(answersSubscriptionRef.current);
-      answersSubscriptionRef.current = null;
-    }
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    if (answerPollIntervalRef.current) clearInterval(answerPollIntervalRef.current);
+    if (answersSubscriptionRef.current) supabase.removeChannel(answersSubscriptionRef.current);
     
     setIsActive(false);
     setRoundEnded(true);
     
-    const teamAResult = getTeamResult('A');
-    const teamBResult = getTeamResult('B');
-    
-    console.log('Final Team A result:', teamAResult);
-    console.log('Final Team B result:', teamBResult);
+    const teamAResult = { correct: checkAnswer(teamAnswers.A), answer: teamAnswers.A };
+    const teamBResult = { correct: checkAnswer(teamAnswers.B), answer: teamAnswers.B };
     
     if (sessionId) {
-      try {
-        await supabase
-          .from('game_sessions')
-          .update({ 
-            status: 'completed', 
-            updated_at: new Date().toISOString(),
-            round_results: {
-              A: { correct: teamAResult.correct, answer: teamAnswers.A },
-              B: { correct: teamBResult.correct, answer: teamAnswers.B }
-            }
-          })
-          .eq('id', sessionId);
-        console.log('Game session updated with results');
-      } catch (error) {
-        console.error('Error updating game session:', error);
-      }
+      await updateGameSession(sessionId, { 
+        status: 'completed', 
+        updated_at: new Date().toISOString(),
+        round_results: { A: teamAResult, B: teamBResult }
+      });
+      console.log('Game session updated with results');
     }
   };
 
   const checkAnswer = (answer) => {
-    if (!answer) return null;
-    const normalizedAnswer = answer.trim().toLowerCase().replace(/\s/g, '');
-    const normalizedCorrect = question.answer.toLowerCase().replace(/\s/g, '');
-    return normalizedAnswer === normalizedCorrect;
-  };
-
-  const getTeamResult = (team) => {
-    const answer = teamAnswers[team];
-    if (!answer) return { correct: false, answer: null };
-    return { correct: checkAnswer(answer), answer: answer };
+    if (!answer) return false;
+    return answer.trim().toLowerCase().replace(/\s/g, '') === question.answer.toLowerCase().replace(/\s/g, '');
   };
 
   useEffect(() => {
     return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      if (answerPollIntervalRef.current) {
-        clearInterval(answerPollIntervalRef.current);
-      }
-      if (answersSubscriptionRef.current) {
-        supabase.removeChannel(answersSubscriptionRef.current);
-      }
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      if (answerPollIntervalRef.current) clearInterval(answerPollIntervalRef.current);
+      if (answersSubscriptionRef.current) supabase.removeChannel(answersSubscriptionRef.current);
     };
   }, []);
 
   const awardTeamPoints = async (team, points) => {
     if (points <= 0) {
-      setShowSuccessMessage({ team, message: 'Please enter a valid point value (greater than 0)' });
+      setShowSuccessMessage({ team, message: 'Please enter a valid point value' });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
-    
     if (teamPointsAwarded[team]) {
-      setShowSuccessMessage({ team, message: `Team ${team} has already received points for this round!` });
+      setShowSuccessMessage({ team, message: `Team ${team} already received points!` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
     
     const students = team === 'A' ? teamA : teamB;
-    
-    if (students.length === 0) {
-      setShowSuccessMessage({ team, message: `Team ${team} has no members to award points to!` });
+    if (!students || students.length === 0) {
+      setShowSuccessMessage({ team, message: `Team ${team} has no members` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
     
     try {
-      console.log(`🎯 Awarding ${points} points to each member of Team ${team}`);
-      
       for (const student of students) {
         const { data: existing } = await supabase
           .from('student_points')
@@ -592,34 +732,22 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           .eq('class_id', classId)
           .maybeSingle();
         
-        const currentPoints = existing?.points || 0;
-        const newPoints = currentPoints + points;
-        
-        const { error: upsertError } = await supabase
+        await supabase
           .from('student_points')
           .upsert({
             student_id: student.id,
             class_id: classId,
-            points: newPoints,
+            points: (existing?.points || 0) + points,
             updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'student_id,class_id'
-          });
-        
-        if (upsertError) throw upsertError;
+          }, { onConflict: 'student_id,class_id' });
       }
-      
       setTeamPointsAwarded(prev => ({ ...prev, [team]: true }));
       setShowSuccessMessage({ team, message: `✓ Team ${team} awarded ${points} points to each member!` });
-      
-      if (onPointsAwarded) {
-        await onPointsAwarded();
-      }
-      
+      if (onPointsAwarded) await onPointsAwarded();
       setTimeout(() => setShowSuccessMessage(null), 4000);
     } catch (error) {
       console.error('Error awarding points:', error);
-      setShowSuccessMessage({ team, message: `Error: ${error.message || 'Failed to award points'}` });
+      setShowSuccessMessage({ team, message: `Error: ${error.message}` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
     }
   };
@@ -627,72 +755,30 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const goToPointsPhase = () => setPointsPhase(true);
   const isTeacher = true;
 
+  // ============================================================
+  // RENDER FUNCTIONS
+  // ============================================================
   const renderAnswerDisplay = (team) => {
     const hasAnswer = submittedStatus[team];
     const answer = teamAnswers[team];
-    const isRoundEnded = roundEnded;
-    const isRoundActive = isActive;
     const isHighlighted = lastUpdated === team;
     
     if (hasAnswer && answer) {
       return (
         <div className={isHighlighted ? 'answer-updated' : ''} style={styles.answerContent}>
           <span style={styles.answerText}>"{answer}"</span>
-          {isRoundEnded && (
-            getTeamResult(team).correct ? 
-              <FiCheckCircle style={styles.correctIcon} /> : 
-              <FiXCircle style={styles.incorrectIcon} />
-          )}
-        </div>
-      );
-    } else if (isRoundActive) {
-      return (
-        <div style={styles.waitingAnswer}>
-          <FiAlertCircle size={16} />
-          <span>Waiting for answers from team members...</span>
-        </div>
-      );
-    } else if (isRoundEnded) {
-      return (
-        <div style={styles.waitingAnswer}>
-          <FiXCircle size={16} color="#ef4444" />
-          <span>No answers submitted</span>
-        </div>
-      );
-    } else {
-      return (
-        <div style={styles.waitingAnswer}>
-          <FiAlertCircle size={16} />
-          <span>Waiting for answers...</span>
+          {roundEnded && (checkAnswer(answer) ? <FiCheckCircle style={styles.correctIcon} /> : <FiXCircle style={styles.incorrectIcon} />)}
         </div>
       );
     }
+    return <div style={styles.waitingAnswer}><FiAlertCircle size={16} /><span>{isActive ? 'Waiting for answers...' : 'No answers submitted'}</span></div>;
   };
 
   const renderStudentAnswers = (team) => {
     const answers = studentAnswers[team];
     const teamMembersList = team === 'A' ? teamA : teamB;
-    const submittedCount = answers.length;
-    const totalCount = teamMembersList?.length || 0;
     
-    const submittedMap = new Map();
-    answers.forEach(answer => {
-      submittedMap.set(answer.studentId, answer);
-    });
-    
-    const allStudents = teamMembersList.map(member => {
-      const submitted = submittedMap.get(member.id);
-      return {
-        id: member.id,
-        name: member.name,
-        role: member.role,
-        answer: submitted?.answer || null,
-        submittedAt: submitted?.submittedAt || null,
-        hasSubmitted: !!submitted
-      };
-    });
-    
-    if (allStudents.length === 0) {
+    if (!teamMembersList || teamMembersList.length === 0) {
       return (
         <div style={styles.noAnswersMessage}>
           <FiAlertCircle size={14} />
@@ -701,20 +787,44 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       );
     }
     
+    // Create a map for quick answer lookup
+    const answerMap = new Map();
+    answers.forEach(answer => {
+      answerMap.set(answer.studentId, answer);
+    });
+    
+    // Build list of all team members with their answers
+    const allStudents = teamMembersList.map(member => {
+      const answer = answerMap.get(member.id);
+      return {
+        id: member.id,
+        name: member.name,
+        answer: answer?.answer || null,
+        submittedAt: answer?.submittedAt || null,
+        hasSubmitted: !!answer
+      };
+    });
+    
+    const submittedCount = answers.length;
+    const totalCount = teamMembersList.length;
+    
     return (
       <div style={styles.studentAnswersList}>
         <div style={styles.submissionStats}>
           <FiUsers size={14} />
-          <span>{submittedCount}/{totalCount} students have submitted answers</span>
+          <span style={{ fontWeight: 'bold' }}>{submittedCount}/{totalCount} students have submitted answers</span>
         </div>
         {allStudents.map((student) => {
           const isCorrect = student.answer ? checkAnswer(student.answer) : false;
           return (
-            <div key={student.id} style={student.hasSubmitted ? styles.studentAnswerItem : styles.studentAnswerItemMissing}>
+            <div 
+              key={student.id} 
+              style={student.hasSubmitted ? styles.studentAnswerItem : styles.studentAnswerItemMissing}
+            >
               <div style={styles.studentAnswerHeader}>
                 <span style={styles.studentName}>
                   {student.name}
-                  {student.role && <span style={styles.studentRoleBadge}>({student.role})</span>}
+                  {student.hasSubmitted && <span style={{ color: '#10b981', marginLeft: '4px' }}>✓</span>}
                 </span>
                 {student.hasSubmitted ? (
                   <span style={styles.submittedBadge}>✅ Submitted</span>
@@ -725,7 +835,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
               {student.hasSubmitted ? (
                 <div style={styles.studentAnswerContent}>
                   <span style={styles.studentAnswerText}>"{student.answer}"</span>
-                  {!isActive && roundEnded && (
+                  {roundEnded && (
                     isCorrect ? 
                       <FiCheckCircle size={16} color="#10b981" /> : 
                       <FiXCircle size={16} color="#ef4444" />
@@ -749,23 +859,14 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     );
   };
 
-  const getSubmissionStats = () => {
-    const teamASubmitted = studentAnswers.A.length;
-    const teamBSubmitted = studentAnswers.B.length;
-    const teamATotal = teamA?.length || 0;
-    const teamBTotal = teamB?.length || 0;
-    
-    return {
-      teamA: { submitted: teamASubmitted, total: teamATotal, percentage: teamATotal > 0 ? (teamASubmitted / teamATotal) * 100 : 0 },
-      teamB: { submitted: teamBSubmitted, total: teamBTotal, percentage: teamBTotal > 0 ? (teamBSubmitted / teamBTotal) * 100 : 0 }
-    };
+  const stats = {
+    teamA: { submitted: studentAnswers.A.length, total: teamA?.length || 0 },
+    teamB: { submitted: studentAnswers.B.length, total: teamB?.length || 0 }
   };
-
-  const stats = getSubmissionStats();
 
   const handleManualRefresh = () => {
     console.log('🔄 Manual refresh triggered');
-    fetchTeamAnswers();
+    fetchAndProcessAnswers();
   };
 
   return (
@@ -776,7 +877,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           <div style={styles.header}>
             <h2 style={styles.title}>🎯 Live Math Challenge</h2>
             <h3 style={styles.className}>{className || 'Class'}</h3>
-            {!roundEnded && isTeacher && isActive && (
+            {!roundEnded && isActive && (
               <>
                 <button style={styles.refreshButton} onClick={handleManualRefresh}>
                   <FiRefreshCw size={16} /> Refresh Answers
@@ -787,7 +888,14 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
             <button style={styles.closeButton} onClick={onClose}>×</button>
           </div>
 
-          {isReadyPhase && (
+          {error && (
+            <div style={styles.errorBox}>
+              <FiAlertCircle size={20} />
+              <div><strong>Error:</strong> {error}</div>
+            </div>
+          )}
+
+          {isReadyPhase ? (
             <div style={styles.readyPhaseContainer}>
               <h3 style={styles.readyTitle}>🎮 Getting Teams Ready</h3>
               <p style={styles.readySubtitle}>Waiting for all team members to confirm they're ready...</p>
@@ -856,9 +964,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <div style={styles.waitingInfo}>
                   <FiAlertCircle size={20} color="#f59e0b" />
                   <p>
-                    {!allTeamAReady && teamA.length > 0 && !allTeamBReady && teamB.length > 0 && "Waiting for both teams..."}
-                    {!allTeamAReady && teamA.length > 0 && allTeamBReady && "Waiting for Team A members to click 'I'm Ready'..."}
-                    {allTeamAReady && !allTeamBReady && teamB.length > 0 && "Waiting for Team B members to click 'I'm Ready'..."}
+                    {teamA.length > 0 && !allTeamAReady && teamB.length > 0 && !allTeamBReady && "Waiting for both teams..."}
+                    {teamA.length > 0 && !allTeamAReady && (teamB.length === 0 || allTeamBReady) && "Waiting for Team A members to click 'I'm Ready'..."}
+                    {(teamA.length === 0 || allTeamAReady) && teamB.length > 0 && !allTeamBReady && "Waiting for Team B members to click 'I'm Ready'..."}
                   </p>
                 </div>
               )}
@@ -878,9 +986,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 </div>
               )}
             </div>
-          )}
-
-          {!isReadyPhase && (
+          ) : (
             <>
               <div style={styles.timerSection}>
                 <div style={styles.timerCircle}>
@@ -900,18 +1006,19 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
               <div style={styles.questionCard}>
                 <h3 style={styles.questionTitle}>📝 Question</h3>
-                <p style={styles.questionText}>{question?.text || 'Loading...'}</p>
+                <p style={styles.questionText}>{question.text}</p>
                 {roundEnded && (
                   <div style={styles.correctAnswerBox}>
-                    <strong>✅ Correct Answer:</strong> {question?.answer || 'N/A'}
+                    <strong>✅ Correct Answer:</strong> {question.answer}
                   </div>
                 )}
               </div>
             </>
           )}
 
-          {isTeacher && !isReadyPhase && (
+          {!isReadyPhase && (
             <div style={styles.teamsContainer}>
+              {/* Team A Column */}
               <div style={styles.teamCardA}>
                 <div style={styles.teamHeaderA}>
                   <FiUsers size={24} />
@@ -927,17 +1034,11 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <div style={styles.answerSection}>
                   <div style={styles.answerLabel}>
                     🏆 Team Answer (Majority Vote)
-                    {isActive && stats.teamA.submitted > 0 && (
-                      <span style={styles.liveBadge}>LIVE</span>
-                    )}
+                    {isActive && stats.teamA.submitted > 0 && <span style={styles.liveBadge}>LIVE</span>}
                   </div>
-                  <div style={styles.answerDisplay}>
-                    {renderAnswerDisplay('A')}
-                  </div>
+                  <div style={styles.answerDisplay}>{renderAnswerDisplay('A')}</div>
                   {isActive && stats.teamA.submitted > 0 && (
-                    <div style={styles.majorityInfo}>
-                      Based on {stats.teamA.submitted} student answer{stats.teamA.submitted !== 1 ? 's' : ''}
-                    </div>
+                    <div style={styles.majorityInfo}>Based on {stats.teamA.submitted} student answer{stats.teamA.submitted !== 1 ? 's' : ''}</div>
                   )}
                 </div>
 
@@ -963,6 +1064,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 </div>
               </div>
 
+              {/* Team B Column */}
               <div style={styles.teamCardB}>
                 <div style={styles.teamHeaderB}>
                   <FiUsers size={24} />
@@ -978,17 +1080,11 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <div style={styles.answerSection}>
                   <div style={styles.answerLabel}>
                     🏆 Team Answer (Majority Vote)
-                    {isActive && stats.teamB.submitted > 0 && (
-                      <span style={styles.liveBadge}>LIVE</span>
-                    )}
+                    {isActive && stats.teamB.submitted > 0 && <span style={styles.liveBadge}>LIVE</span>}
                   </div>
-                  <div style={styles.answerDisplay}>
-                    {renderAnswerDisplay('B')}
-                  </div>
+                  <div style={styles.answerDisplay}>{renderAnswerDisplay('B')}</div>
                   {isActive && stats.teamB.submitted > 0 && (
-                    <div style={styles.majorityInfo}>
-                      Based on {stats.teamB.submitted} student answer{stats.teamB.submitted !== 1 ? 's' : ''}
-                    </div>
+                    <div style={styles.majorityInfo}>Based on {stats.teamB.submitted} student answer{stats.teamB.submitted !== 1 ? 's' : ''}</div>
                   )}
                 </div>
 
@@ -1016,48 +1112,36 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
             </div>
           )}
 
-          {isTeacher && roundEnded && !pointsPhase && (
+          {roundEnded && !pointsPhase && (
             <div style={styles.summaryCard}>
               <h3>🏆 Round Summary</h3>
               <div style={styles.summaryGrid}>
                 <div style={styles.summaryItem}>
                   <strong>Team A:</strong> 
-                  <span style={getTeamResult('A').correct ? styles.correctText : styles.incorrectText}>
-                    {getTeamResult('A').correct ? '✓ Correct' : '✗ Incorrect'}
+                  <span style={checkAnswer(teamAnswers.A) ? styles.correctText : styles.incorrectText}>
+                    {checkAnswer(teamAnswers.A) ? '✓ Correct' : '✗ Incorrect'}
                   </span>
-                  {submittedStatus.A && <div style={styles.summaryAnswer}>Team Answer: {teamAnswers.A}</div>}
-                  {!submittedStatus.A && <div style={styles.summaryAnswer}>❌ No team answer</div>}
+                  <div style={styles.summaryAnswer}>Team Answer: {teamAnswers.A || '❌ No answer'}</div>
                   <div style={styles.summarySubsection}>
                     <strong>Individual Answers:</strong>
                     {studentAnswers.A.map((ans, idx) => (
                       <div key={idx} style={styles.summaryIndividualAnswer}>
-                        • {ans.name}: "{ans.answer}" {checkAnswer(ans.answer) ? '✓' : '✗'}
-                      </div>
-                    ))}
-                    {teamA?.filter(member => !studentAnswers.A.some(a => a.studentId === member.id)).map((member, idx) => (
-                      <div key={`missing-${idx}`} style={styles.summaryIndividualAnswerMissing}>
-                        • {member.name}: ❌ No answer submitted
+                        • {ans.studentName}: "{ans.answer}" {checkAnswer(ans.answer) ? '✓' : '✗'}
                       </div>
                     ))}
                   </div>
                 </div>
                 <div style={styles.summaryItem}>
                   <strong>Team B:</strong> 
-                  <span style={getTeamResult('B').correct ? styles.correctText : styles.incorrectText}>
-                    {getTeamResult('B').correct ? '✓ Correct' : '✗ Incorrect'}
+                  <span style={checkAnswer(teamAnswers.B) ? styles.correctText : styles.incorrectText}>
+                    {checkAnswer(teamAnswers.B) ? '✓ Correct' : '✗ Incorrect'}
                   </span>
-                  {submittedStatus.B && <div style={styles.summaryAnswer}>Team Answer: {teamAnswers.B}</div>}
-                  {!submittedStatus.B && <div style={styles.summaryAnswer}>❌ No team answer</div>}
+                  <div style={styles.summaryAnswer}>Team Answer: {teamAnswers.B || '❌ No answer'}</div>
                   <div style={styles.summarySubsection}>
                     <strong>Individual Answers:</strong>
                     {studentAnswers.B.map((ans, idx) => (
                       <div key={idx} style={styles.summaryIndividualAnswer}>
-                        • {ans.name}: "{ans.answer}" {checkAnswer(ans.answer) ? '✓' : '✗'}
-                      </div>
-                    ))}
-                    {teamB?.filter(member => !studentAnswers.B.some(a => a.studentId === member.id)).map((member, idx) => (
-                      <div key={`missing-${idx}`} style={styles.summaryIndividualAnswerMissing}>
-                        • {member.name}: ❌ No answer submitted
+                        • {ans.studentName}: "{ans.answer}" {checkAnswer(ans.answer) ? '✓' : '✗'}
                       </div>
                     ))}
                   </div>
@@ -1277,6 +1361,17 @@ const styles = {
     color: '#6b7280', 
     padding: '0 8px' 
   },
+  errorBox: {
+    backgroundColor: '#fee2e2',
+    border: '1px solid #fecaca',
+    borderRadius: '12px',
+    padding: '16px',
+    marginBottom: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    color: '#991b1b'
+  },
   readyPhaseContainer: { 
     padding: '20px', 
     backgroundColor: '#f0fdf4', 
@@ -1353,208 +1448,215 @@ const styles = {
     fontWeight: '600' 
   },
   readyStatusWaiting: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '8px', 
-    color: '#f59e0b', 
-    fontWeight: '600' 
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    color: '#f59e0b',
+    fontWeight: '600'
   },
-  teamMembersReadyList: { 
-    marginTop: '12px' 
+  teamMembersReadyList: {
+    marginTop: '12px'
   },
-  memberReadyItem: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '8px 0', 
-    fontSize: '13px', 
-    borderBottom: '1px solid #e5e7eb' 
-  },
-  readyBadge: { 
-    padding: '2px 8px', 
-    borderRadius: '12px', 
-    fontSize: '11px', 
-    fontWeight: '500', 
-    backgroundColor: '#d1fae5', 
-    color: '#065f46' 
-  },
-  notReadyBadge: { 
-    padding: '2px 8px', 
-    borderRadius: '12px', 
-    fontSize: '11px', 
-    fontWeight: '500', 
-    backgroundColor: '#fee2e2', 
-    color: '#991b1b' 
-  },
-  startRoundButton: { 
-    marginTop: '16px', 
-    padding: '12px 24px', 
-    backgroundColor: '#10b981', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '12px', 
-    fontSize: '18px', 
-    fontWeight: '600', 
-    cursor: 'pointer', 
-    display: 'inline-flex', 
-    alignItems: 'center', 
-    gap: '8px' 
-  },
-  countdownContainer: { 
-    textAlign: 'center', 
-    padding: '20px', 
-    backgroundColor: '#1e293b', 
-    borderRadius: '12px', 
-    marginTop: '16px' 
-  },
-  countdownNumber: { 
-    fontSize: '64px', 
-    fontWeight: 'bold', 
-    color: '#fbbf24', 
-    fontFamily: 'monospace' 
-  },
-  waitingInfo: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '8px', 
-    padding: '12px', 
-    backgroundColor: '#fef3c7', 
-    borderRadius: '8px', 
-    color: '#92400e', 
-    marginTop: '16px' 
-  },
-  allReadyInfo: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '12px', 
-    padding: '16px', 
-    backgroundColor: '#d1fae5', 
-    borderRadius: '8px', 
-    color: '#065f46', 
-    marginTop: '16px', 
-    flexDirection: 'column' 
-  },
-  timerSection: { 
-    textAlign: 'center', 
-    marginBottom: '30px', 
-    padding: '20px', 
-    backgroundColor: '#f9fafb', 
-    borderRadius: '16px' 
-  },
-  timerCircle: { 
-    display: 'flex', 
-    flexDirection: 'column', 
-    alignItems: 'center', 
-    gap: '12px', 
-    marginBottom: '16px' 
-  },
-  timerText: { 
-    textAlign: 'center' 
-  },
-  timerNumber: { 
-    fontSize: '48px', 
-    fontWeight: 'bold', 
-    fontFamily: 'monospace', 
-    display: 'block', 
-    color: '#1f2937' 
-  },
-  timerLabel: { 
-    fontSize: '14px', 
-    color: '#6b7280' 
-  },
-  timerBar: { 
-    width: '100%', 
-    height: '10px', 
-    backgroundColor: '#e5e7eb', 
-    borderRadius: '5px', 
-    overflow: 'hidden', 
-    marginBottom: '12px' 
-  },
-  timerProgress: { 
-    height: '100%', 
-    transition: 'width 1s linear', 
-    borderRadius: '5px' 
-  },
-  timerStatus: { 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    color: '#6b7280' 
-  },
-  questionCard: { 
-    backgroundColor: '#f3f4f6', 
-    padding: '20px', 
-    borderRadius: '12px', 
-    marginBottom: '30px' 
-  },
-  questionTitle: { 
-    fontSize: '18px', 
-    fontWeight: '600', 
-    marginBottom: '12px', 
-    color: '#374151' 
-  },
-  questionText: { 
-    fontSize: '20px', 
-    fontWeight: '500', 
-    color: '#1f2937', 
-    margin: '0 0 16px 0' 
-  },
-  correctAnswerBox: { 
-    backgroundColor: '#d1fae5', 
-    padding: '12px', 
-    borderRadius: '8px', 
-    color: '#065f46', 
-    marginTop: '12px' 
-  },
-  teamsContainer: { 
-    display: 'grid', 
-    gridTemplateColumns: '1fr 1fr', 
-    gap: '24px', 
-    marginBottom: '30px' 
-  },
-  teamCardA: { 
-    backgroundColor: '#eff6ff', 
-    borderRadius: '16px', 
-    padding: '20px', 
-    border: '2px solid #bfdbfe' 
-  },
-  teamCardB: { 
-    backgroundColor: '#fce7f3', 
-    borderRadius: '16px', 
-    padding: '20px', 
-    border: '2px solid #fbcfe8' 
-  },
-  teamHeaderA: { 
-    display: 'flex', 
-    alignItems: 'center', 
+  memberReadyItem: {
+    display: 'flex',
     justifyContent: 'space-between',
-    gap: '12px', 
-    marginBottom: '20px', 
-    paddingBottom: '12px', 
+    alignItems: 'center',
+    padding: '8px 0',
+    fontSize: '13px',
+    borderBottom: '1px solid #e5e7eb'
+  },
+  readyBadge: {
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '500',
+    backgroundColor: '#d1fae5',
+    color: '#065f46'
+  },
+  notReadyBadge: {
+    padding: '2px 8px',
+    borderRadius: '12px',
+    fontSize: '11px',
+    fontWeight: '500',
+    backgroundColor: '#fee2e2',
+    color: '#991b1b'
+  },
+  startRoundButton: {
+    marginTop: '16px',
+    padding: '12px 24px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '18px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  countdownContainer: {
+    textAlign: 'center',
+    padding: '20px',
+    backgroundColor: '#1e293b',
+    borderRadius: '12px',
+    marginTop: '16px'
+  },
+  countdownNumber: {
+    fontSize: '64px',
+    fontWeight: 'bold',
+    color: '#fbbf24',
+    fontFamily: 'monospace'
+  },
+  waitingInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '8px',
+    color: '#92400e',
+    marginTop: '16px'
+  },
+  allReadyInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#d1fae5',
+    borderRadius: '8px',
+    color: '#065f46',
+    marginTop: '16px',
+    flexDirection: 'column'
+  },
+  timerSection: {
+    textAlign: 'center',
+    marginBottom: '30px',
+    padding: '20px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '16px'
+  },
+  timerCircle: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '16px'
+  },
+  timerText: {
+    textAlign: 'center'
+  },
+  timerNumber: {
+    fontSize: '48px',
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    display: 'block',
+    color: '#1f2937'
+  },
+  timerLabel: {
+    fontSize: '14px',
+    color: '#6b7280'
+  },
+  timerBar: {
+    width: '100%',
+    height: '10px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '5px',
+    overflow: 'hidden',
+    marginBottom: '12px'
+  },
+  timerProgress: {
+    height: '100%',
+    transition: 'width 1s linear',
+    borderRadius: '5px'
+  },
+  timerStatus: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#6b7280'
+  },
+  questionCard: {
+    backgroundColor: '#f3f4f6',
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '30px'
+  },
+  questionTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '12px',
+    color: '#374151'
+  },
+  questionText: {
+    fontSize: '20px',
+    fontWeight: '500',
+    color: '#1f2937',
+    margin: '0 0 16px 0'
+  },
+  correctAnswerBox: {
+    backgroundColor: '#d1fae5',
+    padding: '12px',
+    borderRadius: '8px',
+    color: '#065f46',
+    marginTop: '12px'
+  },
+  teamsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '24px',
+    marginBottom: '30px'
+  },
+  teamCardA: {
+    backgroundColor: '#eff6ff',
+    borderRadius: '16px',
+    padding: '20px',
+    border: '2px solid #bfdbfe'
+  },
+  teamCardB: {
+    backgroundColor: '#fce7f3',
+    borderRadius: '16px',
+    padding: '20px',
+    border: '2px solid #fbcfe8'
+  },
+  teamHeaderA: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '12px',
+    marginBottom: '20px',
+    paddingBottom: '12px',
     borderBottom: '2px solid #bfdbfe',
     flexWrap: 'wrap'
   },
-  teamHeaderB: { 
-    display: 'flex', 
-    alignItems: 'center', 
+  teamHeaderB: {
+    display: 'flex',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px', 
-    marginBottom: '20px', 
-    paddingBottom: '12px', 
+    gap: '12px',
+    marginBottom: '20px',
+    paddingBottom: '12px',
     borderBottom: '2px solid #fbcfe8',
     flexWrap: 'wrap'
   },
-  teamTitle: { 
-    fontSize: '20px', 
-    fontWeight: '600', 
-    margin: 0 
+  teamTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    margin: 0
   },
   teamStats: {
     display: 'flex',
     gap: '12px',
     alignItems: 'center'
+  },
+  memberCount: {
+    fontSize: '12px',
+    color: '#6b7280',
+    backgroundColor: 'white',
+    padding: '4px 8px',
+    borderRadius: '20px'
   },
   submissionCount: {
     fontSize: '12px',
@@ -1563,13 +1665,13 @@ const styles = {
     padding: '4px 8px',
     borderRadius: '20px'
   },
-  answerSection: { 
-    marginBottom: '20px' 
+  answerSection: {
+    marginBottom: '20px'
   },
-  answerLabel: { 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    marginBottom: '8px', 
+  answerLabel: {
+    fontSize: '14px',
+    fontWeight: '500',
+    marginBottom: '8px',
     color: '#4b5563',
     display: 'flex',
     alignItems: 'center',
@@ -1583,40 +1685,40 @@ const styles = {
     borderRadius: '10px',
     animation: 'pulse 1s infinite'
   },
-  answerDisplay: { 
-    backgroundColor: 'white', 
-    padding: '16px', 
-    borderRadius: '10px', 
-    marginBottom: '12px', 
-    minHeight: '70px' 
+  answerDisplay: {
+    backgroundColor: 'white',
+    padding: '16px',
+    borderRadius: '10px',
+    marginBottom: '12px',
+    minHeight: '70px'
   },
-  answerContent: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    gap: '12px' 
+  answerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px'
   },
-  answerText: { 
-    fontSize: '16px', 
-    fontWeight: '500', 
-    color: '#1f2937', 
-    flex: 1, 
-    wordBreak: 'break-all' 
+  answerText: {
+    fontSize: '16px',
+    fontWeight: '500',
+    color: '#1f2937',
+    flex: 1,
+    wordBreak: 'break-all'
   },
-  waitingAnswer: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px', 
-    color: '#9ca3af', 
-    fontStyle: 'italic' 
+  waitingAnswer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    color: '#9ca3af',
+    fontStyle: 'italic'
   },
-  correctIcon: { 
-    color: '#10b981', 
-    fontSize: '24px' 
+  correctIcon: {
+    color: '#10b981',
+    fontSize: '24px'
   },
-  incorrectIcon: { 
-    color: '#ef4444', 
-    fontSize: '24px' 
+  incorrectIcon: {
+    color: '#ef4444',
+    fontSize: '24px'
   },
   majorityInfo: {
     fontSize: '11px',
@@ -1624,35 +1726,35 @@ const styles = {
     textAlign: 'center',
     marginTop: '8px'
   },
-  individualAnswersSection: { 
-    marginTop: '20px', 
-    marginBottom: '20px', 
-    padding: '12px', 
-    backgroundColor: 'rgba(255,255,255,0.5)', 
-    borderRadius: '10px' 
+  individualAnswersSection: {
+    marginTop: '20px',
+    marginBottom: '20px',
+    padding: '12px',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderRadius: '10px'
   },
-  individualAnswersHeader: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px', 
-    marginBottom: '12px', 
-    paddingBottom: '8px', 
-    borderBottom: '1px solid #e5e7eb', 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    color: '#4b5563' 
+  individualAnswersHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+    paddingBottom: '8px',
+    borderBottom: '1px solid #e5e7eb',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#4b5563'
   },
-  answerCount: { 
-    marginLeft: 'auto', 
-    fontSize: '12px', 
-    backgroundColor: '#e5e7eb', 
-    padding: '2px 8px', 
-    borderRadius: '12px' 
+  answerCount: {
+    marginLeft: 'auto',
+    fontSize: '12px',
+    backgroundColor: '#e5e7eb',
+    padding: '2px 8px',
+    borderRadius: '12px'
   },
-  studentAnswersList: { 
-    display: 'flex', 
-    flexDirection: 'column', 
-    gap: '10px' 
+  studentAnswersList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
   },
   submissionStats: {
     display: 'flex',
@@ -1665,34 +1767,28 @@ const styles = {
     color: '#166534',
     marginBottom: '8px'
   },
-  studentAnswerItem: { 
-    backgroundColor: 'white', 
-    padding: '10px', 
-    borderRadius: '8px', 
-    border: '1px solid #e5e7eb' 
+  studentAnswerItem: {
+    backgroundColor: 'white',
+    padding: '10px',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb'
   },
-  studentAnswerItemMissing: { 
-    backgroundColor: '#fef2f2', 
-    padding: '10px', 
-    borderRadius: '8px', 
-    border: '1px solid #fecaca' 
+  studentAnswerItemMissing: {
+    backgroundColor: '#fef2f2',
+    padding: '10px',
+    borderRadius: '8px',
+    border: '1px solid #fecaca'
   },
-  studentAnswerHeader: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: '6px' 
+  studentAnswerHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '6px'
   },
-  studentName: { 
-    fontSize: '13px', 
-    fontWeight: '600', 
-    color: '#1f2937' 
-  },
-  studentRoleBadge: {
-    fontSize: '10px',
-    fontWeight: 'normal',
-    color: '#6b7280',
-    marginLeft: '6px'
+  studentName: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#1f2937'
   },
   submittedBadge: {
     fontSize: '10px',
@@ -1708,17 +1804,17 @@ const styles = {
     backgroundColor: '#fee2e2',
     color: '#991b1b'
   },
-  studentAnswerContent: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    gap: '8px' 
+  studentAnswerContent: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '8px'
   },
-  studentAnswerText: { 
-    fontSize: '13px', 
-    color: '#374151', 
-    fontFamily: 'monospace', 
-    flex: 1 
+  studentAnswerText: {
+    fontSize: '13px',
+    color: '#374151',
+    fontFamily: 'monospace',
+    flex: 1
   },
   studentAnswerMissing: {
     display: 'flex',
@@ -1728,390 +1824,384 @@ const styles = {
     fontSize: '12px',
     fontStyle: 'italic'
   },
-  submittedTime: { 
-    fontSize: '10px', 
-    color: '#9ca3af', 
-    marginTop: '4px' 
+  submittedTime: {
+    fontSize: '10px',
+    color: '#9ca3af',
+    marginTop: '4px'
   },
-  noAnswersMessage: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '6px', 
-    padding: '12px', 
-    backgroundColor: '#f9fafb', 
-    borderRadius: '8px', 
-    color: '#9ca3af', 
-    fontSize: '13px', 
-    fontStyle: 'italic' 
+  noAnswersMessage: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '12px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '8px',
+    color: '#9ca3af',
+    fontSize: '13px',
+    fontStyle: 'italic'
   },
-  membersList: { 
-    marginTop: '16px', 
-    paddingTop: '16px', 
-    borderTop: '1px solid #e5e7eb' 
+  membersList: {
+    marginTop: '16px',
+    paddingTop: '16px',
+    borderTop: '1px solid #e5e7eb'
   },
-  memberItem: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '8px 0', 
-    fontSize: '14px', 
-    borderBottom: '1px solid #f3f4f6' 
+  memberItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
+    fontSize: '14px',
+    borderBottom: '1px solid #f3f4f6'
   },
-  roleBadge: (role) => ({ 
-    padding: '2px 8px', 
-    borderRadius: '10px', 
-    fontSize: '11px', 
-    fontWeight: '500', 
-    backgroundColor: role === 'analyzer' ? '#ede9fe' : role === 'checker' ? '#fed7aa' : '#d1fae5', 
-    color: role === 'analyzer' ? '#6d28d9' : role === 'checker' ? '#92400e' : '#065f46' 
+  roleBadge: (role) => ({
+    padding: '2px 8px',
+    borderRadius: '10px',
+    fontSize: '11px',
+    fontWeight: '500',
+    backgroundColor: role === 'analyzer' ? '#ede9fe' : role === 'checker' ? '#fed7aa' : '#d1fae5',
+    color: role === 'analyzer' ? '#6d28d9' : role === 'checker' ? '#92400e' : '#065f46'
   }),
-  summaryCard: { 
-    backgroundColor: '#fef3c7', 
-    padding: '20px', 
-    borderRadius: '12px', 
-    marginBottom: '20px' 
+  summaryCard: {
+    backgroundColor: '#fef3c7',
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '20px'
   },
-  summaryGrid: { 
-    display: 'grid', 
-    gridTemplateColumns: '1fr 1fr', 
-    gap: '16px', 
-    marginTop: '16px', 
-    marginBottom: '16px' 
+  summaryGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+    marginTop: '16px',
+    marginBottom: '16px'
   },
-  summaryItem: { 
-    padding: '12px', 
-    backgroundColor: 'white', 
-    borderRadius: '8px' 
+  summaryItem: {
+    padding: '12px',
+    backgroundColor: 'white',
+    borderRadius: '8px'
   },
-  summaryAnswer: { 
-    fontSize: '12px', 
-    color: '#6b7280', 
-    marginTop: '4px' 
+  summaryAnswer: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '4px'
   },
-  summarySubsection: { 
-    marginTop: '8px', 
-    paddingTop: '8px', 
-    borderTop: '1px solid #e5e7eb', 
-    fontSize: '12px' 
+  summarySubsection: {
+    marginTop: '8px',
+    paddingTop: '8px',
+    borderTop: '1px solid #e5e7eb',
+    fontSize: '12px'
   },
-  summaryIndividualAnswer: { 
-    marginTop: '4px', 
-    marginLeft: '8px', 
-    fontSize: '11px', 
-    color: '#4b5563' 
+  summaryIndividualAnswer: {
+    marginTop: '4px',
+    marginLeft: '8px',
+    fontSize: '11px',
+    color: '#4b5563'
   },
-  summaryIndividualAnswerMissing: { 
-    marginTop: '4px', 
-    marginLeft: '8px', 
-    fontSize: '11px', 
-    color: '#dc2626' 
+  correctText: {
+    color: '#10b981',
+    fontWeight: '600',
+    marginLeft: '8px'
   },
-  correctText: { 
-    color: '#10b981', 
-    fontWeight: '600', 
-    marginLeft: '8px' 
+  incorrectText: {
+    color: '#ef4444',
+    fontWeight: '600',
+    marginLeft: '8px'
   },
-  incorrectText: { 
-    color: '#ef4444', 
-    fontWeight: '600', 
-    marginLeft: '8px' 
+  explanationBox: {
+    marginTop: '16px',
+    padding: '16px',
+    backgroundColor: 'white',
+    borderRadius: '8px'
   },
-  explanationBox: { 
-    marginTop: '16px', 
-    padding: '16px', 
-    backgroundColor: 'white', 
-    borderRadius: '8px' 
+  explanationText: {
+    marginTop: '8px',
+    lineHeight: '1.6',
+    whiteSpace: 'pre-line'
   },
-  explanationText: { 
-    marginTop: '8px', 
-    lineHeight: '1.6', 
-    whiteSpace: 'pre-line' 
+  awardPointsButton: {
+    width: '100%',
+    marginTop: '16px',
+    padding: '12px',
+    backgroundColor: '#f59e0b',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
   },
-  awardPointsButton: { 
-    width: '100%', 
-    marginTop: '16px', 
-    padding: '12px', 
-    backgroundColor: '#f59e0b', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '8px', 
-    fontSize: '16px', 
-    fontWeight: '600', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '8px' 
+  pointsPhaseContainer: {
+    marginTop: '20px'
   },
-  pointsPhaseContainer: { 
-    marginTop: '20px' 
+  pointsHeader: {
+    textAlign: 'center',
+    marginBottom: '30px'
   },
-  pointsHeader: { 
-    textAlign: 'center', 
-    marginBottom: '30px' 
+  pointsTitle: {
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#1f2937',
+    marginTop: '12px',
+    marginBottom: '8px'
   },
-  pointsTitle: { 
-    fontSize: '28px', 
-    fontWeight: '700', 
-    color: '#1f2937', 
-    marginTop: '12px', 
-    marginBottom: '8px' 
+  pointsSubtitle: {
+    color: '#6b7280',
+    fontSize: '14px'
   },
-  pointsSubtitle: { 
-    color: '#6b7280', 
-    fontSize: '14px' 
+  pointsTeamsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '24px',
+    marginBottom: '30px'
   },
-  pointsTeamsContainer: { 
-    display: 'grid', 
-    gridTemplateColumns: '1fr 1fr', 
-    gap: '24px', 
-    marginBottom: '30px' 
+  pointsCardA: {
+    backgroundColor: '#eff6ff',
+    borderRadius: '20px',
+    padding: '24px',
+    border: '2px solid #bfdbfe',
+    transition: 'all 0.3s'
   },
-  pointsCardA: { 
-    backgroundColor: '#eff6ff', 
-    borderRadius: '20px', 
-    padding: '24px', 
-    border: '2px solid #bfdbfe', 
-    transition: 'all 0.3s' 
+  pointsCardAAwarded: {
+    backgroundColor: '#eff6ff',
+    borderRadius: '20px',
+    padding: '24px',
+    border: '2px solid #bfdbfe',
+    opacity: 0.85
   },
-  pointsCardAAwarded: { 
-    backgroundColor: '#eff6ff', 
-    borderRadius: '20px', 
-    padding: '24px', 
-    border: '2px solid #bfdbfe', 
-    opacity: 0.85 
+  pointsCardB: {
+    backgroundColor: '#fce7f3',
+    borderRadius: '20px',
+    padding: '24px',
+    border: '2px solid #fbcfe8',
+    transition: 'all 0.3s'
   },
-  pointsCardB: { 
-    backgroundColor: '#fce7f3', 
-    borderRadius: '20px', 
-    padding: '24px', 
-    border: '2px solid #fbcfe8', 
-    transition: 'all 0.3s' 
+  pointsCardBAwarded: {
+    backgroundColor: '#fce7f3',
+    borderRadius: '20px',
+    padding: '24px',
+    border: '2px solid #fbcfe8',
+    opacity: 0.85
   },
-  pointsCardBAwarded: { 
-    backgroundColor: '#fce7f3', 
-    borderRadius: '20px', 
-    padding: '24px', 
-    border: '2px solid #fbcfe8', 
-    opacity: 0.85 
+  pointsCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '24px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e5e7eb'
   },
-  pointsCardHeader: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '16px', 
-    marginBottom: '24px', 
-    paddingBottom: '16px', 
-    borderBottom: '1px solid #e5e7eb' 
+  teamIconWrapperA: {
+    backgroundColor: '#dbeafe',
+    padding: '12px',
+    borderRadius: '12px',
+    color: '#2563eb'
   },
-  teamIconWrapperA: { 
-    backgroundColor: '#dbeafe', 
-    padding: '12px', 
-    borderRadius: '12px', 
-    color: '#2563eb' 
+  teamIconWrapperB: {
+    backgroundColor: '#fce7f3',
+    padding: '12px',
+    borderRadius: '12px',
+    color: '#db2777'
   },
-  teamIconWrapperB: { 
-    backgroundColor: '#fce7f3', 
-    padding: '12px', 
-    borderRadius: '12px', 
-    color: '#db2777' 
+  pointsTeamTitle: {
+    fontSize: '22px',
+    fontWeight: '700',
+    margin: 0,
+    color: '#1f2937'
   },
-  pointsTeamTitle: { 
-    fontSize: '22px', 
-    fontWeight: '700', 
-    margin: 0, 
-    color: '#1f2937' 
+  pointsMemberCount: {
+    fontSize: '12px',
+    color: '#6b7280'
   },
-  pointsMemberCount: { 
-    fontSize: '12px', 
-    color: '#6b7280' 
+  awardedBadge: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    padding: '6px 12px',
+    borderRadius: '20px',
+    fontSize: '12px',
+    fontWeight: '500'
   },
-  awardedBadge: { 
-    marginLeft: 'auto', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '6px', 
-    backgroundColor: '#10b981', 
-    color: 'white', 
-    padding: '6px 12px', 
-    borderRadius: '20px', 
-    fontSize: '12px', 
-    fontWeight: '500' 
+  pointsDisplay: {
+    marginBottom: '24px'
   },
-  pointsDisplay: { 
-    marginBottom: '24px' 
+  pointsInfo: {
+    marginBottom: '16px'
   },
-  pointsInfo: { 
-    marginBottom: '16px' 
+  pointsLabel: {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '8px'
   },
-  pointsLabel: { 
-    fontSize: '14px', 
-    color: '#6b7280', 
-    marginBottom: '8px' 
+  pointsValueAwarded: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#f59e0b'
   },
-  pointsValueAwarded: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px', 
-    fontSize: '24px', 
-    fontWeight: '700', 
-    color: '#f59e0b' 
+  pointsInputWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
   },
-  pointsInputWrapper: { 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '12px' 
+  pointsAdjustBtn: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '8px',
+    border: '1px solid #d1d5db',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  pointsAdjustBtn: { 
-    width: '36px', 
-    height: '36px', 
-    borderRadius: '8px', 
-    border: '1px solid #d1d5db', 
-    backgroundColor: 'white', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center' 
+  pointsInput: {
+    width: '80px',
+    height: '48px',
+    textAlign: 'center',
+    fontSize: '20px',
+    fontWeight: '600',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '0 8px'
   },
-  pointsInput: { 
-    width: '80px', 
-    height: '48px', 
-    textAlign: 'center', 
-    fontSize: '20px', 
-    fontWeight: '600', 
-    border: '2px solid #e5e7eb', 
-    borderRadius: '10px', 
-    padding: '0 8px' 
+  totalPointsInfo: {
+    backgroundColor: 'white',
+    padding: '12px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px'
   },
-  totalPointsInfo: { 
-    backgroundColor: 'white', 
-    padding: '12px', 
-    borderRadius: '8px', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px', 
-    fontSize: '14px' 
+  pointsBreakdown: {
+    fontSize: '12px',
+    color: '#9ca3af'
   },
-  pointsBreakdown: { 
-    fontSize: '12px', 
-    color: '#9ca3af' 
+  awardTeamButton: {
+    width: '100%',
+    padding: '12px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
   },
-  awardTeamButton: { 
-    width: '100%', 
-    padding: '12px', 
-    backgroundColor: '#10b981', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '10px', 
-    fontSize: '16px', 
-    fontWeight: '600', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '8px' 
+  membersPointsSummary: {
+    marginTop: '20px',
+    paddingTop: '16px',
+    borderTop: '1px solid #e5e7eb'
   },
-  membersPointsSummary: { 
-    marginTop: '20px', 
-    paddingTop: '16px', 
-    borderTop: '1px solid #e5e7eb' 
+  membersPointsList: {
+    marginTop: '12px'
   },
-  membersPointsList: { 
-    marginTop: '12px' 
+  memberPointsItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 0',
+    fontSize: '14px',
+    borderBottom: '1px solid #f3f4f6'
   },
-  memberPointsItem: { 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '8px 0', 
-    fontSize: '14px', 
-    borderBottom: '1px solid #f3f4f6' 
+  memberPointsValue: {
+    fontWeight: '600',
+    color: '#10b981'
   },
-  memberPointsValue: { 
-    fontWeight: '600', 
-    color: '#10b981' 
+  successMessageA: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: '#dbeafe',
+    color: '#1e40af',
+    padding: '12px 24px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '14px',
+    fontWeight: '500',
+    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+    zIndex: 2000,
+    border: '2px solid #bfdbfe',
+    animation: 'slideDown 0.3s ease-out'
   },
-  successMessageA: { 
-    position: 'fixed', 
-    top: '20px', 
-    left: '50%', 
-    transform: 'translateX(-50%)', 
-    backgroundColor: '#dbeafe', 
-    color: '#1e40af', 
-    padding: '12px 24px', 
-    borderRadius: '12px', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '12px', 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
-    zIndex: 2000, 
-    border: '2px solid #bfdbfe', 
-    animation: 'slideDown 0.3s ease-out' 
+  successMessageB: {
+    position: 'fixed',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: '#fce7f3',
+    color: '#9d174d',
+    padding: '12px 24px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '14px',
+    fontWeight: '500',
+    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+    zIndex: 2000,
+    border: '2px solid #fbcfe8',
+    animation: 'slideDown 0.3s ease-out'
   },
-  successMessageB: { 
-    position: 'fixed', 
-    top: '20px', 
-    left: '50%', 
-    transform: 'translateX(-50%)', 
-    backgroundColor: '#fce7f3', 
-    color: '#9d174d', 
-    padding: '12px 24px', 
-    borderRadius: '12px', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '12px', 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', 
-    zIndex: 2000, 
-    border: '2px solid #fbcfe8', 
-    animation: 'slideDown 0.3s ease-out' 
+  pointsActions: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '16px',
+    marginTop: '20px'
   },
-  pointsActions: { 
-    display: 'flex', 
-    justifyContent: 'center', 
-    gap: '16px', 
-    marginTop: '20px' 
+  backToSummaryButton: {
+    padding: '12px 24px',
+    backgroundColor: '#6b7280',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '500',
+    cursor: 'pointer'
   },
-  backToSummaryButton: { 
-    padding: '12px 24px', 
-    backgroundColor: '#6b7280', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '10px', 
-    fontSize: '14px', 
-    fontWeight: '500', 
-    cursor: 'pointer' 
+  finishRoundButton: {
+    padding: '12px 32px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
-  finishRoundButton: { 
-    padding: '12px 32px', 
-    backgroundColor: '#3b82f6', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '10px', 
-    fontSize: '14px', 
-    fontWeight: '600', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px' 
+  buttonContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '16px',
+    marginTop: '20px'
   },
-  buttonContainer: { 
-    display: 'flex', 
-    justifyContent: 'center', 
-    gap: '16px', 
-    marginTop: '20px' 
-  },
-  closeButtonMain: { 
-    padding: '12px 32px', 
-    backgroundColor: '#3b82f6', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '10px', 
-    fontSize: '16px', 
-    fontWeight: '600', 
-    cursor: 'pointer' 
+  closeButtonMain: {
+    padding: '12px 32px',
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '16px',
+    fontWeight: '600',
+    cursor: 'pointer'
   }
 };
 

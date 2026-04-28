@@ -5,7 +5,6 @@ export const classService = {
   // ========== HELPER: Get current user with better error handling ==========
   async getCurrentUser() {
     try {
-      // First try to get the session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
@@ -18,7 +17,6 @@ export const classService = {
         return session.user;
       }
       
-      // If no session, try to get the user directly
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -49,7 +47,6 @@ export const classService = {
       }
       if (!user) return null;
       
-      // Extract real Google data
       const realName = user.user_metadata?.full_name || 
                       user.user_metadata?.name || 
                       user.email?.split('@')[0] || 
@@ -83,7 +80,6 @@ export const classService = {
   async ensureAuthenticated() {
     const user = await this.getCurrentUser();
     if (!user) {
-      // Try to refresh the session
       const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError || !session?.user) {
         throw new Error('User not authenticated. Please log in again.');
@@ -93,18 +89,16 @@ export const classService = {
     return user;
   },
 
-  // ========== HELPER: Get or create user with real Google data (FIXED - NO DUPLICATES) ==========
+  // ========== HELPER: Get or create user with real Google data ==========
   async getOrCreateUser(authUserId, email, name) {
     try {
       if (!authUserId) return null;
       
-      // Get real data from Google Auth
       const realUser = await this.getRealUserFromAuth();
       
       const finalEmail = realUser?.email || email || '';
       const finalName = realUser?.name || name || finalEmail?.split('@')[0] || '';
       
-      // Check if user exists
       let { data: existingUser, error: selectError } = await supabase
         .from('users')
         .select('*')
@@ -115,13 +109,11 @@ export const classService = {
         console.error('Error checking user:', selectError);
       }
       
-      // If user exists, return it (don't try to update - could cause issues)
       if (existingUser) {
         console.log('✅ Existing user found:', existingUser.id);
         return existingUser;
       }
       
-      // Double check to prevent race condition
       const { data: doubleCheck, error: doubleCheckError } = await supabase
         .from('users')
         .select('*')
@@ -133,7 +125,6 @@ export const classService = {
         return doubleCheck;
       }
       
-      // Create new user
       console.log('📝 Creating new user:', authUserId);
       
       const { data: newUser, error: insertError } = await supabase
@@ -172,16 +163,14 @@ export const classService = {
     }
   },
 
-  // ========== HELPER: Get or create student with real Google data (FIXED - NO DUPLICATES) ==========
+  // ========== HELPER: Get or create student ==========
   async getOrCreateStudent(authUserId, email, name) {
     try {
       if (!authUserId) return null;
       
-      // First ensure user exists with real data
       const user = await this.getOrCreateUser(authUserId, email, name);
       if (!user) return null;
       
-      // IMPORTANT: Check if student already exists using user_id (not email)
       let { data: existingStudent, error: selectError } = await supabase
         .from('students')
         .select('*')
@@ -192,13 +181,11 @@ export const classService = {
         console.error('Error checking student:', selectError);
       }
       
-      // If student exists, return it immediately (NO UPDATE ATTEMPT)
       if (existingStudent) {
         console.log('✅ Existing student found:', existingStudent.id);
         return existingStudent;
       }
       
-      // CRITICAL: Check ONE MORE TIME to prevent race condition
       const { data: doubleCheck, error: doubleCheckError } = await supabase
         .from('students')
         .select('*')
@@ -210,7 +197,6 @@ export const classService = {
         return doubleCheck;
       }
       
-      // Only create if absolutely no student exists
       console.log('📝 Creating new student for user:', authUserId);
       
       const { data: newStudent, error: insertError } = await supabase
@@ -226,7 +212,6 @@ export const classService = {
         .single();
       
       if (insertError) {
-        // If unique violation, fetch the existing one
         if (insertError.code === '23505') {
           console.log('⚠️ Duplicate detected, fetching existing student...');
           const { data: retryStudent } = await supabase
@@ -282,7 +267,15 @@ export const classService = {
       
       const { data, error } = await supabase
         .from('teachers')
-        .select('*')
+        .select(`
+          *,
+          user:user_id (
+            id,
+            name,
+            email,
+            avatar_url
+          )
+        `)
         .eq('user_id', authUserId)
         .maybeSingle();
       
@@ -294,6 +287,60 @@ export const classService = {
       return data;
     } catch (error) {
       console.error('Error in getTeacherByUserId:', error);
+      return null;
+    }
+  },
+
+  // ========== HELPER: Get teacher by teacher ID ==========
+  async getTeacherById(teacherId) {
+    try {
+      if (!teacherId) return null;
+      
+      const { data, error } = await supabase
+        .from('teachers')
+        .select(`
+          *,
+          user:user_id (
+            id,
+            name,
+            email,
+            avatar_url
+          )
+        `)
+        .eq('id', teacherId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error getting teacher by ID:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getTeacherById:', error);
+      return null;
+    }
+  },
+
+  // ========== HELPER: Get user by ID ==========
+  async getUserById(userId) {
+    try {
+      if (!userId) return null;
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, email, avatar_url, role')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error getting user by ID:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getUserById:', error);
       return null;
     }
   },
@@ -359,20 +406,36 @@ export const classService = {
 
       if (existingClass) throw new Error('Class code already exists');
 
+      // FIXED: Removed 'description' field - only insert fields that exist in the table
+      const insertData = {
+        name: classData.name,
+        code: classData.code.toUpperCase(),
+        teacher_id: teacher.id,
+        students_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Only add description if the column exists (check optional)
+      if (classData.description && typeof classData.description === 'string') {
+        // If you want to add description later, add the column to your table
+        console.log('Note: Description field will be added when you run the SQL migration');
+        // insertData.description = classData.description; // Uncomment after adding column
+      }
+      
+      console.log('📝 Creating class with data:', insertData);
+      
       const { data, error } = await supabase
         .from('classes')
-        .insert({
-          name: classData.name,
-          code: classData.code.toUpperCase(),
-          teacher_id: teacher.id,
-          students_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .insert(insertData)
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(`Failed to create class: ${error.message}`);
+      }
+      
       return data;
     } catch (error) {
       console.error('Error in createClass:', error);
@@ -389,12 +452,31 @@ export const classService = {
       
       const { data, error } = await supabase
         .from('classes')
-        .select('*')
+        .select(`
+          *,
+          teacher:teacher_id (
+            id,
+            user_id,
+            name,
+            email,
+            user:user_id (
+              id,
+              name,
+              email
+            )
+          )
+        `)
         .eq('teacher_id', teacher.id)
         .order('created_at', { ascending: false });
       
       if (error) return [];
-      return data || [];
+      
+      const enrichedData = (data || []).map(cls => ({
+        ...cls,
+        teacher_name: cls.teacher?.user?.name || cls.teacher?.name || 'Teacher'
+      }));
+      
+      return enrichedData;
     } catch (error) {
       console.error('Error in getTeacherClasses:', error);
       return [];
@@ -405,14 +487,80 @@ export const classService = {
     try {
       if (!classId) return null;
       
+      console.log('📚 Fetching class by ID:', classId);
+      
       const { data, error } = await supabase
         .from('classes')
-        .select('*')
+        .select(`
+          *,
+          teacher:teacher_id (
+            id,
+            user_id,
+            name,
+            email,
+            user:user_id (
+              id,
+              name,
+              email,
+              avatar_url
+            )
+          )
+        `)
         .eq('id', classId)
         .maybeSingle();
       
-      if (error) return null;
-      return data;
+      if (error) {
+        console.error('Error getting class by ID:', error);
+        return null;
+      }
+      
+      if (!data) return null;
+      
+      let teacherName = 'Teacher';
+      
+      if (data.teacher) {
+        if (data.teacher.user && data.teacher.user.name) {
+          teacherName = data.teacher.user.name;
+        } 
+        else if (data.teacher.name) {
+          teacherName = data.teacher.name;
+        }
+        else if (data.teacher_id) {
+          const teacherDetails = await this.getTeacherById(data.teacher_id);
+          if (teacherDetails && teacherDetails.user && teacherDetails.user.name) {
+            teacherName = teacherDetails.user.name;
+          } else if (teacherDetails && teacherDetails.name) {
+            teacherName = teacherDetails.name;
+          }
+        }
+      }
+      
+      if (teacherName === 'Teacher' && data.teacher_id) {
+        const { data: teacherUser } = await supabase
+          .from('teachers')
+          .select('user_id')
+          .eq('id', data.teacher_id)
+          .maybeSingle();
+        
+        if (teacherUser && teacherUser.user_id) {
+          const userData = await this.getUserById(teacherUser.user_id);
+          if (userData && userData.name) {
+            teacherName = userData.name;
+          }
+        }
+      }
+      
+      console.log('👨‍🏫 Teacher name found:', teacherName);
+      
+      return {
+        ...data,
+        teacher_name: teacherName,
+        teacher: data.teacher ? {
+          ...data.teacher,
+          name: teacherName
+        } : { name: teacherName }
+      };
+      
     } catch (error) {
       console.error('Error in getClassById:', error);
       return null;
@@ -425,14 +573,67 @@ export const classService = {
       
       const upperCode = code.toUpperCase().trim();
       
+      console.log('🔍 Looking for class with code:', upperCode);
+      
       const { data, error } = await supabase
         .from('classes')
-        .select('*')
+        .select(`
+          *,
+          teacher:teacher_id (
+            id,
+            user_id,
+            name,
+            email,
+            user:user_id (
+              id,
+              name,
+              email,
+              avatar_url
+            )
+          )
+        `)
         .eq('code', upperCode)
         .maybeSingle();
 
-      if (error) return null;
-      return data;
+      if (error) {
+        console.error('Error getting class by code:', error);
+        return null;
+      }
+      
+      if (!data) return null;
+      
+      let teacherName = 'Teacher';
+      
+      if (data.teacher) {
+        if (data.teacher.user && data.teacher.user.name) {
+          teacherName = data.teacher.user.name;
+        } else if (data.teacher.name) {
+          teacherName = data.teacher.name;
+        } else if (data.teacher_id) {
+          const teacherDetails = await this.getTeacherById(data.teacher_id);
+          if (teacherDetails && teacherDetails.user && teacherDetails.user.name) {
+            teacherName = teacherDetails.user.name;
+          } else if (teacherDetails && teacherDetails.name) {
+            teacherName = teacherDetails.name;
+          }
+        }
+      }
+      
+      const { count: studentsCount, error: countError } = await supabase
+        .from('class_students')
+        .select('*', { count: 'exact', head: true })
+        .eq('class_id', data.id);
+      
+      return {
+        ...data,
+        teacher_name: teacherName,
+        teacher: data.teacher ? {
+          ...data.teacher,
+          name: teacherName
+        } : { name: teacherName },
+        students_count: countError ? 0 : (studentsCount || 0)
+      };
+      
     } catch (error) {
       console.error('Error in getClassByCode:', error);
       return null;
@@ -443,56 +644,114 @@ export const classService = {
     try {
       if (!authUserId) return [];
       
-      const student = await this.getStudentByUserId(authUserId);
-      if (!student) return [];
+      console.log('📚 Getting classes for student:', authUserId);
       
-      const { data: enrollments, error: enrollError } = await supabase
-        .from('class_students')
-        .select(`
-          id,
-          class_id,
-          student_id,
-          joined_at,
-          progress,
-          updated_at,
-          class:classes (
+      const student = await this.getStudentByUserId(authUserId);
+      if (!student) {
+        console.log('No student record found');
+        return [];
+      }
+      
+      let enrollments = [];
+      
+      try {
+        const { data, error } = await supabase
+          .from('class_students')
+          .select(`
             id,
-            name,
-            code,
-            teacher_id,
-            students_count,
-            created_at,
-            updated_at
-          )
-        `)
-        .eq('student_id', student.id)
-        .order('joined_at', { ascending: false });
-
-      if (enrollError) return [];
-      if (!enrollments || enrollments.length === 0) return [];
+            class_id,
+            student_id,
+            joined_at,
+            progress,
+            updated_at,
+            class:classes (
+              id,
+              name,
+              code,
+              teacher_id,
+              students_count,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq('student_id', student.id)
+          .order('joined_at', { ascending: false });
+        
+        if (!error) {
+          enrollments = data || [];
+        } else {
+          console.warn('Error fetching enrollments:', error.message);
+          enrollments = [];
+        }
+      } catch (err) {
+        console.error('Error in enrollment query:', err);
+        enrollments = [];
+      }
+      
+      if (!enrollments || enrollments.length === 0) {
+        console.log('No enrollments found');
+        return [];
+      }
+      
+      console.log(`Found ${enrollments.length} enrollments`);
       
       const enrichedEnrollments = await Promise.all(
         enrollments.map(async (enrollment) => {
+          let teacherName = 'Teacher';
+          let teacherData = null;
+          
           if (enrollment.class && enrollment.class.teacher_id) {
-            const { data: teacher } = await supabase
-              .from('users')
-              .select('name, email')
+            const { data: teacher, error: teacherError } = await supabase
+              .from('teachers')
+              .select(`
+                id,
+                user_id,
+                name,
+                email,
+                user:user_id (
+                  id,
+                  name,
+                  email
+                )
+              `)
               .eq('id', enrollment.class.teacher_id)
               .maybeSingle();
             
-            return {
-              ...enrollment,
-              class: {
-                ...enrollment.class,
-                teacher: teacher || { name: 'Unknown Teacher', email: '' }
+            if (!teacherError && teacher) {
+              teacherData = teacher;
+              teacherName = teacher.user?.name || teacher.name || 'Teacher';
+            }
+            
+            if (teacherName === 'Teacher' && enrollment.class.teacher_id) {
+              const { data: teacherRecord } = await supabase
+                .from('teachers')
+                .select('user_id')
+                .eq('id', enrollment.class.teacher_id)
+                .maybeSingle();
+              
+              if (teacherRecord && teacherRecord.user_id) {
+                const userData = await this.getUserById(teacherRecord.user_id);
+                if (userData && userData.name) {
+                  teacherName = userData.name;
+                }
               }
-            };
+            }
           }
-          return enrollment;
+          
+          return {
+            ...enrollment,
+            class: {
+              ...enrollment.class,
+              teacher_name: teacherName,
+              teacher: teacherData || { name: teacherName }
+            }
+          };
         })
       );
       
+      console.log('✅ Found classes with teacher names:', enrichedEnrollments.length);
       return enrichedEnrollments;
+      
     } catch (error) {
       console.error('Error in getStudentClasses:', error);
       return [];
@@ -518,7 +777,6 @@ export const classService = {
     }
   },
 
-  // ========== JOIN CLASS (FIXED - PREVENT DUPLICATE ENROLLMENTS) ==========
   async joinClass(authUserId, classCode) {
     try {
       if (!authUserId || !classCode) {
@@ -527,20 +785,17 @@ export const classService = {
 
       const realUser = await this.getRealUserFromAuth();
       
-      // Get or create student (this now prevents duplicates)
       const student = await this.getOrCreateStudent(authUserId, realUser?.email, realUser?.name);
       if (!student) throw new Error('Could not create or find student record');
       
       const classData = await this.getClassByCode(classCode);
       if (!classData) throw new Error(`Class not found with code: ${classCode}`);
 
-      // CRITICAL: Check for existing enrollment before attempting to join
       const isAlreadyJoined = await this.isStudentInClass(student.id, classData.id);
       if (isAlreadyJoined) {
         throw new Error('You are already a member of this class!');
       }
 
-      // Double check with direct query to prevent race condition
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('class_students')
         .select('id')
@@ -552,7 +807,6 @@ export const classService = {
         throw new Error('You are already enrolled in this class');
       }
 
-      // Create enrollment with unique constraint handling
       const { data, error } = await supabase
         .from('class_students')
         .insert({
@@ -565,7 +819,7 @@ export const classService = {
         .single();
 
       if (error) {
-        if (error.code === '23505') { // Unique violation
+        if (error.code === '23505') {
           throw new Error('You are already a member of this class!');
         }
         throw new Error(`Failed to join class: ${error.message}`);
@@ -585,14 +839,12 @@ export const classService = {
     }
   },
 
-  // ========== GET CLASS STUDENTS (FIXED - RETURN PROPER DATA) ==========
   async getClassStudents(classId) {
     try {
       if (!classId) return [];
       
       console.log('📋 Getting students for class:', classId);
       
-      // Get enrollments with student details in ONE QUERY
       const { data: enrollments, error: enrollError } = await supabase
         .from('class_students')
         .select(`
@@ -619,14 +871,12 @@ export const classService = {
       
       if (!enrollments || enrollments.length === 0) return [];
       
-      // Get unique user IDs from students
       const userIds = [...new Set(
         enrollments
           .map(e => e.students?.user_id)
           .filter(id => id)
       )];
       
-      // Get user details (real Google names)
       let usersMap = {};
       if (userIds.length > 0) {
         const { data: users, error: userError } = await supabase
@@ -640,7 +890,6 @@ export const classService = {
         }
       }
       
-      // Get points for each student
       const { data: points } = await supabase
         .from('student_points')
         .select('student_id, points')
@@ -651,7 +900,6 @@ export const classService = {
         points.forEach(p => { pointsMap[p.student_id] = p.points; });
       }
       
-      // Combine all data
       const result = enrollments.map(enrollment => {
         const student = enrollment.students;
         const user = student ? usersMap[student.user_id] : null;
@@ -682,33 +930,15 @@ export const classService = {
     }
   },
 
-  // ========== GET CLASS WITH STUDENTS (FIXED - PROPER DATA) ==========
   async getClassWithStudents(classId) {
     try {
       if (!classId) return null;
       
       console.log('📋 Fetching class with students for ID:', classId);
       
-      // Get class with teacher
-      const { data: classData, error: classError } = await supabase
-        .from('classes')
-        .select(`
-          *,
-          teacher:teacher_id (
-            id,
-            name,
-            email
-          )
-        `)
-        .eq('id', classId)
-        .maybeSingle();
-
-      if (classError || !classData) {
-        console.error('Error getting class:', classError);
-        return null;
-      }
+      const classData = await this.getClassById(classId);
+      if (!classData) return null;
       
-      // Get students using getClassStudents
       const students = await this.getClassStudents(classId);
       classData.students = students;
       
@@ -747,17 +977,121 @@ export const classService = {
     }
   },
 
-  async deleteClass(classId) {
+  // ========== DELETE CLASS - COMPLETELY REMOVES FROM DATABASE ==========
+  async deleteClass(classId, teacherAuthUserId) {
     try {
       if (!classId) throw new Error('Class ID is required');
+      if (!teacherAuthUserId) throw new Error('Teacher authorization required');
       
-      await supabase.from('class_students').delete().eq('class_id', classId);
-      const { error } = await supabase.from('classes').delete().eq('id', classId);
-      if (error) throw error;
-      return true;
+      // Verify the teacher owns this class
+      const teacher = await this.getTeacherByUserId(teacherAuthUserId);
+      if (!teacher) throw new Error('Teacher not found');
+      
+      // Get class to verify ownership
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .select('teacher_id')
+        .eq('id', classId)
+        .maybeSingle();
+      
+      if (classError) throw new Error('Class not found');
+      if (classData.teacher_id !== teacher.id) {
+        throw new Error('You do not have permission to delete this class');
+      }
+      
+      console.log(`🗑️ Deleting class ${classId} and all related data...`);
+      
+      // 1. Delete student points
+      const { error: pointsError } = await supabase
+        .from('student_points')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (pointsError) {
+        console.warn('Error deleting student points:', pointsError);
+      }
+      
+      // 2. Delete team assignments
+      const { error: teamError } = await supabase
+        .from('team_assignments')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (teamError) {
+        console.warn('Error deleting team assignments:', teamError);
+      }
+      
+      // 3. Delete student ready statuses
+      const { error: readyStatusError } = await supabase
+        .from('student_ready_status')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (readyStatusError) {
+        console.warn('Error deleting ready statuses:', readyStatusError);
+      }
+      
+      // 4. Delete announcements
+      const { error: announcementsError } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (announcementsError) {
+        console.warn('Error deleting announcements:', announcementsError);
+      }
+      
+      // 5. Delete missions
+      const { error: missionsError } = await supabase
+        .from('missions')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (missionsError) {
+        console.warn('Error deleting missions:', missionsError);
+      }
+      
+      // 6. Delete class students (enrollments)
+      const { error: enrollmentsError } = await supabase
+        .from('class_students')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (enrollmentsError) {
+        console.warn('Error deleting enrollments:', enrollmentsError);
+      }
+      
+      // 7. Finally, delete the class itself
+      const { error: deleteError } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classId);
+      
+      if (deleteError) {
+        throw new Error(`Failed to delete class: ${deleteError.message}`);
+      }
+      
+      console.log(`✅ Class ${classId} and all related data deleted successfully`);
+      
+      // Dispatch event to notify other components
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('classDeleted', { 
+          detail: { classId, timestamp: Date.now() }
+        });
+        window.dispatchEvent(event);
+      }
+      
+      return { 
+        success: true, 
+        message: 'Class and all related data deleted successfully' 
+      };
+      
     } catch (error) {
       console.error('Error in deleteClass:', error);
-      throw error;
+      return { 
+        success: false, 
+        message: error.message || 'Failed to delete class' 
+      };
     }
   },
 
@@ -801,6 +1135,65 @@ export const classService = {
     }
   },
 
+  // ========== CLASS ANNOUNCEMENTS ==========
+  async getClassAnnouncements(classId) {
+    try {
+      if (!classId) return [];
+      
+      const { data, error } = await supabase
+        .from('announcements')
+        .select(`
+          *,
+          teacher:teacher_id (
+            id,
+            name,
+            user:user_id (
+              id,
+              name,
+              email
+            )
+          )
+        `)
+        .eq('class_id', classId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error getting announcements:', error);
+        return [];
+      }
+      
+      const enrichedData = (data || []).map(announcement => ({
+        ...announcement,
+        teacher_name: announcement.teacher?.user?.name || announcement.teacher?.name || 'Teacher'
+      }));
+      
+      return enrichedData;
+    } catch (error) {
+      console.error('Error in getClassAnnouncements:', error);
+      return [];
+    }
+  },
+
+  async createAnnouncement(announcementData) {
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .insert({
+          ...announcementData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error in createAnnouncement:', error);
+      throw error;
+    }
+  },
+
   // ========== TEAM ASSIGNMENT MANAGEMENT ==========
   
   async getClassTeamAssignments(classId) {
@@ -831,7 +1224,6 @@ export const classService = {
       
       console.log('📝 Assigning student to team:', { classId, studentId, team, role });
       
-      // First check if assignment exists
       const { data: existing, error: checkError } = await supabase
         .from('team_assignments')
         .select('id')
@@ -839,14 +1231,9 @@ export const classService = {
         .eq('student_id', studentId)
         .maybeSingle();
       
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('Error checking existing assignment:', checkError);
-      }
-      
       let result;
       
       if (existing) {
-        // Update existing assignment
         const { data, error } = await supabase
           .from('team_assignments')
           .update({
@@ -858,14 +1245,9 @@ export const classService = {
           .select()
           .single();
         
-        if (error) {
-          console.error('Error updating team assignment:', error);
-          throw new Error(`Failed to update team assignment: ${error.message}`);
-        }
+        if (error) throw error;
         result = data;
-        console.log('✅ Updated team assignment:', result);
       } else {
-        // Create new assignment
         const { data, error } = await supabase
           .from('team_assignments')
           .insert({
@@ -878,12 +1260,8 @@ export const classService = {
           .select()
           .single();
         
-        if (error) {
-          console.error('Error creating team assignment:', error);
-          throw new Error(`Failed to create team assignment: ${error.message}`);
-        }
+        if (error) throw error;
         result = data;
-        console.log('✅ Created team assignment:', result);
       }
       
       return result;
@@ -901,10 +1279,7 @@ export const classService = {
         .eq('class_id', classId)
         .eq('student_id', studentId);
       
-      if (error) {
-        console.error('Error removing team assignment:', error);
-        throw error;
-      }
+      if (error) throw error;
       return true;
     } catch (error) {
       console.error('Error in removeStudentFromTeam:', error);
@@ -923,10 +1298,7 @@ export const classService = {
         .eq('class_id', classId)
         .maybeSingle();
       
-      if (error) {
-        console.error('Error getting student team assignment:', error);
-        return null;
-      }
+      if (error) return null;
       return data;
     } catch (error) {
       console.error('Error in getStudentTeamAssignment:', error);
@@ -944,10 +1316,7 @@ export const classService = {
         .eq('class_id', classId)
         .eq('team', team);
       
-      if (error) {
-        console.error('Error getting students by team:', error);
-        return [];
-      }
+      if (error) return [];
       return data || [];
     } catch (error) {
       console.error('Error in getStudentsByTeam:', error);
@@ -963,17 +1332,12 @@ export const classService = {
         throw new Error('Missing required fields');
       }
       
-      // Check if status exists
       const { data: existing, error: checkError } = await supabase
         .from('student_ready_status')
         .select('id')
         .eq('student_id', studentId)
         .eq('class_id', classId)
         .maybeSingle();
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('Error checking existing status:', checkError);
-      }
       
       let result;
       
@@ -1023,10 +1387,7 @@ export const classService = {
         .select('*, student:students(*)')
         .eq('class_id', classId);
       
-      if (error) {
-        console.error('Error getting ready statuses:', error);
-        return [];
-      }
+      if (error) return [];
       return data || [];
     } catch (error) {
       console.error('Error in getStudentReadyStatuses:', error);
@@ -1044,12 +1405,7 @@ export const classService = {
         .eq('class_id', classId)
         .eq('team', team);
       
-      if (error) {
-        console.error('Error checking team ready status:', error);
-        return false;
-      }
-      
-      // All team members must be ready
+      if (error) return false;
       if (!data || data.length === 0) return false;
       
       return data.every(status => status.is_ready === true);
@@ -1072,10 +1428,7 @@ export const classService = {
         .eq('class_id', classId)
         .eq('team', team);
       
-      if (error) {
-        console.error('Error resetting team ready status:', error);
-        return false;
-      }
+      if (error) return false;
       return true;
     } catch (error) {
       console.error('Error in resetTeamReadyStatus:', error);
@@ -1166,17 +1519,12 @@ export const classService = {
         throw new Error('Missing required fields');
       }
       
-      // Check if points record exists
       const { data: existing, error: checkError } = await supabase
         .from('student_points')
         .select('id, points')
         .eq('student_id', studentId)
         .eq('class_id', classId)
         .maybeSingle();
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('Error checking points:', checkError);
-      }
       
       let result;
       
@@ -1247,12 +1595,8 @@ export const classService = {
         .eq('class_id', classId)
         .order('points', { ascending: false });
       
-      if (error) {
-        console.error('Error getting leaderboard:', error);
-        return [];
-      }
+      if (error) return [];
       
-      // Enrich with Google user data
       const enrichedData = [];
       for (const item of (data || [])) {
         const student = item.student;

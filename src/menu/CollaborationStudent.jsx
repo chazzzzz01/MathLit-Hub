@@ -4,9 +4,8 @@ import { useOutletContext } from 'react-router-dom';
 import { 
   FiBookOpen, FiChevronDown, FiUsers, FiUser, FiUserCheck, FiUserX, 
   FiUserPlus, FiStar, FiClock, FiSend, FiCheckCircle, 
-  FiXCircle, FiAward, FiAlertCircle, FiZap, FiLock, FiRefreshCw
+  FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw
 } from 'react-icons/fi';
-import { classService } from '../services/classService';
 import { supabase } from '../lib/supabase';
 
 function CollaborationStudent() {
@@ -21,138 +20,311 @@ function CollaborationStudent() {
   const [error, setError] = useState(null);
   const [studentPoints, setStudentPoints] = useState(0);
   const [teamTotalPoints, setTeamTotalPoints] = useState(0);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   
+  // Ready states
   const [isReady, setIsReady] = useState(false);
-  const [isRoundActive, setIsRoundActive] = useState(false);
-  const [currentRound, setCurrentRound] = useState(null);
-  const [studentAnswer, setStudentAnswer] = useState('');
-  const [answerSubmitted, setAnswerSubmitted] = useState(false);
-  const [roundEnded, setRoundEnded] = useState(false);
-  const [roundResult, setRoundResult] = useState(null);
-  const [waitingForResults, setWaitingForResults] = useState(false);
-  const [submittedAnswerText, setSubmittedAnswerText] = useState('');
   const [readySubmitted, setReadySubmitted] = useState(false);
-  const [teacherStartedRound, setTeacherStartedRound] = useState(false);
-  const [loadingQuestion, setLoadingQuestion] = useState(false);
   const [readyError, setReadyError] = useState(null);
-  const [submissionError, setSubmissionError] = useState(null);
-  
-  const [isQuestionLocked, setIsQuestionLocked] = useState(true);
-  const [teacherClickedStart, setTeacherClickedStart] = useState(false);
-  const [roundStarting, setRoundStarting] = useState(false);
-  const [debugInfo, setDebugInfo] = useState('');
-  
-  const [studentUUID, setStudentUUID] = useState(null);
-  const [initialized, setInitialized] = useState(false);
   const [waitingForTeacher, setWaitingForTeacher] = useState(false);
   
-  // New states for real-time question receiving
+  // Round states
+  const [roundActive, setRoundActive] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [roundActive, setRoundActive] = useState(false);
   const [canAnswer, setCanAnswer] = useState(false);
+  const [studentAnswer, setStudentAnswer] = useState('');
+  const [answerSubmitted, setAnswerSubmitted] = useState(false);
+  const [submittedAnswerText, setSubmittedAnswerText] = useState('');
+  const [submissionError, setSubmissionError] = useState(null);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [questionLoading, setQuestionLoading] = useState(false);
+  const [roundEnded, setRoundEnded] = useState(false);
+  
+  // Game session tracking
+  const [studentUUID, setStudentUUID] = useState(null);
+  const [currentGameSessionId, setCurrentGameSessionId] = useState(null);
   
   const dropdownRef = useRef(null);
-  const submittedAnswerRef = useRef(null);
-  const gameSessionSubscriptionRef = useRef(null);
-  const roundStatusSubscriptionRef = useRef(null);
   const pollingIntervalRef = useRef(null);
-  let countdownInterval = null;
+  const countdownIntervalRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
-    
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Get the auth user ID from the user object
   const getAuthUserId = () => {
-    if (user?.id) return user.id;
-    if (user?.dbId) return user.dbId;
-    if (userData?.id) return userData.id;
-    if (userData?.dbId) return userData.dbId;
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        if (parsedUser?.id) return parsedUser.id;
-        if (parsedUser?.dbId) return parsedUser.dbId;
-      } catch (e) {}
+    try {
+      if (user?.id) return user.id;
+      if (user?.dbId) return user.dbId;
+      if (userData?.id) return userData.id;
+      if (userData?.dbId) return userData.dbId;
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          return parsedUser?.id || parsedUser?.dbId || null;
+        } catch (e) {}
+      }
+      return null;
+    } catch (error) {
+      return null;
     }
-    return null;
   };
 
-  // Countdown timer function
-  const startCountdown = (endsAt) => {
-    if (countdownInterval) clearInterval(countdownInterval);
+  const startCountdown = (startTime, duration) => {
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     
-    countdownInterval = setInterval(() => {
+    const start = new Date(startTime).getTime();
+    const endTime = start + (duration * 1000);
+    
+    const updateTimer = () => {
       const now = new Date().getTime();
-      const end = new Date(endsAt).getTime();
-      const remaining = Math.max(0, Math.floor((end - now) / 1000));
-      
+      const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
       setTimeLeft(remaining);
       
       if (remaining <= 0) {
-        clearInterval(countdownInterval);
+        clearInterval(countdownIntervalRef.current);
         setCanAnswer(false);
-        setIsQuestionLocked(true);
       }
-    }, 1000);
+    };
+    
+    updateTimer();
+    countdownIntervalRef.current = setInterval(updateTimer, 1000);
   };
 
-  // Check answer against correct answer
-  const checkAnswerAgainstCorrect = async (correctAnswer, studentAns) => {
-    if (!studentAns) return;
+  const fetchOrCreateStudentUUID = async () => {
+    const authUserId = getAuthUserId();
+    if (!authUserId) return null;
     
-    const isCorrect = studentAns.trim().toLowerCase() === correctAnswer.toLowerCase();
-    
-    setRoundResult({
-      isCorrect: isCorrect,
-      correctAnswer: correctAnswer,
-      yourAnswer: studentAns,
-      pointsEarned: isCorrect ? 10 : 0
-    });
-    
-    setRoundEnded(true);
-    setRoundActive(false);
-    setCanAnswer(false);
-    
-    // Update points if correct
-    if (isCorrect && studentUUID && selectedClass?.id) {
-      try {
-        const currentPoints = await classService.getStudentPoints(selectedClass.id, studentUUID);
-        await classService.updateStudentPoints(selectedClass.id, studentUUID, currentPoints + 10);
-        await loadStudentPoints(selectedClass.id);
-        
-        // Update team total
-        const { data: teamPoints } = await supabase
-          .from('student_points')
-          .select('points')
-          .eq('class_id', selectedClass.id)
-          .in('student_id', teamMembers.map(m => m.id));
-        
-        const total = teamPoints?.reduce((sum, p) => sum + (p.points || 0), 0) || 0;
-        setTeamTotalPoints(total);
-        
-      } catch (error) {
-        console.error('Error updating points:', error);
+    try {
+      let { data: existingStudent } = await supabase
+        .from('students')
+        .select('id')
+        .eq('user_id', authUserId)
+        .maybeSingle();
+      
+      if (existingStudent) {
+        setStudentUUID(existingStudent.id);
+        return existingStudent.id;
       }
+      
+      const userEmail = user?.email || userData?.email || '';
+      const userName = user?.name || userData?.name || userEmail?.split('@')[0] || 'Student';
+      
+      const { data: newStudent, error: insertError } = await supabase
+        .from('students')
+        .insert({
+          user_id: authUserId,
+          name: userName,
+          email: userEmail,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+      
+      if (insertError) return null;
+      
+      setStudentUUID(newStudent.id);
+      return newStudent.id;
+    } catch (error) {
+      return null;
     }
   };
 
-  // Submit answer function
+  const loadStudentPoints = async (classId) => {
+    if (!classId || !studentUUID) return;
+    try {
+      const { data } = await supabase
+        .from('student_points')
+        .select('points')
+        .eq('student_id', studentUUID)
+        .eq('class_id', classId)
+        .maybeSingle();
+      setStudentPoints(data?.points || 0);
+    } catch (error) {}
+  };
+
+  const loadTeamInfo = async (classId) => {
+    if (!studentUUID || !classId) return;
+    
+    setLoadingTeam(true);
+    try {
+      const { data: assignment } = await supabase
+        .from('team_assignments')
+        .select('*')
+        .eq('student_id', studentUUID)
+        .eq('class_id', classId)
+        .maybeSingle();
+      
+      if (assignment?.team) {
+        setTeamInfo({
+          team: assignment.team,
+          role: assignment.role,
+          assignedAt: assignment.updated_at
+        });
+        
+        const { data: teamAssignments } = await supabase
+          .from('team_assignments')
+          .select('*, students(id, name, user_id)')
+          .eq('class_id', classId)
+          .eq('team', assignment.team);
+        
+        const memberDetails = await Promise.all(
+          (teamAssignments || []).map(async (ta) => {
+            let userName = ta.students?.name || 'Student';
+            
+            if (ta.students?.user_id) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('name')
+                .eq('id', ta.students.user_id)
+                .maybeSingle();
+              if (userData) userName = userData.name || userName;
+            }
+            
+            const { data: pointData } = await supabase
+              .from('student_points')
+              .select('points')
+              .eq('student_id', ta.student_id)
+              .eq('class_id', classId)
+              .maybeSingle();
+            
+            return {
+              id: ta.student_id,
+              name: userName,
+              role: ta.role,
+              isCurrentUser: ta.student_id === studentUUID,
+              points: pointData?.points || 0
+            };
+          })
+        );
+        
+        setTeamMembers(memberDetails);
+        const total = memberDetails.reduce((sum, m) => sum + m.points, 0);
+        setTeamTotalPoints(total);
+      }
+    } catch (error) {
+    } finally {
+      setLoadingTeam(false);
+    }
+  };
+
+  const loadStudentClasses = async () => {
+    const authUserId = getAuthUserId();
+    if (!authUserId) {
+      setError('Please log in again.');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const uuid = await fetchOrCreateStudentUUID();
+      if (!uuid) {
+        setError('Unable to create student record.');
+        setLoading(false);
+        return;
+      }
+      
+      const { data: enrollments } = await supabase
+        .from('class_students')
+        .select(`
+          id,
+          class_id,
+          joined_at,
+          classes (
+            id,
+            name,
+            code,
+            teacher_id,
+            students_count
+          )
+        `)
+        .eq('student_id', uuid);
+      
+      const enrichedClasses = await Promise.all(
+        (enrollments || []).map(async (enrollment) => {
+          let teacherName = 'Teacher';
+          const classData = enrollment.classes;
+          
+          if (classData?.teacher_id) {
+            const { data: teacher } = await supabase
+              .from('teachers')
+              .select('name, user_id')
+              .eq('id', classData.teacher_id)
+              .maybeSingle();
+            
+            if (teacher?.user_id) {
+              const { data: user } = await supabase
+                .from('users')
+                .select('name')
+                .eq('id', teacher.user_id)
+                .maybeSingle();
+              if (user?.name) teacherName = user.name;
+            } else if (teacher?.name) {
+              teacherName = teacher.name;
+            }
+          }
+          
+          return {
+            id: enrollment.id,
+            class_id: enrollment.class_id,
+            joined_at: enrollment.joined_at,
+            class: {
+              ...classData,
+              teacher_name: teacherName
+            }
+          };
+        })
+      );
+      
+      setClasses(enrichedClasses || []);
+      
+      if (enrichedClasses?.length > 0 && !selectedClass) {
+        const firstEnrollment = enrichedClasses[0];
+        setSelectedClass({
+          id: firstEnrollment.class_id,
+          name: firstEnrollment.class?.name,
+          code: firstEnrollment.class?.code,
+          teacher: firstEnrollment.class?.teacher_name
+        });
+        await loadTeamInfo(firstEnrollment.class_id);
+        await loadStudentPoints(firstEnrollment.class_id);
+      }
+    } catch (error) {
+      setError('Failed to load your classes. Please refresh the page.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetRoundState = () => {
+    setRoundActive(false);
+    setCurrentQuestion(null);
+    setTimeLeft(0);
+    setCanAnswer(false);
+    setStudentAnswer('');
+    setAnswerSubmitted(false);
+    setSubmittedAnswerText('');
+    setSubmissionError(null);
+    setSubmitSuccess(false);
+    setQuestionLoading(false);
+    setRoundEnded(false);
+    setCurrentGameSessionId(null);
+    
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  };
+
   const submitAnswer = async () => {
     if (!canAnswer || answerSubmitted) {
       setSubmissionError('Cannot submit answer at this time');
@@ -168,485 +340,102 @@ function CollaborationStudent() {
     setSubmissionError(null);
     
     try {
-      // Get current game session
+      console.log('📤 SUBMITTING ANSWER...');
+      
       const { data: gameSession, error: sessionError } = await supabase
         .from('game_sessions')
         .select('*')
         .eq('class_id', selectedClass.id)
         .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
       
       if (sessionError) throw sessionError;
+      if (!gameSession) throw new Error('No active game session found');
       
-      if (!gameSession) {
-        throw new Error('No active game session found');
-      }
-      
-      // Update team answers
-      const teamAnswers = gameSession.team_answers || {};
-      teamAnswers[teamInfo?.team] = studentAnswer;
-      
-      const { error: updateError } = await supabase
-        .from('game_sessions')
-        .update({
-          team_answers: teamAnswers,
+      const { error: answerError } = await supabase
+        .from('student_answers')
+        .insert({
+          session_id: gameSession.id,
+          student_id: studentUUID,
+          answer: studentAnswer.trim(),
+          created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        })
-        .eq('id', gameSession.id);
+        });
       
-      if (updateError) throw updateError;
+      if (answerError) throw answerError;
+      
+      console.log('✅ ANSWER SAVED!');
       
       setAnswerSubmitted(true);
       setSubmitSuccess(true);
       setSubmittedAnswerText(studentAnswer);
       
-      console.log('Answer submitted successfully');
-      
-      // Check if both teams have answered
-      const { data: updatedSession } = await supabase
-        .from('game_sessions')
-        .select('team_answers')
-        .eq('id', gameSession.id)
-        .single();
-      
-      const answers = updatedSession?.team_answers || {};
-      const bothTeamsAnswered = answers.A && answers.B;
-      
-      if (bothTeamsAnswered) {
-        // End round automatically
-        await supabase
-          .from('round_status')
-          .update({
-            is_active: false,
-            updated_at: new Date().toISOString()
-          })
-          .eq('class_id', selectedClass.id);
-          
-        await supabase
-          .from('game_sessions')
-          .update({
-            status: 'completed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', gameSession.id);
-      }
+      setTimeout(() => setSubmitSuccess(false), 3000);
       
     } catch (error) {
-      console.error('Error submitting answer:', error);
+      console.error('Error:', error);
       setSubmissionError(error.message || 'Failed to submit answer');
+      setTimeout(() => setSubmissionError(null), 5000);
     } finally {
       setQuestionLoading(false);
     }
   };
 
-  // Fetch or create student UUID
-  const fetchOrCreateStudentUUID = async () => {
-    const authUserId = getAuthUserId();
-    
-    if (!authUserId) {
-      console.error('No auth user ID available');
-      return null;
-    }
-    
-    try {
-      console.log('Fetching/creating student for auth user ID:', authUserId);
-      
-      let { data: existingStudent, error: fetchError } = await supabase
-        .from('students')
-        .select('id')
-        .eq('user_id', authUserId)
-        .maybeSingle();
-      
-      if (fetchError) {
-        console.error('Error fetching student:', fetchError);
-      }
-      
-      if (existingStudent) {
-        console.log('✅ Found existing student UUID:', existingStudent.id);
-        setStudentUUID(existingStudent.id);
-        return existingStudent.id;
-      }
-      
-      console.log('Creating new student record...');
-      
-      const userEmail = user?.email || userData?.email || '';
-      const userName = user?.name || userData?.name || user?.user_metadata?.name || userEmail?.split('@')[0] || 'Student';
-      
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', authUserId)
-        .maybeSingle();
-      
-      if (!existingUser) {
-        await supabase
-          .from('users')
-          .insert({
-            id: authUserId,
-            email: userEmail,
-            name: userName,
-            role: 'student',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-      }
-      
-      const { data: newStudent, error: insertError } = await supabase
-        .from('students')
-        .insert({
-          user_id: authUserId,
-          name: userName,
-          email: userEmail,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select('id')
-        .single();
-      
-      if (insertError) {
-        console.error('Error creating student:', insertError);
-        return null;
-      }
-      
-      console.log('✅ Created new student UUID:', newStudent.id);
-      setStudentUUID(newStudent.id);
-      return newStudent.id;
-    } catch (error) {
-      console.error('Error in fetchOrCreateStudentUUID:', error);
-      return null;
-    }
-  };
-
-  // Load student points
-  const loadStudentPoints = async (classId) => {
-    if (!classId) return;
-    
-    try {
-      const authUserId = getAuthUserId();
-      if (!authUserId) return;
-      
-      const points = await classService.getStudentProgress(classId, authUserId);
-      setStudentPoints(points);
-    } catch (error) {
-      console.error('Error loading student points:', error);
-      setStudentPoints(0);
-    }
-  };
-
-  // Load team info
-  const loadTeamInfo = async (classId) => {
-    const studentId = studentUUID;
-    if (!studentId || !classId) return;
-    
-    setLoadingTeam(true);
-    
-    try {
-      console.log('Loading team info for student:', studentId, 'class:', classId);
-      
-      const { data: assignment, error: assignmentError } = await supabase
-        .from('team_assignments')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('class_id', classId)
-        .maybeSingle();
-      
-      if (assignmentError) throw assignmentError;
-      
-      if (assignment && assignment.team) {
-        setTeamInfo({
-          team: assignment.team,
-          role: assignment.role,
-          assignedAt: assignment.updated_at
-        });
-        
-        const { data: teamAssignments, error: teamError } = await supabase
-          .from('team_assignments')
-          .select('*, student:students(*)')
-          .eq('class_id', classId)
-          .eq('team', assignment.team);
-        
-        if (teamError) throw teamError;
-        
-        const memberDetails = await Promise.all(
-          (teamAssignments || []).map(async (ta) => {
-            let userName = ta.student?.name || 'Student';
-            let userEmail = ta.student?.email || '';
-            
-            if (ta.student?.user_id) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('name, email')
-                .eq('id', ta.student.user_id)
-                .maybeSingle();
-              if (userData) {
-                userName = userData.name || userName;
-                userEmail = userData.email || userEmail;
-              }
-            }
-            
-            const { data: pointData } = await supabase
-              .from('student_points')
-              .select('points')
-              .eq('student_id', ta.student_id)
-              .eq('class_id', classId)
-              .maybeSingle();
-            
-            const points = pointData?.points || 0;
-            
-            return {
-              id: ta.student_id,
-              name: userName,
-              email: userEmail,
-              role: ta.role,
-              isCurrentUser: ta.student_id === studentId,
-              points: points
-            };
-          })
-        );
-        
-        setTeamMembers(memberDetails);
-        
-        const total = memberDetails.reduce((sum, m) => sum + (m.points || 0), 0);
-        setTeamTotalPoints(total);
-      } else {
-        setTeamInfo(null);
-        setTeamMembers([]);
-      }
-    } catch (error) {
-      console.error('Error loading team info:', error);
-      setTeamInfo(null);
-      setTeamMembers([]);
-    } finally {
-      setLoadingTeam(false);
-    }
-  };
-
-  // Load student classes
-  const loadStudentClasses = async () => {
-    const authUserId = getAuthUserId();
-    
-    if (!authUserId) {
-      console.error('No auth user ID available');
-      setError('Please log in again to continue.');
-      setLoading(false);
+  // SIMPLE POLLING FUNCTION - NO SUBSCRIPTIONS
+  const checkForActiveGameSession = async () => {
+    if (!waitingForTeacher || !selectedClass?.id || !studentUUID || !teamInfo) {
       return;
     }
     
     try {
-      setLoading(true);
-      console.log('Loading classes for auth user ID:', authUserId);
+      const { data: gameSession, error } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('class_id', selectedClass.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       
-      const uuid = await fetchOrCreateStudentUUID();
-      if (!uuid) {
-        setError('Unable to create or find your student record.');
-        setLoading(false);
-        return;
-      }
+      if (error) throw error;
       
-      const studentClasses = await classService.getStudentClasses(authUserId);
-      console.log('Loaded student classes:', studentClasses);
-      
-      setClasses(studentClasses || []);
-      
-      if (studentClasses && studentClasses.length > 0 && !selectedClass) {
-        const firstEnrollment = studentClasses[0];
-        setSelectedClass({
-          id: firstEnrollment.class_id,
-          name: firstEnrollment.class?.name,
-          code: firstEnrollment.class?.code,
-          teacher: firstEnrollment.class?.teacher
-        });
+      // New game session started
+      if (gameSession && currentGameSessionId !== gameSession.id) {
+        console.log('🎮 Game session started!');
         
-        await loadTeamInfo(firstEnrollment.class_id);
-        await loadStudentPoints(firstEnrollment.class_id);
+        setCurrentGameSessionId(gameSession.id);
+        setCurrentQuestion(gameSession.current_question);
+        setRoundActive(true);
+        setCanAnswer(true);
+        setAnswerSubmitted(false);
+        setStudentAnswer('');
+        
+        if (gameSession.current_question?.timeLimit && gameSession.current_question?.started_at) {
+          startCountdown(
+            gameSession.current_question.started_at, 
+            gameSession.current_question.timeLimit
+          );
+        }
       }
       
-      setError(null);
+      // Check if current session ended (no active session found)
+      if (currentGameSessionId && !gameSession) {
+        console.log('🏁 Round ended');
+        setRoundActive(false);
+        setRoundEnded(true);
+        setCanAnswer(false);
+        setWaitingForTeacher(false);
+        setReadySubmitted(false);
+        setIsReady(false);
+      }
+      
     } catch (error) {
-      console.error('Error loading classes:', error);
-      setError('Failed to load your classes. Please refresh the page.');
-    } finally {
-      setLoading(false);
+      console.error('Polling error:', error);
     }
   };
 
-  // Real-time subscription for round status
-  useEffect(() => {
-    if (!selectedClass?.id || !studentUUID) return;
-    
-    console.log('Setting up real-time subscription for class:', selectedClass.id);
-    
-    // Subscribe to round_status changes
-    const roundSubscription = supabase
-      .channel(`round_status_${selectedClass.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'round_status',
-          filter: `class_id=eq.${selectedClass.id}`
-        },
-        (payload) => {
-          console.log('Round status changed:', payload);
-          
-          if (payload.new && payload.new.is_active === true) {
-            // Round started
-            setRoundActive(true);
-            setCurrentQuestion(payload.new.question_data);
-            setTimeLeft(payload.new.time_limit || 20);
-            setCanAnswer(true);
-            setAnswerSubmitted(false);
-            setSubmitSuccess(false);
-            setStudentAnswer('');
-            setIsQuestionLocked(false);
-            setRoundEnded(false);
-            setRoundResult(null);
-            
-            // Start countdown timer
-            if (payload.new.ends_at) {
-              startCountdown(payload.new.ends_at);
-            }
-            
-          } else if (payload.new && payload.new.is_active === false && payload.old?.is_active === true) {
-            // Round ended - check answers
-            setRoundActive(false);
-            setCanAnswer(false);
-            setIsQuestionLocked(true);
-            
-            if (countdownInterval) clearInterval(countdownInterval);
-            
-            // Get the final answers from game session
-            const checkAnswers = async () => {
-              const { data: gameSession } = await supabase
-                .from('game_sessions')
-                .select('team_answers')
-                .eq('class_id', selectedClass.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-              
-              const teamAnswers = gameSession?.team_answers || {};
-              const myAnswer = teamAnswers[teamInfo?.team];
-              
-              if (myAnswer && payload.new.question_data?.answer) {
-                checkAnswerAgainstCorrect(payload.new.question_data.answer, myAnswer);
-              }
-            };
-            
-            checkAnswers();
-          }
-        }
-      )
-      .subscribe();
-    
-    // Subscribe to game_sessions changes
-    const gameSessionSubscription = supabase
-      .channel(`game_sessions_${selectedClass.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'game_sessions',
-          filter: `class_id=eq.${selectedClass.id}`
-        },
-        (payload) => {
-          console.log('Game session changed:', payload);
-          
-          if (payload.new?.status === 'active') {
-            setTeacherStartedRound(true);
-            setRoundStarting(false);
-          }
-        }
-      )
-      .subscribe();
-    
-    // Check for existing active round
-    const checkActiveRound = async () => {
-      const { data: activeRound } = await supabase
-        .from('round_status')
-        .select('*')
-        .eq('class_id', selectedClass.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      if (activeRound) {
-        setRoundActive(true);
-        setCurrentQuestion(activeRound.question_data);
-        setTimeLeft(activeRound.time_limit || 20);
-        setCanAnswer(true);
-        setIsQuestionLocked(false);
-        
-        if (activeRound.ends_at) {
-          startCountdown(activeRound.ends_at);
-        }
-      }
-    };
-    
-    checkActiveRound();
-    
-    return () => {
-      roundSubscription.unsubscribe();
-      gameSessionSubscription.unsubscribe();
-      if (countdownInterval) clearInterval(countdownInterval);
-    };
-  }, [selectedClass?.id, studentUUID, teamInfo?.team]);
-
-  // Initialize component
-  useEffect(() => {
-    const init = async () => {
-      const authUserId = getAuthUserId();
-      
-      if (!authUserId) {
-        console.log('No auth user ID found, waiting for user data...');
-        setLoading(false);
-        setInitialized(true);
-        return;
-      }
-      
-      console.log('Initializing with auth user ID:', authUserId);
-      await loadStudentClasses();
-      setInitialized(true);
-    };
-    
-    init();
-  }, [user?.id, user?.dbId, userData?.id, userData?.dbId]);
-
-  // Refresh function
-  const refreshClasses = async () => {
-    setLoading(true);
-    await loadStudentClasses();
-  };
-
-  const handleClassSelect = async (classItem) => {
-    if (!classItem?.id) return;
-    
-    setSelectedClass(classItem);
-    setShowDropdown(false);
-    
-    await loadTeamInfo(classItem.id);
-    await loadStudentPoints(classItem.id);
-    
-    setIsReady(false);
-    setReadySubmitted(false);
-    setIsRoundActive(false);
-    setAnswerSubmitted(false);
-    setRoundEnded(false);
-    setRoundResult(null);
-    setStudentAnswer('');
-    setWaitingForResults(false);
-    setSubmittedAnswerText('');
-    setCurrentRound(null);
-    setTeacherStartedRound(false);
-    setIsQuestionLocked(true);
-    setWaitingForTeacher(false);
-    setRoundActive(false);
-    setCanAnswer(false);
-    setCurrentQuestion(null);
-  };
-
-  // Fixed handleReady - no onConflict, direct insert
   const handleReady = async () => {
     if (!selectedClass?.id || !teamInfo?.team) {
       setReadyError('No class or team selected.');
@@ -654,56 +443,75 @@ function CollaborationStudent() {
     }
     
     if (readySubmitted || !studentUUID) {
-      setReadyError('Already marked ready or no student ID.');
+      setReadyError('Already marked ready.');
       return;
     }
     
     setReadyError(null);
     
     try {
-      console.log('Marking student as ready:', { student_id: studentUUID, class_id: selectedClass.id, team: teamInfo.team });
-      
-      // Direct insert without onConflict - will fail if duplicate, but we check first
       const { error: insertError } = await supabase
         .from('student_ready_status')
-        .insert({
+        .upsert({
           student_id: studentUUID,
           class_id: selectedClass.id,
           team: teamInfo.team,
           is_ready: true,
           updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'student_id,class_id'
         });
       
-      if (insertError) {
-        // If duplicate, try to update instead
-        if (insertError.code === '23505') {
-          console.log('Duplicate entry, updating existing...');
-          const { error: updateError } = await supabase
-            .from('student_ready_status')
-            .update({
-              team: teamInfo.team,
-              is_ready: true,
-              updated_at: new Date().toISOString()
-            })
-            .eq('student_id', studentUUID)
-            .eq('class_id', selectedClass.id);
-          
-          if (updateError) throw updateError;
-        } else {
-          throw insertError;
-        }
-      }
+      if (insertError) throw insertError;
       
-      console.log('✅ Student ready status saved');
       setIsReady(true);
       setReadySubmitted(true);
       setWaitingForTeacher(true);
       
+      console.log('✅ Ready for team', teamInfo.team);
+      
     } catch (error) {
-      console.error('Error saving ready status:', error);
+      console.error('Error:', error);
       setReadyError(error.message || 'Failed to set ready status.');
     }
   };
+
+  // Start polling when waiting for teacher
+  useEffect(() => {
+    if (!selectedClass?.id || !studentUUID || !teamInfo) return;
+    
+    // Clear any existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+    
+    // Only poll if waiting for teacher OR round is active
+    if (waitingForTeacher || roundActive) {
+      console.log('🔄 Starting polling (every 3 seconds)...');
+      pollingIntervalRef.current = setInterval(() => {
+        checkForActiveGameSession();
+      }, 3000);
+    }
+    
+    // Cleanup on unmount or dependency change
+    return () => {
+      if (pollingIntervalRef.current) {
+        console.log('🛑 Stopping polling');
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [selectedClass?.id, studentUUID, teamInfo?.team, waitingForTeacher, roundActive]);
+
+  // Cleanup countdown on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+    };
+  }, []);
 
   const getRoleIcon = (role) => {
     switch(role) {
@@ -723,12 +531,44 @@ function CollaborationStudent() {
       case 'solver':
         return { label: 'Solver', description: 'You solve problems and find solutions', color: '#10b981', bgColor: '#d1fae5' };
       default:
-        return { label: 'Not Assigned', description: 'You haven\'t been assigned to a team yet', color: '#6b7280', bgColor: '#f3f4f6' };
+        return { label: 'Not Assigned', description: 'Wait for teacher to assign you to a team', color: '#6b7280', bgColor: '#f3f4f6' };
     }
   };
 
   const getTeamColor = (team) => team === 'A' ? '#3b82f6' : '#ef4444';
   const getTeamBgColor = (team) => team === 'A' ? '#eff6ff' : '#fef2f2';
+
+  useEffect(() => {
+    const init = async () => {
+      const authUserId = getAuthUserId();
+      if (!authUserId) {
+        setLoading(false);
+        return;
+      }
+      await loadStudentClasses();
+    };
+    init();
+  }, []);
+
+  const refreshClasses = async () => {
+    setLoading(true);
+    await loadStudentClasses();
+  };
+
+  const handleClassSelect = async (classItem) => {
+    if (!classItem?.id) return;
+    
+    setSelectedClass(classItem);
+    setShowDropdown(false);
+    
+    setIsReady(false);
+    setReadySubmitted(false);
+    setWaitingForTeacher(false);
+    resetRoundState();
+    
+    await loadTeamInfo(classItem.id);
+    await loadStudentPoints(classItem.id);
+  };
 
   if (loading) {
     return (
@@ -745,19 +585,12 @@ function CollaborationStudent() {
         <div style={styles.headerSection}>
           <div style={styles.headerLeft}>
             <h1 style={styles.mainTitle}>Student Dashboard</h1>
-            <p style={styles.subtitle}>Track your progress and collaborate with your team</p>
+            <p style={styles.subtitle}>Collaborate with your team and answer questions when the teacher starts</p>
           </div>
-          <button onClick={refreshClasses} style={styles.refreshButton} title="Refresh Classes">
-            <FiRefreshCw size={18} />
-            Refresh
+          <button onClick={refreshClasses} style={styles.refreshButton}>
+            <FiRefreshCw size={18} /> Refresh
           </button>
         </div>
-
-        {debugInfo && (
-          <div style={styles.debugPanel}>
-            <strong>🔍 Debug:</strong> {debugInfo}
-          </div>
-        )}
 
         {error && (
           <div style={styles.errorCard}>
@@ -776,13 +609,7 @@ function CollaborationStudent() {
           </div>
           
           <div style={styles.customDropdown} ref={dropdownRef}>
-            <button 
-              style={styles.dropdownButton}
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowDropdown(!showDropdown);
-              }}
-            >
+            <button style={styles.dropdownButton} onClick={() => setShowDropdown(!showDropdown)}>
               <div style={styles.dropdownButtonContent}>
                 {selectedClass ? (
                   <>
@@ -798,10 +625,7 @@ function CollaborationStudent() {
                   </span>
                 )}
               </div>
-              <FiChevronDown size={20} style={{
-                transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.3s ease'
-              }} />
+              <FiChevronDown size={20} />
             </button>
             
             {showDropdown && (
@@ -810,7 +634,6 @@ function CollaborationStudent() {
                   <div style={styles.emptyDropdown}>
                     <div style={styles.emptyIcon}>📚</div>
                     <p>You haven't joined any classes yet</p>
-                    <p style={styles.emptySubtext}>Go to the Home page and click "Join a New Class" to get started!</p>
                   </div>
                 ) : (
                   classes.map((enrollment) => (
@@ -824,7 +647,7 @@ function CollaborationStudent() {
                         id: enrollment.class_id,
                         name: enrollment.class?.name,
                         code: enrollment.class?.code,
-                        teacher: enrollment.class?.teacher
+                        teacher: enrollment.class?.teacher_name
                       })}
                     >
                       <div style={styles.dropdownItemContent}>
@@ -834,7 +657,7 @@ function CollaborationStudent() {
                             {enrollment.class?.name || 'Unnamed Class'}
                           </span>
                           <span style={styles.dropdownItemTeacher}>
-                            👨‍🏫 {enrollment.class?.teacher?.name || 'Unknown Teacher'}
+                            👨‍🏫 {enrollment.class?.teacher_name || 'Unknown Teacher'}
                           </span>
                         </div>
                       </div>
@@ -861,7 +684,7 @@ function CollaborationStudent() {
           <div style={styles.noTeamCard}>
             <div style={styles.noTeamIcon}>👥</div>
             <h3>No Team Assigned Yet</h3>
-            <p>You have joined <strong>{selectedClass.name}</strong> but haven't been assigned to a team yet.</p>
+            <p>You have joined <strong>{selectedClass.name}</strong> but haven't been assigned to a team.</p>
             <p>Please wait for your teacher to assign you to a team.</p>
           </div>
         )}
@@ -899,14 +722,10 @@ function CollaborationStudent() {
                   borderLeftColor: getTeamColor(teamInfo.team)
                 }}>
                   <div style={styles.teamBadgeContent}>
-                    <span style={styles.teamBadgeIcon}>
-                      {teamInfo.team === 'A' ? '⚡' : '🔥'}
-                    </span>
+                    <span style={styles.teamBadgeIcon}>{teamInfo.team === 'A' ? '⚡' : '🔥'}</span>
                     <div style={styles.teamBadgeText}>
                       <span style={styles.teamBadgeLabel}>Your Team</span>
-                      <span style={{...styles.teamBadgeLetter, color: getTeamColor(teamInfo.team)}}>
-                        Team {teamInfo.team}
-                      </span>
+                      <span style={{...styles.teamBadgeLetter, color: getTeamColor(teamInfo.team)}}>Team {teamInfo.team}</span>
                     </div>
                   </div>
                 </div>
@@ -963,16 +782,24 @@ function CollaborationStudent() {
                 </div>
               </div>
 
-              {/* Question Section - Shows when round is active */}
+              {waitingForTeacher && !roundActive && !roundEnded && (
+                <div style={styles.waitingMessageModern}>
+                  <span>⏳</span>
+                  <p>You are ready! Waiting for teacher to start the game...</p>
+                </div>
+              )}
+
               {roundActive && currentQuestion && (
                 <div style={styles.questionCard}>
                   <div style={styles.questionHeader}>
                     <FiZap size={24} color="#f59e0b" />
                     <h3 style={styles.questionTitle}>Current Question</h3>
-                    <div style={styles.timerDisplay}>
-                      <FiClock size={16} />
-                      <span>{timeLeft}s</span>
-                    </div>
+                    {timeLeft > 0 && (
+                      <div style={styles.timerDisplay}>
+                        <FiClock size={16} />
+                        <span>{timeLeft}s</span>
+                      </div>
+                    )}
                   </div>
                   
                   <div style={styles.questionBody}>
@@ -986,32 +813,25 @@ function CollaborationStudent() {
                           onChange={(e) => setStudentAnswer(e.target.value)}
                           placeholder="Type your answer here..."
                           rows={3}
-                          disabled={!canAnswer || answerSubmitted}
+                          disabled={!canAnswer || answerSubmitted || questionLoading}
                         />
                         <button 
                           style={styles.submitButton}
                           onClick={submitAnswer}
                           disabled={!canAnswer || answerSubmitted || questionLoading}
                         >
-                          {questionLoading ? (
-                            'Submitting...'
-                          ) : (
-                            <>
-                              <FiSend size={18} />
-                              Submit Answer
-                            </>
-                          )}
+                          {questionLoading ? 'Submitting...' : <><FiSend size={18} /> Submit Answer</>}
                         </button>
                       </div>
                     )}
                     
-                    {answerSubmitted && submitSuccess && (
+                    {answerSubmitted && (
                       <div style={styles.submittedMessage}>
                         <FiCheckCircle size={24} color="#10b981" />
                         <div>
                           <strong>Answer Submitted!</strong>
                           <p>Your answer: "{submittedAnswerText}"</p>
-                          <p>Waiting for team or teacher to proceed...</p>
+                          <p>Waiting for teacher to end the round...</p>
                         </div>
                       </div>
                     )}
@@ -1026,23 +846,26 @@ function CollaborationStudent() {
                 </div>
               )}
 
-              {/* Round Results */}
-              {roundEnded && roundResult && (
-                <div style={roundResult.isCorrect ? styles.resultCardCorrect : styles.resultCardIncorrect}>
+              {roundEnded && (
+                <div style={styles.resultCardEnded}>
                   <div style={styles.resultIcon}>
-                    {roundResult.isCorrect ? <FiCheckCircle size={48} color="#10b981" /> : <FiXCircle size={48} color="#ef4444" />}
+                    <FiCheckCircle size={48} color="#10b981" />
                   </div>
-                  <h3>{roundResult.isCorrect ? 'Correct!' : 'Incorrect'}</h3>
-                  <p>Your answer: "{roundResult.yourAnswer}"</p>
-                  <p>Correct answer: "{roundResult.correctAnswer}"</p>
-                  {roundResult.isCorrect && (
-                    <p style={styles.pointsEarned}>+{roundResult.pointsEarned} points!</p>
-                  )}
+                  <h3>Round Ended!</h3>
+                  <p>Your answer: "{submittedAnswerText || 'No answer submitted'}"</p>
                   <button 
                     style={styles.dismissResultButton}
                     onClick={() => {
                       setRoundEnded(false);
-                      setRoundResult(null);
+                      setRoundActive(false);
+                      setCurrentQuestion(null);
+                      setAnswerSubmitted(false);
+                      setSubmittedAnswerText('');
+                      setStudentAnswer('');
+                      setCurrentGameSessionId(null);
+                      setWaitingForTeacher(false);
+                      setReadySubmitted(false);
+                      setIsReady(false);
                     }}
                   >
                     Close
@@ -1050,26 +873,10 @@ function CollaborationStudent() {
                 </div>
               )}
 
-              {/* Ready Section */}
-              {!isReady && !waitingForTeacher && !roundActive && (
+              {!roundActive && !roundEnded && !waitingForTeacher && (
                 <button style={styles.readyButton} onClick={handleReady}>
-                  <FiUserCheck size={20} />
-                  I'm Ready! - Team {teamInfo.team}
+                  <FiUserCheck size={20} /> I'm Ready! - Team {teamInfo.team}
                 </button>
-              )}
-              
-              {waitingForTeacher && !roundActive && (
-                <div style={styles.waitingMessageModern}>
-                  <span>⏳</span>
-                  <p>You are ready! Waiting for teacher to start the game...</p>
-                </div>
-              )}
-
-              {roundActive && (
-                <div style={styles.roundActiveMessage}>
-                  <FiZap size={20} color="#f59e0b" />
-                  <p>Round in progress! Submit your answer before time runs out.</p>
-                </div>
               )}
             </div>
           </>
@@ -1099,7 +906,6 @@ const styles = {
     alignItems: 'center',
     minHeight: '100vh',
     gap: '20px',
-    background: 'linear-gradient(135deg, #f5f7fa 0%, #f9fafb 100%)',
   },
   loadingSpinner: {
     width: '48px',
@@ -1125,16 +931,15 @@ const styles = {
     flex: 1,
   },
   mainTitle: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 5vw, 32px)',
     fontWeight: '700',
     background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     margin: 0,
-    letterSpacing: '-0.02em',
   },
   subtitle: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     color: '#64748b',
     margin: '8px 0 0 0',
   },
@@ -1150,7 +955,8 @@ const styles = {
     fontSize: '14px',
     fontWeight: '500',
     color: '#64748b',
-    transition: 'all 0.2s',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap',
   },
   selectionCard: {
     background: 'white',
@@ -1167,6 +973,7 @@ const styles = {
     marginBottom: '16px',
     paddingBottom: '12px',
     borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
   },
   selectionTitle: {
     fontSize: '16px',
@@ -1202,19 +1009,25 @@ const styles = {
     alignItems: 'center',
     gap: '14px',
     flex: 1,
+    overflow: 'hidden',
   },
   selectedClassIcon: {
     fontSize: '24px',
+    flexShrink: 0,
   },
   selectedClassInfo: {
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
+    overflow: 'hidden',
   },
   selectedClassName: {
     fontSize: '16px',
     fontWeight: '600',
     color: '#1e293b',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   },
   selectedClassCode: {
     fontSize: '12px',
@@ -1244,7 +1057,8 @@ const styles = {
     alignItems: 'center',
     cursor: 'pointer',
     borderBottom: '1px solid #f1f5f9',
-    transition: 'background 0.2s',
+    flexWrap: 'wrap',
+    gap: '8px',
   },
   dropdownItemSelected: {
     background: '#eef2ff',
@@ -1254,9 +1068,11 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     flex: 1,
+    minWidth: '180px',
   },
   dropdownItemIcon: {
     fontSize: '20px',
+    flexShrink: 0,
   },
   dropdownItemInfo: {
     display: 'flex',
@@ -1275,6 +1091,7 @@ const styles = {
   joinedDate: {
     fontSize: '11px',
     color: '#94a3b8',
+    whiteSpace: 'nowrap',
   },
   emptyDropdown: {
     padding: '40px 20px',
@@ -1284,11 +1101,6 @@ const styles = {
   emptyIcon: {
     fontSize: '48px',
     marginBottom: '12px',
-  },
-  emptySubtext: {
-    fontSize: '12px',
-    marginTop: '8px',
-    color: '#94a3b8',
   },
   errorCard: {
     display: 'flex',
@@ -1314,6 +1126,7 @@ const styles = {
     marginBottom: '20px',
     border: '1px solid #fecaca',
     color: '#dc2626',
+    flexWrap: 'wrap',
   },
   dismissButton: {
     marginLeft: 'auto',
@@ -1335,33 +1148,26 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
   },
-  debugPanel: {
-    background: '#1e293b',
-    color: '#a5f3fc',
-    padding: '8px 16px',
-    borderRadius: '8px',
-    marginBottom: '16px',
-    fontSize: '12px',
-    fontFamily: 'monospace',
-    wordBreak: 'break-all',
-  },
   pointsDashboard: {
     marginBottom: '24px',
   },
   pointsCard: {
     background: 'linear-gradient(135deg, #ffffff 0%, #fef3c7 100%)',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 4vw, 24px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
     border: '1px solid #fde68a',
+    flexWrap: 'wrap',
+    gap: '16px',
   },
   pointsCardLeft: {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
+    flexWrap: 'wrap',
   },
   pointsIcon: {
     width: '56px',
@@ -1371,6 +1177,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   pointsInfo: {
     display: 'flex',
@@ -1380,10 +1187,9 @@ const styles = {
     fontSize: '12px',
     color: '#92400e',
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
   },
   pointsValue: {
-    fontSize: '36px',
+    fontSize: 'clamp(28px, 6vw, 36px)',
     fontWeight: '700',
     color: '#d97706',
     lineHeight: 1,
@@ -1395,7 +1201,7 @@ const styles = {
     padding: '12px 20px',
     background: 'white',
     borderRadius: '16px',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+    flexWrap: 'wrap',
   },
   teamPointsIcon: {
     width: '40px',
@@ -1405,6 +1211,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   teamPointsInfo: {
     display: 'flex',
@@ -1415,14 +1222,14 @@ const styles = {
     color: '#64748b',
   },
   teamPointsValue: {
-    fontSize: '20px',
+    fontSize: 'clamp(18px, 4vw, 20px)',
     fontWeight: '700',
     color: '#6366f1',
   },
   teamInfoCard: {
     background: 'white',
     borderRadius: '24px',
-    padding: '32px',
+    padding: 'clamp(20px, 5vw, 32px)',
     boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
     border: '1px solid #e2e8f0',
   },
@@ -1443,10 +1250,12 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '16px',
-    padding: '12px 28px',
+    padding: 'clamp(8px, 3vw, 12px) clamp(20px, 5vw, 28px)',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   teamBadgeIcon: {
-    fontSize: '32px',
+    fontSize: 'clamp(24px, 6vw, 32px)',
   },
   teamBadgeText: {
     display: 'flex',
@@ -1457,10 +1266,9 @@ const styles = {
     fontSize: '11px',
     color: '#64748b',
     textTransform: 'uppercase',
-    letterSpacing: '0.5px',
   },
   teamBadgeLetter: {
-    fontSize: '28px',
+    fontSize: 'clamp(22px, 5vw, 28px)',
     fontWeight: '700',
   },
   roleCardModern: {
@@ -1471,6 +1279,7 @@ const styles = {
     background: '#f8fafc',
     borderRadius: '20px',
     marginBottom: '32px',
+    flexWrap: 'wrap',
   },
   roleIconModern: {
     width: '64px',
@@ -1480,18 +1289,20 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '28px',
+    flexShrink: 0,
   },
   roleInfoModern: {
     flex: 1,
+    minWidth: '180px',
   },
   roleTitleModern: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 4vw, 18px)',
     fontWeight: '600',
     marginBottom: '6px',
     color: '#1e293b',
   },
   roleDescriptionModern: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
     color: '#64748b',
     margin: 0,
   },
@@ -1505,9 +1316,10 @@ const styles = {
     marginBottom: '20px',
     paddingBottom: '12px',
     borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
   },
   sectionTitle: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 4vw, 18px)',
     fontWeight: '600',
     color: '#1e293b',
     margin: 0,
@@ -1531,7 +1343,7 @@ const styles = {
     padding: '16px',
     background: '#f8fafc',
     borderRadius: '16px',
-    transition: 'all 0.2s',
+    flexWrap: 'wrap',
   },
   currentUserCardModern: {
     background: '#eef2ff',
@@ -1557,6 +1369,7 @@ const styles = {
   },
   memberInfoModern: {
     flex: 1,
+    minWidth: '150px',
   },
   memberNameModern: {
     fontSize: '15px',
@@ -1583,6 +1396,7 @@ const styles = {
     alignItems: 'center',
     gap: '6px',
     marginBottom: '4px',
+    flexWrap: 'wrap',
   },
   memberPointsModern: {
     fontSize: '12px',
@@ -1594,7 +1408,7 @@ const styles = {
   questionCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(20px, 5vw, 24px)',
     marginTop: '24px',
     color: 'white',
   },
@@ -1605,11 +1419,12 @@ const styles = {
     marginBottom: '20px',
     paddingBottom: '12px',
     borderBottom: '1px solid rgba(255,255,255,0.2)',
+    flexWrap: 'wrap',
   },
   questionTitle: {
     flex: 1,
     margin: 0,
-    fontSize: '20px',
+    fontSize: 'clamp(18px, 4vw, 20px)',
   },
   timerDisplay: {
     display: 'flex',
@@ -1625,7 +1440,7 @@ const styles = {
     marginTop: '16px',
   },
   questionText: {
-    fontSize: '18px',
+    fontSize: 'clamp(16px, 4vw, 18px)',
     lineHeight: '1.5',
     marginBottom: '24px',
   },
@@ -1642,6 +1457,8 @@ const styles = {
     fontSize: '14px',
     fontFamily: 'inherit',
     resize: 'vertical',
+    color: '#333',
+    backgroundColor: 'white',
   },
   submitButton: {
     display: 'flex',
@@ -1656,7 +1473,7 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.2s',
+    transition: 'all 0.2s ease',
   },
   submittedMessage: {
     display: 'flex',
@@ -1665,6 +1482,7 @@ const styles = {
     padding: '16px',
     background: 'rgba(255,255,255,0.15)',
     borderRadius: '12px',
+    flexWrap: 'wrap',
   },
   errorMessage: {
     display: 'flex',
@@ -1674,31 +1492,18 @@ const styles = {
     background: 'rgba(239,68,68,0.2)',
     borderRadius: '8px',
     color: '#fecaca',
+    flexWrap: 'wrap',
   },
-  resultCardCorrect: {
+  resultCardEnded: {
     textAlign: 'center',
-    padding: '24px',
+    padding: 'clamp(20px, 5vw, 24px)',
     background: '#d1fae5',
     borderRadius: '16px',
     marginTop: '20px',
     border: '2px solid #10b981',
   },
-  resultCardIncorrect: {
-    textAlign: 'center',
-    padding: '24px',
-    background: '#fee2e2',
-    borderRadius: '16px',
-    marginTop: '20px',
-    border: '2px solid #ef4444',
-  },
   resultIcon: {
     marginBottom: '12px',
-  },
-  pointsEarned: {
-    fontSize: '24px',
-    fontWeight: 'bold',
-    color: '#10b981',
-    marginTop: '12px',
   },
   dismissResultButton: {
     marginTop: '16px',
@@ -1718,15 +1523,16 @@ const styles = {
     color: 'white',
     border: 'none',
     borderRadius: '12px',
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '10px',
-    transition: 'all 0.2s',
     marginTop: '20px',
+    transition: 'all 0.2s ease',
+    flexWrap: 'wrap',
   },
   waitingMessageModern: {
     display: 'flex',
@@ -1738,39 +1544,145 @@ const styles = {
     borderRadius: '12px',
     color: '#92400e',
     marginTop: '20px',
-  },
-  roundActiveMessage: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    marginTop: '20px',
-    padding: '12px 16px',
-    background: '#ede9fe',
-    borderRadius: '10px',
-    color: '#6d28d9',
-    fontSize: '14px',
-    fontWeight: '500',
+    flexWrap: 'wrap',
+    textAlign: 'center',
   },
   noTeamCard: {
     background: 'white',
     borderRadius: '20px',
-    padding: '40px',
+    padding: 'clamp(30px, 8vw, 40px)',
     textAlign: 'center',
     border: '2px solid #fef3c7',
     backgroundColor: '#fffbeb',
   },
   noTeamIcon: {
-    fontSize: '64px',
+    fontSize: 'clamp(48px, 12vw, 64px)',
     marginBottom: '16px',
   },
 };
 
-// Add global animations
+// Add hover effects and animations
 const styleSheetGlobal = document.createElement("style");
 styleSheetGlobal.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  
+  @media (max-width: 640px) {
+    .refresh-button-text {
+      display: none;
+    }
+  }
+  
+  button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton {
+    transition: all 0.2s ease;
+  }
+  
+  button:hover, .dropdownButton:hover, .submitButton:hover, .readyButton:hover, .dismissResultButton:hover, .retryButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  }
+  
+  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active {
+    transform: translateY(0);
+  }
+  
+  @media (max-width: 768px) {
+    .memberCardModern {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .memberInfoModern {
+      text-align: center;
+    }
+    
+    .memberNameModern {
+      justify-content: center;
+    }
+    
+    .memberRoleModern {
+      justify-content: center;
+    }
+    
+    .memberPointsModern {
+      justify-content: center;
+    }
+    
+    .roleCardModern {
+      text-align: center;
+      justify-content: center;
+    }
+    
+    .roleInfoModern {
+      text-align: center;
+    }
+    
+    .teamBadgeContent {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .teamBadgeText {
+      text-align: center;
+    }
+    
+    .pointsCard {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .pointsCardLeft {
+      justify-content: center;
+    }
+    
+    .pointsCardRight {
+      justify-content: center;
+    }
+    
+    .submittedMessage {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .errorCardSmall {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .dismissButton {
+      margin-left: 0;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .dropdownItem {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .joinedDate {
+      margin-left: 32px;
+    }
+    
+    .selectionHeader {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .classCount {
+      margin-left: 0;
+    }
+    
+    .headerSection {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .refreshButton {
+      align-self: flex-start;
+    }
   }
 `;
 document.head.appendChild(styleSheetGlobal);

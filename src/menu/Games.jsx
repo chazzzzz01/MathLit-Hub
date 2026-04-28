@@ -18,6 +18,7 @@ function Games() {
   const iframeRef = useRef(null);
   const [currentScore, setCurrentScore] = useState(null);
   const [xpPoints, setXpPoints] = useState(userData?.xp || 0);
+  const [notification, setNotification] = useState(null);
 
   // Function to update XP
   const updateXP = (points, reason = '') => {
@@ -43,20 +44,6 @@ function Games() {
     } else if (points < 0) {
       showNotification(`${points} XP (${reason})`, '#ef4444');
     }
-  };
-
-  // Function to get total scores from all games
-  const getTotalScores = () => {
-    const totalHighScore = Object.values(gameProgress).reduce((sum, game) => sum + (game.highScore || 0), 0);
-    const totalLastScores = Object.values(gameProgress).reduce((sum, game) => sum + (game.lastScore || 0), 0);
-    return {
-      totalHighScore,
-      totalLastScores,
-      equationScore: gameProgress.equation?.highScore || 0,
-      battleScore: gameProgress.battle?.highScore || 0,
-      spaceShooterScore: gameProgress.spaceShooter?.highScore || 0,
-      allGameProgress: gameProgress
-    };
   };
 
   // Load saved progress from userData when component mounts
@@ -226,23 +213,11 @@ function Games() {
   }, [xpPoints, userData, updateUserData]);
 
   const showNotification = (message, color) => {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: ${color};
-      color: white;
-      padding: 12px 20px;
-      border-radius: 8px;
-      z-index: 10002;
-      animation: slideIn 0.3s ease;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      font-weight: bold;
-    `;
-    notification.innerHTML = message;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
+    const id = Date.now();
+    setNotification({ id, message, color });
+    setTimeout(() => {
+      setNotification(prev => prev?.id === id ? null : prev);
+    }, 3000);
   };
 
   const resetAllProgress = () => {
@@ -369,140 +344,119 @@ function Games() {
     const userName = user?.name || user?.email?.split('@')[0] || 'Student';
 
     return (
-      <>
-        <div style={styles.dashboardContainer}>
-          <div style={styles.dashboardHeader}>
-            <GiConsoleController style={styles.dashboardIcon} />
-            <div>
-              <h2 style={styles.dashboardTitle}>Your Progress</h2>
-              <p style={styles.userInfoText}>Welcome back, {userName}!</p>
-            </div>
-            <div style={styles.xpDisplay}>
-              <span style={styles.xpIcon}>⭐</span>
-              <span style={styles.xpValue}>{xpPoints} XP</span>
-            </div>
-            <button onClick={() => setShowResetConfirm(true)} style={styles.resetButton}>
-              <FaTrash style={styles.resetIcon} />
-              Reset Progress
-            </button>
+      <div style={styles.dashboardContainer}>
+        <div style={styles.dashboardHeader}>
+          <GiConsoleController style={styles.dashboardIcon} />
+          <div style={styles.headerText}>
+            <h2 style={styles.dashboardTitle}>Your Progress</h2>
+            <p style={styles.userInfoText}>Welcome back, {userName}!</p>
           </div>
+          <div style={styles.xpDisplay}>
+            <span style={styles.xpIcon}>⭐</span>
+            <span style={styles.xpValue}>{xpPoints} XP</span>
+          </div>
+          <button onClick={() => setShowResetConfirm(true)} style={styles.resetButton}>
+            <FaTrash style={styles.resetIcon} />
+            <span>Reset Progress</span>
+          </button>
+        </div>
 
-          <div style={styles.statsGrid}>
-            <div style={styles.statCard}>
-              <div style={styles.statCardIcon}>🎮</div>
-              <div style={styles.statCardInfo}>
-                <div style={styles.statCardValue}>{completedGames}/{totalGames}</div>
-                <div style={styles.statCardLabel}>Games Completed</div>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={styles.statCardIcon}>🏆</div>
-              <div style={styles.statCardInfo}>
-                <div style={styles.statCardValue}>{totalHighScore}</div>
-                <div style={styles.statCardLabel}>Total High Score</div>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={styles.statCardIcon}>🎯</div>
-              <div style={styles.statCardInfo}>
-                <div style={styles.statCardValue}>{totalAttempts}</div>
-                <div style={styles.statCardLabel}>Total Attempts</div>
-              </div>
-            </div>
-            <div style={styles.statCard}>
-              <div style={styles.statCardIcon}>📊</div>
-              <div style={styles.statCardInfo}>
-                <div style={styles.statCardValue}>{Math.round(overallProgress)}%</div>
-                <div style={styles.statCardLabel}>Overall Progress</div>
-              </div>
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}>
+            <div style={styles.statCardIcon}>🎮</div>
+            <div style={styles.statCardInfo}>
+              <div style={styles.statCardValue}>{completedGames}/{totalGames}</div>
+              <div style={styles.statCardLabel}>Games Completed</div>
             </div>
           </div>
-
-          {/* Dropdown for detailed progress */}
-          <div style={styles.dropdownContainer}>
-            <button 
-              style={styles.dropdownHeader} 
-              onClick={() => setShowDetailedProgress(!showDetailedProgress)}
-              className="dropdown-button"
-            >
-              <div style={styles.dropdownTitleSection}>
-                <span style={styles.dropdownIcon}>📊</span>
-                <span style={styles.dropdownTitle}>Game Progress Details</span>
-                <span style={styles.dropdownBadge}>
-                  {Object.values(gameProgress).filter(g => g.completed).length}/3 Completed
-                </span>
-              </div>
-              {showDetailedProgress ? <FaChevronUp /> : <FaChevronDown />}
-            </button>
-            
-            {showDetailedProgress && (
-              <div style={styles.dropdownContent}>
-                {Object.entries(gameProgress).map(([gameId, progress]) => {
-                  const maxScore = { equation: 1000, battle: 1000, spaceShooter: 1000 }[gameId];
-                  const gameTitle = { equation: 'Equation Escape', battle: 'Math Battle', spaceShooter: 'Space Shooter' }[gameId];
-                  const highScorePercent = Math.min(100, (progress.highScore / maxScore) * 100);
-                  const attemptsPercent = Math.min(100, (progress.attempts / 3) * 100);
-                  
-                  return (
-                    <div key={gameId} style={styles.progressItem}>
-                      <div style={styles.progressHeader}>
-                        <span style={styles.progressGameTitle}>{gameTitle}</span>
-                        <span style={styles.progressStats}>
-                          {progress.completed ? '✓ Completed' : 'In Progress'} | 
-                          High Score: {progress.highScore} | 
-                          Attempts: {progress.attempts}
-                        </span>
-                      </div>
-                      <div style={styles.progressBarContainer}>
-                        <div style={styles.progressLabels}>
-                          <span>Completion</span>
-                          <span>{progress.completed ? '100%' : '0%'}</span>
-                        </div>
-                        <div style={styles.progressBarBackground}>
-                          <div style={{...styles.progressBarFill, width: progress.completed ? '100%' : '0%', backgroundColor: '#10b981'}} />
-                        </div>
-                        <div style={styles.progressLabels}>
-                          <span>High Score Progress</span>
-                          <span>{Math.round(highScorePercent)}%</span>
-                        </div>
-                        <div style={styles.progressBarBackground}>
-                          <div style={{...styles.progressBarFill, width: `${highScorePercent}%`, backgroundColor: '#f59e0b'}} />
-                        </div>
-                        <div style={styles.progressLabels}>
-                          <span>Engagement (Attempts)</span>
-                          <span>{Math.round(attemptsPercent)}%</span>
-                        </div>
-                        <div style={styles.progressBarBackground}>
-                          <div style={{...styles.progressBarFill, width: `${attemptsPercent}%`, backgroundColor: '#3b82f6'}} />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <div style={styles.statCard}>
+            <div style={styles.statCardIcon}>🏆</div>
+            <div style={styles.statCardInfo}>
+              <div style={styles.statCardValue}>{totalHighScore}</div>
+              <div style={styles.statCardLabel}>Total High Score</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statCardIcon}>🎯</div>
+            <div style={styles.statCardInfo}>
+              <div style={styles.statCardValue}>{totalAttempts}</div>
+              <div style={styles.statCardLabel}>Total Attempts</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statCardIcon}>📊</div>
+            <div style={styles.statCardInfo}>
+              <div style={styles.statCardValue}>{Math.round(overallProgress)}%</div>
+              <div style={styles.statCardLabel}>Overall Progress</div>
+            </div>
           </div>
         </div>
 
-        {showResetConfirm && (
-          <div style={styles.modalOverlay} onClick={() => setShowResetConfirm(false)}>
-            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <h3 style={styles.modalTitle}>Reset All Progress?</h3>
-              <p style={styles.modalText}>
-                This action cannot be undone. All your game progress, high scores, and achievements will be permanently deleted.
-              </p>
-              <div style={styles.modalButtons}>
-                <button onClick={() => setShowResetConfirm(false)} style={styles.modalCancelButton}>
-                  Cancel
-                </button>
-                <button onClick={resetAllProgress} style={styles.modalConfirmButton}>
-                  Yes, Reset Everything
-                </button>
-              </div>
+        {/* Dropdown for detailed progress */}
+        <div style={styles.dropdownContainer}>
+          <button 
+            style={styles.dropdownHeader} 
+            onClick={() => setShowDetailedProgress(!showDetailedProgress)}
+            className="dropdown-button"
+          >
+            <div style={styles.dropdownTitleSection}>
+              <span style={styles.dropdownIcon}>📊</span>
+              <span style={styles.dropdownTitle}>Game Progress Details</span>
+              <span style={styles.dropdownBadge}>
+                {Object.values(gameProgress).filter(g => g.completed).length}/3 Completed
+              </span>
             </div>
-          </div>
-        )}
-      </>
+            {showDetailedProgress ? <FaChevronUp /> : <FaChevronDown />}
+          </button>
+          
+          {showDetailedProgress && (
+            <div style={styles.dropdownContent}>
+              {Object.entries(gameProgress).map(([gameId, progress]) => {
+                const maxScore = { equation: 1000, battle: 1000, spaceShooter: 1000 }[gameId];
+                const gameTitle = { equation: 'Equation Escape', battle: 'Math Battle', spaceShooter: 'Space Shooter' }[gameId];
+                const highScorePercent = Math.min(100, (progress.highScore / maxScore) * 100);
+                const attemptsPercent = Math.min(100, (progress.attempts / 3) * 100);
+                
+                return (
+                  <div key={gameId} style={styles.progressItem}>
+                    <div style={styles.progressHeader}>
+                      <span style={styles.progressGameTitle}>{gameTitle}</span>
+                      <span style={styles.progressStats}>
+                        {progress.completed ? '✓ Completed' : 'In Progress'} | 
+                        High Score: {progress.highScore} | 
+                        Attempts: {progress.attempts}
+                      </span>
+                    </div>
+                    <div style={styles.progressBarContainer}>
+                      <div style={styles.progressLabels}>
+                        <span>Completion</span>
+                        <span>{progress.completed ? '100%' : '0%'}</span>
+                      </div>
+                      <div style={styles.progressBarBackground}>
+                        <div style={{...styles.progressBarFill, width: progress.completed ? '100%' : '0%', backgroundColor: '#10b981'}} />
+                      </div>
+                      <div style={styles.progressLabels}>
+                        <span>High Score Progress</span>
+                        <span>{Math.round(highScorePercent)}%</span>
+                      </div>
+                      <div style={styles.progressBarBackground}>
+                        <div style={{...styles.progressBarFill, width: `${highScorePercent}%`, backgroundColor: '#f59e0b'}} />
+                      </div>
+                      <div style={styles.progressLabels}>
+                        <span>Engagement (Attempts)</span>
+                        <span>{Math.round(attemptsPercent)}%</span>
+                      </div>
+                      <div style={styles.progressBarBackground}>
+                        <div style={{...styles.progressBarFill, width: `${attemptsPercent}%`, backgroundColor: '#3b82f6'}} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -654,6 +608,32 @@ function Games() {
       </div>
 
       {renderActiveGame()}
+      
+      {/* Notification Toast */}
+      {notification && (
+        <div style={{...styles.notification, backgroundColor: notification.color}}>
+          {notification.message}
+        </div>
+      )}
+
+      {showResetConfirm && (
+        <div style={styles.modalOverlay} onClick={() => setShowResetConfirm(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>Reset All Progress?</h3>
+            <p style={styles.modalText}>
+              This action cannot be undone. All your game progress, high scores, and achievements will be permanently deleted.
+            </p>
+            <div style={styles.modalButtons}>
+              <button onClick={() => setShowResetConfirm(false)} style={styles.modalCancelButton}>
+                Cancel
+              </button>
+              <button onClick={resetAllProgress} style={styles.modalConfirmButton}>
+                Yes, Reset Everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -672,7 +652,7 @@ export const getGameTotalScores = (gameProgress) => {
   };
 };
 
-// Styles
+// Enhanced responsive styles
 const styles = {
   container: {
     maxWidth: '1400px',
@@ -681,31 +661,21 @@ const styles = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     backgroundColor: '#f3f4f6',
     minHeight: '100vh',
+    '@media (max-width: 768px)': {
+      padding: '16px',
+    },
   },
   
-  title: {
-    fontSize: '48px',
-    fontWeight: '700',
-    margin: '0 0 16px 0',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '16px',
-  },
-  titleIcon: {
-    fontSize: '56px',
-  },
-  subtitle: {
-    fontSize: '18px',
-    opacity: '0.95',
-    margin: 0,
-  },
   dashboardContainer: {
     background: 'white',
     borderRadius: '16px',
     padding: '24px',
     marginBottom: '30px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+    '@media (max-width: 640px)': {
+      padding: '16px',
+      marginBottom: '20px',
+    },
   },
   dashboardHeader: {
     display: 'flex',
@@ -715,6 +685,13 @@ const styles = {
     paddingBottom: '15px',
     borderBottom: '2px solid #f3f4f6',
     flexWrap: 'wrap',
+    '@media (max-width: 640px)': {
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+    },
+  },
+  headerText: {
+    flex: 1,
   },
   userInfoText: {
     fontSize: '14px',
@@ -730,9 +707,11 @@ const styles = {
     fontWeight: '600',
     color: '#1f2937',
     margin: 0,
+    '@media (max-width: 640px)': {
+      fontSize: '20px',
+    },
   },
   xpDisplay: {
-    marginLeft: 'auto',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -740,6 +719,9 @@ const styles = {
     padding: '8px 16px',
     borderRadius: '20px',
     fontWeight: 'bold',
+    '@media (max-width: 640px)': {
+      alignSelf: 'flex-start',
+    },
   },
   xpIcon: {
     fontSize: '20px',
@@ -760,6 +742,10 @@ const styles = {
     gap: '8px',
     fontSize: '14px',
     fontWeight: '500',
+    '@media (max-width: 640px)': {
+      width: '100%',
+      justifyContent: 'center',
+    },
   },
   resetIcon: {
     fontSize: '14px',
@@ -769,6 +755,13 @@ const styles = {
     gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '15px',
     marginBottom: '30px',
+    '@media (max-width: 640px)': {
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '12px',
+    },
+    '@media (max-width: 480px)': {
+      gridTemplateColumns: '1fr',
+    },
   },
   statCard: {
     background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
@@ -777,10 +770,16 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
+    '@media (max-width: 640px)': {
+      padding: '15px',
+    },
   },
   statCardIcon: {
     fontSize: '32px',
     color: '#3b82f6',
+    '@media (max-width: 640px)': {
+      fontSize: '28px',
+    },
   },
   statCardInfo: {
     flex: 1,
@@ -790,6 +789,9 @@ const styles = {
     fontWeight: 'bold',
     color: '#1f2937',
     lineHeight: 1,
+    '@media (max-width: 640px)': {
+      fontSize: '24px',
+    },
   },
   statCardLabel: {
     fontSize: '13px',
@@ -816,11 +818,17 @@ const styles = {
     color: '#1f2937',
     transition: 'all 0.2s',
     fontFamily: 'inherit',
+    '@media (max-width: 640px)': {
+      padding: '12px 16px',
+      flexWrap: 'wrap',
+      gap: '8px',
+    },
   },
   dropdownTitleSection: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+    flexWrap: 'wrap',
   },
   dropdownIcon: {
     fontSize: '20px',
@@ -841,12 +849,19 @@ const styles = {
     backgroundColor: 'white',
     borderTop: '1px solid #e5e7eb',
     animation: 'slideDown 0.3s ease',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+    },
   },
   progressItem: {
     marginBottom: '20px',
     padding: '15px',
     backgroundColor: '#f9fafb',
     borderRadius: '8px',
+    '@media (max-width: 640px)': {
+      padding: '12px',
+      marginBottom: '12px',
+    },
   },
   progressHeader: {
     display: 'flex',
@@ -887,19 +902,18 @@ const styles = {
     borderRadius: '10px',
     transition: 'width 0.3s ease',
   },
-  privacyNote: {
-    marginTop: '20px',
-    padding: '12px',
-    backgroundColor: '#fef3c7',
-    borderRadius: '8px',
-    textAlign: 'center',
-    fontSize: '12px',
-    color: '#92400e',
-  },
   gamesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
     gap: '24px',
+    '@media (max-width: 860px)': {
+      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+      gap: '20px',
+    },
+    '@media (max-width: 640px)': {
+      gridTemplateColumns: '1fr',
+      gap: '16px',
+    },
   },
   cardContainer: {
     background: 'white',
@@ -907,6 +921,9 @@ const styles = {
     padding: '24px',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
     transition: 'transform 0.2s',
+    '@media (max-width: 640px)': {
+      padding: '20px',
+    },
   },
   cardContent: {
     display: 'flex',
@@ -919,6 +936,11 @@ const styles = {
     gap: '20px',
     alignItems: 'flex-start',
     flex: 1,
+    '@media (max-width: 480px)': {
+      flexDirection: 'column',
+      alignItems: 'center',
+      textAlign: 'center',
+    },
   },
   cardIcon: {
     width: '80px',
@@ -939,12 +961,19 @@ const styles = {
     marginBottom: '12px',
     flexWrap: 'wrap',
     gap: '8px',
+    '@media (max-width: 480px)': {
+      justifyContent: 'center',
+      textAlign: 'center',
+    },
   },
   cardTitle: {
     fontSize: '22px',
     fontWeight: '600',
     color: '#1f2937',
     margin: 0,
+    '@media (max-width: 640px)': {
+      fontSize: '20px',
+    },
   },
   difficultyBadge: {
     padding: '4px 12px',
@@ -965,6 +994,9 @@ const styles = {
     flexWrap: 'wrap',
     gap: '6px',
     marginBottom: '16px',
+    '@media (max-width: 480px)': {
+      justifyContent: 'center',
+    },
   },
   featureTag: {
     background: '#f3f4f6',
@@ -979,6 +1011,9 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     flexWrap: 'wrap',
+    '@media (max-width: 480px)': {
+      justifyContent: 'center',
+    },
   },
   timeEstimate: {
     fontSize: '12px',
@@ -1036,6 +1071,11 @@ const styles = {
     flexDirection: 'column',
     overflow: 'hidden',
     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+    '@media (max-width: 768px)': {
+      width: '98%',
+      height: '95%',
+      borderRadius: '12px',
+    },
   },
   gameModalHeader: {
     padding: '20px 24px',
@@ -1045,26 +1085,41 @@ const styles = {
     alignItems: 'center',
     backgroundColor: '#2a2a4a',
     flexShrink: 0,
+    '@media (max-width: 640px)': {
+      padding: '16px',
+    },
   },
   gameModalTitleSection: {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
+    '@media (max-width: 640px)': {
+      gap: '10px',
+    },
   },
   gameModalIcon: {
     fontSize: '32px',
     color: '#ffd93d',
+    '@media (max-width: 640px)': {
+      fontSize: '24px',
+    },
   },
   gameModalTitle: {
     fontSize: '24px',
     fontWeight: '600',
     color: '#fff',
     margin: 0,
+    '@media (max-width: 640px)': {
+      fontSize: '18px',
+    },
   },
   gameModalSubtitle: {
     fontSize: '12px',
     color: '#aaa',
     margin: '4px 0 0 0',
+    '@media (max-width: 640px)': {
+      fontSize: '10px',
+    },
   },
   closeButton: {
     background: 'rgba(255,255,255,0.1)',
@@ -1080,6 +1135,11 @@ const styles = {
     justifyContent: 'center',
     width: '40px',
     height: '40px',
+    '@media (max-width: 640px)': {
+      width: '36px',
+      height: '36px',
+      fontSize: '16px',
+    },
   },
   gameModalContent: {
     flex: 1,
@@ -1110,6 +1170,9 @@ const styles = {
     padding: '24px',
     maxWidth: '400px',
     width: '90%',
+    '@media (max-width: 640px)': {
+      padding: '20px',
+    },
   },
   modalTitle: {
     fontSize: '20px',
@@ -1126,6 +1189,9 @@ const styles = {
     display: 'flex',
     gap: '12px',
     justifyContent: 'flex-end',
+    '@media (max-width: 480px)': {
+      flexDirection: 'column',
+    },
   },
   modalCancelButton: {
     padding: '8px 16px',
@@ -1134,6 +1200,9 @@ const styles = {
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
+    '@media (max-width: 480px)': {
+      width: '100%',
+    },
   },
   modalConfirmButton: {
     padding: '8px 16px',
@@ -1142,10 +1211,31 @@ const styles = {
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
+    '@media (max-width: 480px)': {
+      width: '100%',
+    },
+  },
+  notification: {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    padding: '12px 20px',
+    borderRadius: '8px',
+    zIndex: 10002,
+    animation: 'slideIn 0.3s ease',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    fontWeight: 'bold',
+    color: 'white',
+    '@media (max-width: 640px)': {
+      bottom: '10px',
+      right: '10px',
+      left: '10px',
+      textAlign: 'center',
+    },
   },
 };
 
-// Add CSS animations
+// Add CSS animations to document head
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   .game-card:hover {
@@ -1187,6 +1277,9 @@ styleSheet.textContent = `
     }
   }
 `;
-document.head.appendChild(styleSheet);
+if (!document.querySelector('#games-styles')) {
+  styleSheet.id = 'games-styles';
+  document.head.appendChild(styleSheet);
+}
 
 export default Games;
