@@ -4,14 +4,22 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/', // Important for Vercel deployment
+  base: '/',
   server: {
     port: 5173,
     strictPort: true,
     host: true
   },
   build: {
-    outDir: 'dist', // Explicitly set output directory
-    sourcemap: false // Optional: set to true for debugging
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      input: {
+        main: 'index.html'
+      }
+    }
+  },
+  resolve: {
+    extensions: ['.js', '.jsx', '.json']  // Add this to help resolve imports
   }
 })
