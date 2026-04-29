@@ -11,7 +11,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
   const [feedbackAvatar, setFeedbackAvatar] = useState(null);
   const [canProceed, setCanProceed] = useState(true);
   const [showAvatarMessage, setShowAvatarMessage] = useState(true);
-  const [currentAvatarMessage, setCurrentAvatarMessage] = useState("📐 Welcome! Ready to learn about Point-Slope Form?");
+  const [currentAvatarMessage, setCurrentAvatarMessage] = useState("📐 Welcome! Ready to learn about X and Y Intercepts?");
   const [isCompleting, setIsCompleting] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showRewardClaimed, setShowRewardClaimed] = useState(false);
@@ -19,6 +19,130 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
 
   const MISSION_ID = 5;
   const MISSION_XP = 600;
+
+  // Questions with correct answers randomized in different positions
+  const questions = [
+    {
+      title: "Question 1: Standard Intercept Form",
+      question: "What is the standard Intercept-Form used when the x-intercept (a) and y-intercept (b) are known?",
+      options: [
+        "Ax + By = C",
+        "x/a + y/b = 1",
+        "y - y₁ = m(x - x₁)",
+        "y = mx + b"
+      ],
+      correct: 1,
+      explanation: "The Intercept Form specifically is x/a + y/b = 1, where a is the x-intercept and b is the y-intercept."
+    },
+    {
+      title: "Question 2: Intercept Form for x-intercept 4 and y-intercept -2",
+      question: "Following the steps in the solution, what is the Intercept Form for a line with an x-intercept of 4 and a y-intercept of -2?",
+      options: [
+        "x/4 + y/(-2) = 0",
+        "x/4 - y/2 = 1",
+        "x/(-2) + y/4 = 1",
+        "4x - 2y = 1"
+      ],
+      correct: 1,
+      explanation: "Substitute the given values a=4 and b=-2 directly into the formula x/a + y/b = 1. This results in x/4 - y/2 = 1."
+    },
+    {
+      title: "Question 3: Resulting Standard Form",
+      question: "In the example, the equation x/4 + y/(-2) = 1 is simplified by multiplying both sides by 4. What is the resulting Standard Form?",
+      options: [
+        "x + 2y = 4",
+        "x - 2y = 4",
+        "4x - 2y = 4",
+        "x - y = 4"
+      ],
+      correct: 1,
+      explanation: "When you multiply x/4 by 4, you get x. When you multiply -y/2 by 4, you get -2y. Multiplying the right side 1 by 4 gives 4, resulting in x - 2y = 4."
+    },
+    {
+      title: "Question 4: Points the Line Passes Through",
+      question: "If a line has an x-intercept (a) of 4 and a y-intercept (b) of -2, which set of points does the line pass through?",
+      options: [
+        "(0,4) and (-2,0)",
+        "(4,0) and (0,-2)",
+        "(4,-2) and (0,0)",
+        "(4,4) and (-2,-2)"
+      ],
+      correct: 1,
+      explanation: "An x-intercept (a) is the point where the line crosses the x-axis (y=0), which is (4,0). A y-intercept (b) is the point where the line crosses the y-axis (x=0), which is (0,-2)."
+    },
+    {
+      title: "Question 5: Intercept Form for x-intercept 5 and y-intercept 3",
+      question: "What is the Intercept Form for a line with an x-intercept of 5 and a y-intercept of 3?",
+      options: [
+        "x/3 + y/5 = 1",
+        "x/5 + y/3 = 1",
+        "5x + 3y = 1",
+        "x - y = 2"
+      ],
+      correct: 1,
+      explanation: "Using the Intercept Form x/a + y/b = 1, you substitute a=5 and b=3."
+    },
+    {
+      title: "Question 6: Identifying Standard Form",
+      question: "Comparing the two forms provided, which one is written as x - 2y = 4?",
+      options: [
+        "Intercept Form",
+        "Standard Form",
+        "Slope Form",
+        "Variable Form"
+      ],
+      correct: 1,
+      explanation: "x - 2y = 4 is a 'Standard Form'."
+    },
+    {
+      title: "Question 7: Convert to Standard Form",
+      question: "Convert x/5 + y/(-1) = 1 into standard form.",
+      options: [
+        "x + 5y = 5",
+        "x - 5y = 5",
+        "5x - y = 5",
+        "x - y = 1"
+      ],
+      correct: 1,
+      explanation: "Multiply both sides by 5 → x - 5y = 5."
+    },
+    {
+      title: "Question 8: Equivalent Intercept Form",
+      question: "Which equation is equivalent to x - 2y = 4 in intercept form?",
+      options: [
+        "x/4 + y/2 = 1",
+        "x/4 + y/(-2) = 1",
+        "x/(-4) + y/2 = 1",
+        "x/2 + y/4 = 1"
+      ],
+      correct: 1,
+      explanation: "From standard form, intercepts are (4,0) and (0,-2). So intercept form is x/4 + y/(-2) = 1."
+    },
+    {
+      title: "Question 9: Line with x-intercept -3 and y-intercept 5",
+      question: "Which equation represents a line with x-intercept -3 and y-intercept 5?",
+      options: [
+        "x/3 + y/5 = 1",
+        "x/(-3) + y/5 = 1",
+        "x/5 + y/(-3) = 1",
+        "x + y = 2"
+      ],
+      correct: 1,
+      explanation: "Direct substitution into intercept form: x/(-3) + y/5 = 1."
+    },
+    {
+      title: "Question 10: Equation with Intercepts (8,0) and (0,-4)",
+      question: "Which equation could represent a line with intercepts (8,0) and (0,-4)?",
+      options: [
+        "x/8 + y/4 = 1",
+        "x/8 + y/(-4) = 1",
+        "x/(-8) + y/4 = 1",
+        "x + y = 4"
+      ],
+      correct: 1,
+      explanation: "Correct signs must match the intercepts given. x-intercept is 8, y-intercept is -4, so x/8 + y/(-4) = 1."
+    }
+  ];
 
   // Check if mission is already completed on load
   useEffect(() => {
@@ -34,7 +158,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
         if (data?.status === 'completed') {
           setIsAlreadyCompleted(true);
           setShowRewardClaimed(true);
-          setCurrentStep(10); // Go to complete screen (last step index)
+          setCurrentStep(11); // Go to complete screen (last step index)
         }
       }
     };
@@ -43,170 +167,115 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
 
   const steps = [
     {
-      title: "📐 POINT-SLOPE FORM MISSION",
-      content: "Welcome to the Point-Slope Form mission! Learn how to find the equation of a line using a point and the slope.",
-      description: "The point-slope form is: y - y₁ = m(x - x₁), where m is the slope and (x₁, y₁) is a point on the line.",
-      showImage: true,
-      imagePath: "/image5.png",
-      type: "info"
-    },
-    {
-      title: "Example: Point-Slope Form",
-      content: "Example: Find the equation of a line that passes through the point (2, 3) with a slope of 4.",
-      solution: "Step 1: Identify the point (x₁, y₁) = (2, 3) and slope m = 4\nStep 2: Substitute into y - y₁ = m(x - x₁)\ny - 3 = 4(x - 2)\nStep 3: Simplify to slope-intercept form\ny - 3 = 4x - 8\ny = 4x - 5\nFinal equation: y = 4x - 5 (slope-intercept form) or 4x - y = 5 (standard form)",
+      title: "Mission 4: X and Y Intercepts",
+      content: (
+        <div>
+          <div style={styles.imageContainer}>
+            <img 
+              src="/image5.png" 
+              alt="X and Y Intercepts Concept"
+              style={styles.lessonImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%23f3f4f6'/%3E%3Ctext x='200' y='120' text-anchor='middle' fill='%23666'%3EX and Y Intercepts Concept%3C/text%3E%3Ctext x='200' y='145' text-anchor='middle' fill='%23999' font-size='12'%3Ex-intercept and y-intercept%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <p style={styles.imageCaption}>Figure 1: X and Y Intercepts - Where the line crosses the axes</p>
+          </div>
+          
+          {/* Second Image - image2.png */}
+          <div style={styles.imageContainer}>
+            <img 
+              src="/image2.png" 
+              alt="Intercept Form Graph"
+              style={styles.lessonImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%23f0fdf4'/%3E%3Ctext x='200' y='120' text-anchor='middle' fill='%23666'%3EIntercept Form Graph%3C/text%3E%3Ctext x='200' y='145' text-anchor='middle' fill='%23999' font-size='12'%3ELine with x-intercept 4 and y-intercept -2%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <p style={styles.imageCaption}>Figure 2: Graph showing x-intercept at (4,0) and y-intercept at (0,-2)</p>
+          </div>
+          
+          <div style={styles.exampleBox}>
+            <h4 style={styles.exampleTitle}>📐 Example:</h4>
+            <p>Find the equation of a line whose graph has an x-intercept of <strong>4</strong> and a y-intercept of <strong>-2</strong>.</p>
+            
+            <div style={styles.solutionBox}>
+              <p><strong>Solution:</strong> If the x-intercept and y-intercept are known, we use the <strong>Intercept Form</strong> defined as:</p>
+              <div style={styles.formulaBox}>
+                <strong>x/a + y/b = 1</strong>
+              </div>
+              
+              <p><strong>Step 1.</strong> Identify the x-intercept or a and y-intercept or b.</p>
+              <p>✓ a = 4 , b = -2</p>
+              
+              <p><strong>Step 2.</strong> Substitute the given values into the formula:</p>
+              <div style={styles.formulaBox}>
+                x/4 + y/(-2) = 1
+              </div>
+              
+              <p><strong>Step 3.</strong> Simplify the equation:</p>
+              <div style={styles.formulaBox}>
+                x/4 - y/2 = 1<br/>
+                Multiply both sides by 4: x - 2y = 4
+              </div>
+              
+              <p><strong>Thus, the equation of the line whose graph has an x-intercept of 4 and a y-intercept of -2 is:</strong></p>
+              <div style={styles.resultBox}>
+                x/4 + y/(-2) = 1 &nbsp;&nbsp;(intercept form)<br/>
+                x - 2y = 4 &nbsp;&nbsp;(standard form)
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
       type: "lesson"
-    },
-    {
-      title: "Question 1: Point-Slope Form",
-      question: "What is the general form of the point-slope equation?",
-      options: [
-        "y = mx + b",
-        "Ax + By = C",
-        "y - y₁ = m(x - x₁)",
-        "x/a + y/b = 1"
-      ],
-      correct: 2,
-      explanation: "The point-slope form is y - y₁ = m(x - x₁), where m is the slope and (x₁, y₁) is a point on the line.",
-      type: "quiz"
-    },
-    {
-      title: "Question 2: Identify Components",
-      question: "In the equation y - 5 = 2(x - 3), what is the slope and what point does it pass through?",
-      options: [
-        "m = 5, point (2, 3)",
-        "m = 2, point (3, 5)",
-        "m = 2, point (5, 3)",
-        "m = 3, point (2, 5)"
-      ],
-      correct: 1,
-      explanation: "Comparing with y - y₁ = m(x - x₁), we have m = 2, x₁ = 3, y₁ = 5, so the point is (3, 5).",
-      type: "quiz"
-    },
-    {
-      title: "Question 3: Using Point-Slope Form",
-      question: "Which equation represents a line with slope -2 passing through the point (1, 4)?",
-      options: [
-        "y - 4 = -2(x - 1)",
-        "y + 4 = -2(x + 1)",
-        "y - 1 = -2(x - 4)",
-        "y - 4 = 2(x - 1)"
-      ],
-      correct: 0,
-      explanation: "Substitute m = -2, x₁ = 1, y₁ = 4 into y - y₁ = m(x - x₁) → y - 4 = -2(x - 1).",
-      type: "quiz"
-    },
-    {
-      title: "Question 4: Convert to Slope-Intercept",
-      question: "Convert y - 3 = 5(x - 2) to slope-intercept form (y = mx + b).",
-      options: [
-        "y = 5x + 7",
-        "y = 5x - 7",
-        "y = 5x + 13",
-        "y = 5x - 13"
-      ],
-      correct: 1,
-      explanation: "y - 3 = 5(x - 2) → y - 3 = 5x - 10 → y = 5x - 7.",
-      type: "quiz"
-    },
-    {
-      title: "Question 5: Find Equation from Point and Slope",
-      question: "Find the equation of a line with slope 3 passing through the point (-2, 5).",
-      options: [
-        "y = 3x + 11",
-        "y = 3x - 1",
-        "y = 3x + 1",
-        "y = 3x - 11"
-      ],
-      correct: 0,
-      explanation: "y - 5 = 3(x + 2) → y - 5 = 3x + 6 → y = 3x + 11.",
-      type: "quiz"
-    },
-    {
-      title: "Question 6: Identify Point and Slope",
-      question: "For the equation y + 4 = -3(x - 6), what is the point and slope?",
-      options: [
-        "(4, 6), m = -3",
-        "(-4, 6), m = -3",
-        "(6, -4), m = -3",
-        "(-6, 4), m = -3"
-      ],
-      correct: 2,
-      explanation: "Rewrite as y - (-4) = -3(x - 6), so point is (6, -4) and m = -3.",
-      type: "quiz"
-    },
-    {
-      title: "Question 7: Real-World Application",
-      question: "A line passes through the point (4, -2) with a slope of -1/2. What is its equation in slope-intercept form?",
-      options: [
-        "y = -1/2x",
-        "y = -1/2x + 2",
-        "y = -1/2x - 4",
-        "y = -1/2x - 2"
-      ],
-      correct: 0,
-      explanation: "y - (-2) = -1/2(x - 4) → y + 2 = -1/2x + 2 → y = -1/2x.",
-      type: "quiz"
-    },
-    {
-      title: "Question 8: Standard Form Conversion",
-      question: "Convert y - 2 = 4(x - 1) to standard form (Ax + By = C).",
-      options: [
-        "4x - y = 2",
-        "4x + y = 2",
-        "4x - y = -2",
-        "4x + y = -2"
-      ],
-      correct: 0,
-      explanation: "y - 2 = 4x - 4 → y = 4x - 2 → 4x - y = 2.",
-      type: "quiz"
-    },
-    {
-      title: "Question 9: Two Points to Point-Slope",
-      question: "What is the point-slope form of the line passing through (2, 5) and (4, 11)?",
-      options: [
-        "y - 5 = 3(x - 2)",
-        "y - 2 = 3(x - 5)",
-        "y - 5 = 6(x - 2)",
-        "y - 11 = 3(x - 4)"
-      ],
-      correct: 0,
-      explanation: "Slope = (11-5)/(4-2) = 6/2 = 3. Using point (2, 5): y - 5 = 3(x - 2).",
-      type: "quiz"
-    },
-    {
-      title: "Mission Complete! 🎉",
-      content: "Congratulations! You've mastered the Point-Slope Form mission!",
-      result: "You now know how to find equations using a point and slope!",
-      note: "The point-slope form y - y₁ = m(x - x₁) is perfect when you know a point and the slope!",
-      type: "complete"
     }
   ];
 
+  // Add quiz steps dynamically from questions array
+  for (let i = 0; i < questions.length; i++) {
+    steps.push({
+      ...questions[i],
+      type: "quiz"
+    });
+  }
+
+  // Add complete step
+  steps.push({
+    title: "Mission Complete! 🎉",
+    content: "Congratulations! You've mastered the X and Y Intercepts mission!",
+    result: "You now know how to find equations using x-intercept and y-intercept!",
+    note: "The intercept form x/a + y/b = 1 is perfect when you know both intercepts!",
+    type: "complete"
+  });
+
   const avatarMessages = {
     happy: [
-      "📐 Excellent! You're mastering point-slope form!",
-      "✨ Perfect! y - y₁ = m(x - x₁) is clear to you!",
+      "📐 Excellent! You're mastering intercept form!",
+      "✨ Perfect! x/a + y/b = 1 is clear to you!",
       "🌟 Great job! Keep going!",
       "💫 You're becoming a linear equations expert!",
-      "📏 The point-slope form is easy for you now!",
+      "📏 The intercepts are easy for you now!",
       "📚 Excellent work! One step closer!",
       "🏆 Amazing! You've got this!"
     ],
     wrong: [
-      "🤔 Oops! Let's review point-slope form!",
-      "💡 Almost there! Remember: y - y₁ = m(x - x₁)",
+      "🤔 Oops! Let's review intercept form!",
+      "💡 Almost there! Remember: x/a + y/b = 1",
       "📚 Not quite right. Check your substitution!",
       "✨ Don't give up! Practice makes perfect!",
-      "🎯 Keep trying! You'll master point-slope form!",
+      "🎯 Keep trying! You'll master intercept form!",
       "💪 Every mistake teaches us something! Try again!",
-      "🌟 Focus on identifying m, x₁, and y₁ correctly!"
+      "🌟 Focus on identifying a (x-intercept) and b (y-intercept) correctly!"
     ],
     info: [
-      "💡 Remember: Point-slope form is y - y₁ = m(x - x₁)!",
-      "📈 m is the slope, (x₁, y₁) is a point on the line!",
-      "🔢 The point-slope form is great when you know a point and slope!",
-      "✨ You can convert point-slope to slope-intercept by distributing!",
-      "📚 Keep practicing your point-slope skills!"
+      "💡 Remember: Intercept form is x/a + y/b = 1!",
+      "📈 a is the x-intercept (where y = 0), b is the y-intercept (where x = 0)!",
+      "🔢 The x-intercept and y-intercept are where the line crosses the axes!",
+      "✨ You can convert intercept form to standard form by multiplying!",
+      "📚 Keep practicing your intercept form skills!"
     ]
   };
 
@@ -259,7 +328,10 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
     
     setAnswers({
       ...answers,
-      [stepIndex]: answerIndex
+      [stepIndex]: {
+        selected: answerIndex,
+        isCorrect: isCorrect
+      }
     });
     
     setTimeout(() => {
@@ -270,7 +342,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       if (steps[currentStep].type === 'quiz') {
-        if (answers[currentStep] === undefined) {
+        if (!answers[currentStep]) {
           setCurrentAvatarMessage("🤔 Please select an answer first!");
           setFeedbackAvatar('wrong');
           setShowAvatarMessage(true);
@@ -295,8 +367,8 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
         setCurrentAvatarMessage(getRandomMessage('info'));
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
-      } else if (steps[currentStep + 1]?.type === 'lesson') {
-        setCurrentAvatarMessage("📖 Let's learn how to use point-slope form!");
+      } else if (steps[currentStep + 1]?.type === 'complete') {
+        setCurrentAvatarMessage("🎉 You're almost there! Complete the mission to claim your reward!");
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else {
@@ -311,7 +383,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
       const prevStep = steps[currentStep - 1];
       if (prevStep.type === 'quiz') {
         const prevAnswer = answers[currentStep - 1];
-        setCanProceed(prevAnswer === prevStep.correct);
+        setCanProceed(prevAnswer ? prevAnswer.isCorrect : true);
       } else {
         setCanProceed(true);
       }
@@ -361,7 +433,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
   // Function to go to mission list (back to all missions)
   const goToMissionsList = () => {
     if (onComplete) {
-      onComplete(); // Go back to missions list
+      onComplete();
     } else {
       navigate('/studenthub/missions');
     }
@@ -372,7 +444,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
     setIsCompleting(true);
     
     setShowConfetti(true);
-    setCurrentAvatarMessage(`🏆 CONGRATULATIONS! You've mastered the Point-Slope Form mission! +${MISSION_XP} XP! 🎉`);
+    setCurrentAvatarMessage(`🏆 CONGRATULATIONS! You've mastered the X and Y Intercepts mission! +${MISSION_XP} XP! 🎉`);
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
     
@@ -421,40 +493,10 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
     const currentAnswer = answers[currentStep];
 
     switch (step.type) {
-      case "info":
-        return (
-          <div style={styles.infoContent}>
-            <p style={styles.contentText}>{step.content}</p>
-            <p style={styles.descriptionText}>{step.description}</p>
-            {step.showImage && step.imagePath && (
-              <div style={styles.imageContainer}>
-                <img 
-                  src={step.imagePath} 
-                  alt="Point-Slope Form Concept"
-                  style={styles.infoImage}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%23f3f4f6'/%3E%3Ctext x='200' y='120' text-anchor='middle' fill='%23666'%3EPoint-Slope Form Concept%3C/text%3E%3Ctext x='200' y='145' text-anchor='middle' fill='%23999' font-size='12'%3EImage: y - y₁ = m(x - x₁) Illustration%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-                <p style={styles.imageCaption}>Figure 1: Point-Slope Form (y - y₁ = m(x - x₁))</p>
-              </div>
-            )}
-            <div style={styles.formulaBox}>
-              <p style={styles.formulaText}>Point-Slope Form: y - y₁ = m(x - x₁)</p>
-              <p style={styles.formulaSubtext}>m = slope, (x₁, y₁) = a point on the line</p>
-            </div>
-          </div>
-        );
-
       case "lesson":
         return (
           <div style={styles.lessonContent}>
-            <p style={styles.contentText}>{step.content}</p>
-            <div style={styles.exampleBox}>
-              <h3 style={styles.exampleTitle}>Solution:</h3>
-              <pre style={styles.solutionText}>{step.solution}</pre>
-            </div>
+            {step.content}
           </div>
         );
 
@@ -462,7 +504,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
         return (
           <div style={styles.quizContent}>
             <div style={styles.questionNumber}>
-              Question {currentStep - 1} of {steps.length - 2}
+              Question {currentStep} of {questions.length}
             </div>
             <p style={styles.questionText}>{step.question}</p>
             <div style={styles.optionsContainer}>
@@ -471,15 +513,15 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
                   key={idx} 
                   style={{
                     ...styles.optionLabel,
-                    ...(answers[currentStep] === idx && idx === step.correct ? styles.correctOption : {}),
-                    ...(answers[currentStep] === idx && idx !== step.correct ? styles.wrongOption : {})
+                    ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? styles.correctOption : {}),
+                    ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? styles.wrongOption : {})
                   }}
                 >
                   <input
                     type="radio"
                     name={`question-${currentStep}`}
                     value={idx}
-                    checked={answers[currentStep] === idx}
+                    checked={currentAnswer && currentAnswer.selected === idx}
                     onChange={() => handleAnswer(currentStep, idx)}
                     style={styles.radio}
                   />
@@ -487,11 +529,11 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
                 </label>
               ))}
             </div>
-            {answers[currentStep] !== undefined && (
-              <div style={answers[currentStep] === step.correct ? styles.correctFeedback : styles.incorrectFeedback}>
-                {answers[currentStep] === step.correct ? 
-                  `✅ ${step.explanation}` : 
-                  `❌ ${step.explanation}`}
+            {currentAnswer && (
+              <div style={currentAnswer.isCorrect ? styles.correctFeedback : styles.incorrectFeedback}>
+                {currentAnswer.isCorrect ? 
+                  `✅ Correct! ${step.explanation}` : 
+                  `❌ Incorrect. ${step.explanation}`}
               </div>
             )}
           </div>
@@ -555,7 +597,8 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
   };
 
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
-  const questionsCompleted = Math.max(0, currentStep - 1);
+  const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
+  const totalQuestions = questions.length;
 
   // If already completed, show the completed screen directly
   if (isAlreadyCompleted && currentStep !== steps.length - 1 && !showRewardClaimed) {
@@ -573,7 +616,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
           <div style={styles.confettiMessage}>
             🎉 +{MISSION_XP} XP Earned! 🎉
             <br />
-            You've mastered Point-Slope Form! 📐
+            You've mastered X and Y Intercepts! 📐
           </div>
         </div>
       )}
@@ -614,7 +657,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
 
       {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
         <div style={styles.questionProgress}>
-          <span>📐 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
+          <span>📐 Questions Mastered: {questionsCompleted}/{totalQuestions}</span>
         </div>
       )}
 
@@ -636,10 +679,10 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
             <button 
               style={{
                 ...styles.nextButton,
-                ...(steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined) ? styles.disabledButton : {})
+                ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? styles.disabledButton : {})
               }}
               onClick={handleNext}
-              disabled={steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined)}
+              disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}
             >
               Next →
             </button>
@@ -648,7 +691,7 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
         
         <div style={styles.stepIndicator}>
           {steps[currentStep].type === 'quiz' && !showRewardClaimed
-            ? `Question ${currentStep - 1} of ${steps.length - 2}` 
+            ? `Question ${currentStep} of ${totalQuestions}` 
             : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
       </div>
@@ -688,11 +731,11 @@ function Mission5({ user, userData, updateUserData, onComplete }) {
             onError={(e) => {
               e.target.onerror = null;
               if (feedbackAvatar === 'happy') {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%238b5cf6'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else if (feedbackAvatar === 'wrong') {
                 e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 70 L65 70' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%238b5cf6'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               }
             }}
           />
@@ -786,23 +829,9 @@ const styles = {
     flexShrink: 0,
   },
   
-  infoContent: {
-    textAlign: 'center',
+  lessonContent: {
     padding: '15px',
-  },
-  
-  contentText: {
-    fontSize: '16px',
-    color: '#666',
     lineHeight: '1.6',
-    marginBottom: '12px',
-  },
-  
-  descriptionText: {
-    fontSize: '15px',
-    color: '#555',
-    lineHeight: '1.5',
-    marginBottom: '12px',
   },
   
   imageContainer: {
@@ -810,14 +839,14 @@ const styles = {
     marginBottom: '20px',
     padding: '10px',
     backgroundColor: '#f9fafb',
-    borderRadius: '8px',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
   },
   
-  infoImage: {
+  lessonImage: {
     maxWidth: '100%',
     height: 'auto',
     borderRadius: '8px',
-    border: '1px solid #e5e7eb',
   },
   
   imageCaption: {
@@ -836,44 +865,37 @@ const styles = {
     border: '1px solid #8b5cf6',
   },
   
-  formulaText: {
-    fontSize: '18px',
-    fontFamily: 'monospace',
-    color: '#6d28d9',
+  resultBox: {
+    backgroundColor: '#dcfce7',
+    padding: '12px',
+    borderRadius: '6px',
+    marginTop: '10px',
+    textAlign: 'center',
     fontWeight: 'bold',
-  },
-  
-  formulaSubtext: {
-    fontSize: '12px',
-    color: '#666',
-    marginTop: '5px',
-  },
-  
-  lessonContent: {
-    padding: '5px',
+    border: '1px solid #86efac',
   },
   
   exampleBox: {
-    backgroundColor: '#ede9fe',
-    padding: '15px',
-    borderRadius: '8px',
+    backgroundColor: '#f0f9ff',
+    padding: '20px',
+    borderRadius: '12px',
     marginTop: '15px',
-    borderLeft: '4px solid #8b5cf6',
+    border: '1px solid #bae6fd',
   },
   
   exampleTitle: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#6d28d9',
-    marginBottom: '10px',
+    color: '#0369a1',
+    marginBottom: '15px',
+    fontSize: '18px',
   },
   
-  solutionText: {
+  solutionBox: {
+    backgroundColor: '#fefce8',
+    padding: '15px',
+    borderRadius: '8px',
+    marginTop: '10px',
     fontSize: '14px',
-    color: '#333',
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'monospace',
-    lineHeight: '1.6',
+    border: '1px solid #fde047',
   },
   
   quizContent: {
@@ -1130,7 +1152,6 @@ const styles = {
     padding: '8px 12px',
     borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    animation: 'bubblePop 0.3s ease-out',
     maxWidth: '220px',
     position: 'relative',
     border: '2px solid #8b5cf6',
@@ -1172,7 +1193,6 @@ const styles = {
     height: '70px',
     borderRadius: '50%',
     overflow: 'hidden',
-    animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     border: '3px solid white',
@@ -1198,7 +1218,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    animation: 'fadeIn 0.3s',
   },
   
   confettiMessage: {
@@ -1208,7 +1227,6 @@ const styles = {
     fontSize: '20px',
     textAlign: 'center',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    animation: 'bounce 0.5s',
   },
   
   modalOverlay: {
@@ -1222,7 +1240,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2000,
-    animation: 'fadeIn 0.2s',
   },
   
   modalContent: {
@@ -1233,7 +1250,6 @@ const styles = {
     width: '90%',
     textAlign: 'center',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-    animation: 'bounce 0.3s',
   },
   
   modalTitle: {

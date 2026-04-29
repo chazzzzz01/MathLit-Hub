@@ -20,6 +20,130 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
   const MISSION_ID = 4;
   const MISSION_XP = 500;
 
+  // Questions with correct answers randomized in different positions (1st, 2nd, 3rd, or 4th)
+  const questions = [
+    {
+      title: "Question 1: Slope-Intercept Form",
+      question: "What is the general form of the slope-intercept equation?",
+      options: [
+        "Ax + By = C",
+        "y = mx + b",
+        "y - y₁ = m(x - x₁)",
+        "x = my + b"
+      ],
+      correct: 1,
+      explanation: "The slope-intercept form is y = mx + b, where m is slope and b is y-intercept."
+    },
+    {
+      title: "Question 2: y-intercept Meaning",
+      question: "In the equation y = mx + b, what does b represent?",
+      options: [
+        "The slope of the line",
+        "The y-intercept, where the line crosses the y-axis",
+        "The x-intercept",
+        "The rate of change"
+      ],
+      correct: 1,
+      explanation: "b is the y-intercept, where the line crosses the y-axis."
+    },
+    {
+      title: "Question 3: Negative Slope Meaning",
+      question: "If the slope is -3, what does it mean?",
+      options: [
+        "The line increases from left to right",
+        "The line decreases from left to right",
+        "The line is horizontal",
+        "The line is vertical"
+      ],
+      correct: 1,
+      explanation: "A negative slope means the line decreases from left to right."
+    },
+    {
+      title: "Question 4: Equation with Slope 2 and y-intercept 4",
+      question: "Which equation represents a line with slope 2 and y-intercept 4?",
+      options: [
+        "y = 4x + 2",
+        "y = 2x + 4",
+        "y = -2x + 4",
+        "y = 2x - 4"
+      ],
+      correct: 1,
+      explanation: "Substitute into y = mx + b → y = 2x + 4."
+    },
+    {
+      title: "Question 5: Equation with Slope -3 and y-intercept 2",
+      question: "Find the equation of a line with slope -3 and y-intercept 2.",
+      options: [
+        "y = 3x + 2",
+        "y = -3x - 2",
+        "y = -3x + 2",
+        "y = 3x - 2"
+      ],
+      correct: 2,
+      explanation: "Substitute values in the formula y = mx + b → y = -3x + 2."
+    },
+    {
+      title: "Question 6: Equation with Slope 1 and y-intercept -5",
+      question: "What is the equation of a line with slope 1 and y-intercept -5?",
+      options: [
+        "y = x + 5",
+        "y = -x - 5",
+        "y = x - 5",
+        "y = -x + 5"
+      ],
+      correct: 2,
+      explanation: "Substitute into formula y = mx + b → y = 1x - 5."
+    },
+    {
+      title: "Question 7: Identify Slope and y-intercept",
+      question: "What is the slope and y-intercept of y = 4x - 7?",
+      options: [
+        "m = 4, b = 7",
+        "m = -4, b = 7",
+        "m = 4, b = -7",
+        "m = -4, b = -7"
+      ],
+      correct: 2,
+      explanation: "Compare with y = mx + b → m = 4, b = -7."
+    },
+    {
+      title: "Question 8: Analyze y = x + 2",
+      question: "Which statement is correct about the equation y = x + 2?",
+      options: [
+        "Slope is negative, y-intercept is 2",
+        "Slope is 1 (positive), y-intercept is 2",
+        "Slope is 0, y-intercept is 2",
+        "Slope is 2, y-intercept is 1"
+      ],
+      correct: 1,
+      explanation: "m = 1 (positive slope), b = 2."
+    },
+    {
+      title: "Question 9: Real-world Application",
+      question: "Which equation represents a line that passes through the y-axis at 3 and rises 2 units for every 1 unit to the right?",
+      options: [
+        "y = 2x + 3",
+        "y = 3x + 2",
+        "y = -2x + 3",
+        "y = 2x - 3"
+      ],
+      correct: 0,
+      explanation: "'Rises 2' means slope is 2 and 'y-intercept 3' means b = 3, so y = 2x + 3."
+    },
+    {
+      title: "Question 10: Identify from Standard Form",
+      question: "What is the slope and y-intercept of the equation 3x + y = 2?",
+      options: [
+        "m = 3, b = 2",
+        "m = -3, b = 2",
+        "m = 3, b = -2",
+        "m = -3, b = -2"
+      ],
+      correct: 1,
+      explanation: "Rewrite in slope-intercept form: y = -3x + 2 → m = -3, b = 2."
+    }
+  ];
+
   // Check if mission is already completed on load
   useEffect(() => {
     const checkCompletion = async () => {
@@ -34,7 +158,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
         if (data?.status === 'completed') {
           setIsAlreadyCompleted(true);
           setShowRewardClaimed(true);
-          setCurrentStep(10); // Go to complete screen (last step index)
+          setCurrentStep(12); // Go to complete screen (last step index)
         }
       }
     };
@@ -51,136 +175,73 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
       type: "info"
     },
     {
-      title: "Example: Slope and y-intercept",
-      content: "Example: Find the equation of a line whose graph has a slope of -3 and a y-intercept of 2.",
-      solution: "Step 1: Identify m = -3 and b = 2\nStep 2: Substitute into y = mx + b\ny = (-3)x + (2)\ny = -3x + 2\nFinal equation: y = -3x + 2 or 3x + y = 2 in standard form",
+      title: "Mission 3: Slope and y-intercept",
+      content: (
+        <div>
+          <div style={styles.imageContainer}>
+            <img 
+              src="/image1.png" 
+              alt="Slope and y-intercept Concept"
+              style={styles.lessonImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='250' viewBox='0 0 400 250'%3E%3Crect width='400' height='250' fill='%23f3f4f6'/%3E%3Ctext x='200' y='120' text-anchor='middle' fill='%23666'%3ESlope and y-intercept Concept%3C/text%3E%3Ctext x='200' y='145' text-anchor='middle' fill='%23999' font-size='12'%3Ey = mx + b%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <p style={styles.imageCaption}>Figure 1: Slope-Intercept Form (y = mx + b)</p>
+          </div>
+          
+          <p style={{ marginBottom: '10px', fontSize: '14px', color: '#555' }}>
+            <strong>𝒚 = 𝒎𝒙 + 𝒃</strong>
+          </p>
+          
+          <div style={styles.exampleBox}>
+            <h4 style={styles.exampleTitle}>📐 Example:</h4>
+            <p>Find the equation of a line whose graph has a slope of <strong>-3</strong> and a y-intercept of <strong>2</strong>.</p>
+            
+            <div style={styles.solutionBox}>
+              <p><strong>Solution:</strong> If the slope of a line and a y-intercept are known. Therefore, we will use the <strong>Slope-intercept Form</strong> defined as:</p>
+              <div style={styles.formulaBox}>
+                <strong>𝒚 = 𝒎𝒙 + 𝒃</strong>
+              </div>
+              
+              <p><strong>Step 1.</strong> Identify the slope or m and y-intercept or b.</p>
+              <p>✓ m = -3 and b = 2</p>
+              
+              <p><strong>Step 2.</strong> Substitute the given values into the formula: y = mx + b</p>
+              <div style={styles.formulaBox}>
+                y = (-3)x + (2)<br/>
+                y = -3x + 2
+              </div>
+              
+              <p><strong>Thus, the equation of a line whose graph has a slope of -3 and a y-intercept of 2 is:</strong></p>
+              <div style={styles.resultBox}>
+                y = -3x + 2 &nbsp;&nbsp;or&nbsp;&nbsp; 3x + y = 2 (standard form)
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
       type: "lesson"
-    },
-    {
-      title: "Question 1: Slope-Intercept Form",
-      question: "What is the general form of the slope-intercept equation?",
-      options: [
-        "Ax + By = C",
-        "y = mx + b",
-        "y - y₁ = m(x - x₁)",
-        "x = my + b"
-      ],
-      correct: 1,
-      explanation: "The slope-intercept form is y = mx + b, where m is slope and b is y-intercept.",
-      type: "quiz"
-    },
-    {
-      title: "Question 2: y-intercept Meaning",
-      question: "In the equation y = mx + b, what does b represent?",
-      options: [
-        "The slope of the line",
-        "The y-intercept, where the line crosses the y-axis",
-        "The x-intercept",
-        "The rate of change"
-      ],
-      correct: 1,
-      explanation: "b is the y-intercept, where the line crosses the y-axis.",
-      type: "quiz"
-    },
-    {
-      title: "Question 3: Negative Slope Meaning",
-      question: "If the slope is -3, what does it mean?",
-      options: [
-        "The line increases from left to right",
-        "The line decreases from left to right",
-        "The line is horizontal",
-        "The line is vertical"
-      ],
-      correct: 1,
-      explanation: "A negative slope means the line decreases from left to right.",
-      type: "quiz"
-    },
-    {
-      title: "Question 4: Equation with Slope 2 and y-intercept 4",
-      question: "Which equation represents a line with slope 2 and y-intercept 4?",
-      options: [
-        "y = 4x + 2",
-        "y = 2x + 4",
-        "y = -2x + 4",
-        "y = 2x - 4"
-      ],
-      correct: 1,
-      explanation: "Substitute into y = mx + b → y = 2x + 4.",
-      type: "quiz"
-    },
-    {
-      title: "Question 5: Equation with Slope -3 and y-intercept 2",
-      question: "Find the equation of a line with slope -3 and y-intercept 2.",
-      options: [
-        "y = 3x + 2",
-        "y = -3x - 2",
-        "y = -3x + 2",
-        "y = 3x - 2"
-      ],
-      correct: 2,
-      explanation: "Substitute values in the formula y = mx + b → y = -3x + 2.",
-      type: "quiz"
-    },
-    {
-      title: "Question 6: Equation with Slope 1 and y-intercept -5",
-      question: "What is the equation of a line with slope 1 and y-intercept -5?",
-      options: [
-        "y = x + 5",
-        "y = -x - 5",
-        "y = x - 5",
-        "y = -x + 5"
-      ],
-      correct: 2,
-      explanation: "Substitute into formula y = mx + b → y = 1x - 5.",
-      type: "quiz"
-    },
-    {
-      title: "Question 7: Identify Slope and y-intercept",
-      question: "What is the slope and y-intercept of y = 4x - 7?",
-      options: [
-        "m = 4, b = 7",
-        "m = -4, b = 7",
-        "m = 4, b = -7",
-        "m = -4, b = -7"
-      ],
-      correct: 2,
-      explanation: "Compare with y = mx + b → m = 4, b = -7.",
-      type: "quiz"
-    },
-    {
-      title: "Question 8: Analyze y = x + 2",
-      question: "Which statement is correct about the equation y = x + 2?",
-      options: [
-        "Slope is negative, y-intercept is 2",
-        "Slope is 1 (positive), y-intercept is 2",
-        "Slope is 0, y-intercept is 2",
-        "Slope is 2, y-intercept is 1"
-      ],
-      correct: 1,
-      explanation: "m = 1 (positive slope), b = 2.",
-      type: "quiz"
-    },
-    {
-      title: "Question 9: Real-world Application",
-      question: "Which equation represents a line that passes through the y-axis at 3 and rises 2 units for every 1 unit to the right?",
-      options: [
-        "y = 2x + 3",
-        "y = 3x + 2",
-        "y = -2x + 3",
-        "y = 2x - 3"
-      ],
-      correct: 0,
-      explanation: "'Rises 2' means slope is 2 and 'y-intercept 3' means b = 3, so y = 2x + 3.",
-      type: "quiz"
-    },
-    {
-      title: "Mission Complete! 🎉",
-      content: "Congratulations! You've mastered the Slope and y-intercept mission!",
-      result: "You now know how to find equations using slope and y-intercept!",
-      note: "The slope-intercept form y = mx + b is one of the most useful forms in algebra!",
-      type: "complete"
     }
   ];
+
+  // Add quiz steps dynamically from questions array
+  for (let i = 0; i < questions.length; i++) {
+    steps.push({
+      ...questions[i],
+      type: "quiz"
+    });
+  }
+
+  // Add complete step
+  steps.push({
+    title: "Mission Complete! 🎉",
+    content: "Congratulations! You've mastered the Slope and y-intercept mission!",
+    result: "You now know how to find equations using slope and y-intercept!",
+    note: "The slope-intercept form y = mx + b is one of the most useful forms in algebra!",
+    type: "complete"
+  });
 
   const avatarMessages = {
     happy: [
@@ -259,7 +320,10 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
     
     setAnswers({
       ...answers,
-      [stepIndex]: answerIndex
+      [stepIndex]: {
+        selected: answerIndex,
+        isCorrect: isCorrect
+      }
     });
     
     setTimeout(() => {
@@ -270,7 +334,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       if (steps[currentStep].type === 'quiz') {
-        if (answers[currentStep] === undefined) {
+        if (!answers[currentStep]) {
           setCurrentAvatarMessage("🤔 Please select an answer first!");
           setFeedbackAvatar('wrong');
           setShowAvatarMessage(true);
@@ -295,8 +359,8 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
         setCurrentAvatarMessage(getRandomMessage('info'));
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
-      } else if (steps[currentStep + 1]?.type === 'lesson') {
-        setCurrentAvatarMessage("📖 Let's learn how to use slope-intercept form!");
+      } else if (steps[currentStep + 1]?.type === 'complete') {
+        setCurrentAvatarMessage("🎉 You're almost there! Complete the mission to claim your reward!");
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else {
@@ -311,7 +375,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
       const prevStep = steps[currentStep - 1];
       if (prevStep.type === 'quiz') {
         const prevAnswer = answers[currentStep - 1];
-        setCanProceed(prevAnswer === prevStep.correct);
+        setCanProceed(prevAnswer ? prevAnswer.isCorrect : true);
       } else {
         setCanProceed(true);
       }
@@ -361,7 +425,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
   // Function to go to mission list (back to all missions)
   const goToMissionsList = () => {
     if (onComplete) {
-      onComplete(); // Go back to missions list
+      onComplete();
     } else {
       navigate('/studenthub/missions');
     }
@@ -450,11 +514,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
       case "lesson":
         return (
           <div style={styles.lessonContent}>
-            <p style={styles.contentText}>{step.content}</p>
-            <div style={styles.exampleBox}>
-              <h3 style={styles.exampleTitle}>Solution:</h3>
-              <pre style={styles.solutionText}>{step.solution}</pre>
-            </div>
+            {step.content}
           </div>
         );
 
@@ -462,7 +522,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
         return (
           <div style={styles.quizContent}>
             <div style={styles.questionNumber}>
-              Question {currentStep - 1} of {steps.length - 2}
+              Question {currentStep - 1} of {questions.length}
             </div>
             <p style={styles.questionText}>{step.question}</p>
             <div style={styles.optionsContainer}>
@@ -471,15 +531,15 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
                   key={idx} 
                   style={{
                     ...styles.optionLabel,
-                    ...(answers[currentStep] === idx && idx === step.correct ? styles.correctOption : {}),
-                    ...(answers[currentStep] === idx && idx !== step.correct ? styles.wrongOption : {})
+                    ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? styles.correctOption : {}),
+                    ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? styles.wrongOption : {})
                   }}
                 >
                   <input
                     type="radio"
                     name={`question-${currentStep}`}
                     value={idx}
-                    checked={answers[currentStep] === idx}
+                    checked={currentAnswer && currentAnswer.selected === idx}
                     onChange={() => handleAnswer(currentStep, idx)}
                     style={styles.radio}
                   />
@@ -487,11 +547,11 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
                 </label>
               ))}
             </div>
-            {answers[currentStep] !== undefined && (
-              <div style={answers[currentStep] === step.correct ? styles.correctFeedback : styles.incorrectFeedback}>
-                {answers[currentStep] === step.correct ? 
-                  `✅ ${step.explanation}` : 
-                  `❌ ${step.explanation}`}
+            {currentAnswer && (
+              <div style={currentAnswer.isCorrect ? styles.correctFeedback : styles.incorrectFeedback}>
+                {currentAnswer.isCorrect ? 
+                  `✅ Correct! ${step.explanation}` : 
+                  `❌ Incorrect. ${step.explanation}`}
               </div>
             )}
           </div>
@@ -555,7 +615,8 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
   };
 
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
-  const questionsCompleted = Math.max(0, currentStep - 1);
+  const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
+  const totalQuestions = questions.length;
 
   // If already completed, show the completed screen directly
   if (isAlreadyCompleted && currentStep !== steps.length - 1 && !showRewardClaimed) {
@@ -614,7 +675,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
 
       {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
         <div style={styles.questionProgress}>
-          <span>📈 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
+          <span>📈 Questions Mastered: {questionsCompleted}/{totalQuestions}</span>
         </div>
       )}
 
@@ -636,10 +697,10 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
             <button 
               style={{
                 ...styles.nextButton,
-                ...(steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined) ? styles.disabledButton : {})
+                ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? styles.disabledButton : {})
               }}
               onClick={handleNext}
-              disabled={steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined)}
+              disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}
             >
               Next →
             </button>
@@ -648,7 +709,7 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
         
         <div style={styles.stepIndicator}>
           {steps[currentStep].type === 'quiz' && !showRewardClaimed
-            ? `Question ${currentStep - 1} of ${steps.length - 2}` 
+            ? `Question ${currentStep - 1} of ${totalQuestions}` 
             : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
       </div>
@@ -688,11 +749,11 @@ function Mission4({ user, userData, updateUserData, onComplete }) {
             onError={(e) => {
               e.target.onerror = null;
               if (feedbackAvatar === 'happy') {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23f59e0b'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else if (feedbackAvatar === 'wrong') {
                 e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 70 L65 70' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23f59e0b'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               }
             }}
           />
@@ -810,14 +871,20 @@ const styles = {
     marginBottom: '20px',
     padding: '10px',
     backgroundColor: '#f9fafb',
-    borderRadius: '8px',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
   },
   
   infoImage: {
     maxWidth: '100%',
     height: 'auto',
     borderRadius: '8px',
-    border: '1px solid #e5e7eb',
+  },
+  
+  lessonImage: {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: '8px',
   },
   
   imageCaption: {
@@ -850,30 +917,41 @@ const styles = {
   },
   
   lessonContent: {
-    padding: '5px',
+    padding: '15px',
+    lineHeight: '1.6',
   },
   
   exampleBox: {
-    backgroundColor: '#fef3c7',
-    padding: '15px',
-    borderRadius: '8px',
+    backgroundColor: '#f0f9ff',
+    padding: '20px',
+    borderRadius: '12px',
     marginTop: '15px',
-    borderLeft: '4px solid #f59e0b',
+    border: '1px solid #bae6fd',
   },
   
   exampleTitle: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#d97706',
-    marginBottom: '10px',
+    color: '#0369a1',
+    marginBottom: '15px',
+    fontSize: '18px',
   },
   
-  solutionText: {
+  solutionBox: {
+    backgroundColor: '#fefce8',
+    padding: '15px',
+    borderRadius: '8px',
+    marginTop: '10px',
     fontSize: '14px',
-    color: '#333',
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'monospace',
-    lineHeight: '1.6',
+    border: '1px solid #fde047',
+  },
+  
+  resultBox: {
+    backgroundColor: '#dcfce7',
+    padding: '12px',
+    borderRadius: '6px',
+    marginTop: '10px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    border: '1px solid #86efac',
   },
   
   quizContent: {
@@ -962,7 +1040,7 @@ const styles = {
     marginBottom: '20px',
   },
   
-  resultBox: {
+  finalResultBox: {
     backgroundColor: '#fef3c7',
     padding: '15px',
     borderRadius: '12px',
@@ -1130,7 +1208,6 @@ const styles = {
     padding: '8px 12px',
     borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    animation: 'bubblePop 0.3s ease-out',
     maxWidth: '220px',
     position: 'relative',
     border: '2px solid #f59e0b',
@@ -1172,7 +1249,6 @@ const styles = {
     height: '70px',
     borderRadius: '50%',
     overflow: 'hidden',
-    animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     border: '3px solid white',
@@ -1198,7 +1274,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    animation: 'fadeIn 0.3s',
   },
   
   confettiMessage: {
@@ -1208,7 +1283,6 @@ const styles = {
     fontSize: '20px',
     textAlign: 'center',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    animation: 'bounce 0.5s',
   },
   
   modalOverlay: {
@@ -1222,7 +1296,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2000,
-    animation: 'fadeIn 0.2s',
   },
   
   modalContent: {
@@ -1233,7 +1306,6 @@ const styles = {
     width: '90%',
     textAlign: 'center',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-    animation: 'bounce 0.3s',
   },
   
   modalTitle: {

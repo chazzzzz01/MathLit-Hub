@@ -20,26 +20,129 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const MISSION_ID = 3;
   const MISSION_XP = 400;
 
-  // Check if mission is already completed on load
-  useEffect(() => {
-    const checkCompletion = async () => {
-      if (user?.dbId) {
-        const { data } = await supabase
-          .from('mission_progress')
-          .select('status')
-          .eq('mission_id', MISSION_ID)
-          .eq('student_id', user.dbId)
-          .maybeSingle();
-        
-        if (data?.status === 'completed') {
-          setIsAlreadyCompleted(true);
-          setShowRewardClaimed(true);
-          setCurrentStep(11); // Go to complete screen (last step index)
-        }
-      }
-    };
-    checkCompletion();
-  }, [user?.dbId]);
+  // Questions with correct answers randomized in different positions (1st, 2nd, 3rd, or 4th)
+  const questions = [
+    {
+      title: "Question 1: Point-Slope Formula",
+      question: "What is the formula of the point-slope form of a linear equation?",
+      options: [
+        "y = mx + b",
+        "y - y₁ = m(x - x₁)",
+        "y = x + b",
+        "y₁ - y = m(x₁ - x)"
+      ],
+      correct: 1,  // Correct answer is 2nd choice
+      explanation: "Point-slope form uses a known slope m and a point (x₁, y₁): y - y₁ = m(x - x₁)."
+    },
+    {
+      title: "Question 2: What Slope Represents",
+      question: "What does the slope represent?",
+      options: [
+        "The y-intercept of the line",
+        "The highest point of the line",
+        "The rate of change of the line",
+        "The x-intercept of the line"
+      ],
+      correct: 2,  // Correct answer is 3rd choice
+      explanation: "Slope tells how steep the line is or how y changes with respect to x."
+    },
+    {
+      title: "Question 3: Equation with Slope 3 through (2, -1)",
+      question: "What is the equation of a line with slope 3 passing through (2, -1)?",
+      options: [
+        "y - 1 = 3(x + 2)",
+        "y + 1 = 3(x + 2)",
+        "y - 1 = 3(x - 2)",
+        "y + 1 = 3(x - 2)"
+      ],
+      correct: 3,  // Correct answer is 4th choice
+      explanation: "Substitute m=3, x₁=2, y₁=-1: y - (-1) = 3(x - 2) → y + 1 = 3(x - 2)"
+    },
+    {
+      title: "Question 4: Equation with Slope -4 through (0, 5)",
+      question: "Find the equation of the line with slope -4 passing through (0, 5).",
+      options: [
+        "y - 5 = -4(x - 0)",
+        "y + 5 = -4(x - 0)",
+        "y - 5 = 4(x - 0)",
+        "y + 5 = 4(x - 0)"
+      ],
+      correct: 0,  // Correct answer is 1st choice
+      explanation: "Substitute m=-4, x₁=0, y₁=5: y - 5 = -4(x - 0)"
+    },
+    {
+      title: "Question 5: Identify Slope",
+      question: "In the equation y - 2 = 5(x - 1), what is the slope?",
+      options: [
+        "2",
+        "1",
+        "-5",
+        "5"
+      ],
+      correct: 3,  // Correct answer is 4th choice
+      explanation: "The slope is the coefficient of (x - x₁), which is 5."
+    },
+    {
+      title: "Question 6: Comparing Graphs",
+      question: "How do the graphs of y - 3 = 2(x - 4) and y - 3 = -2(x - 4) differ?",
+      options: [
+        "They are the same line",
+        "One increases while the other decreases",
+        "Both are horizontal lines",
+        "They overlap exactly"
+      ],
+      correct: 1,  // Correct answer is 2nd choice
+      explanation: "Positive slope rises from left to right; negative slope falls from left to right."
+    },
+    {
+      title: "Question 7: Verify Correctness",
+      question: "Is the equation y - 5 = 3(x + 2) correct for slope 3 and point (-2, 5)?",
+      options: [
+        "No, because the slope is wrong",
+        "Yes, because it follows the formula",
+        "No, because the point is incorrect",
+        "Yes, but only after simplifying"
+      ],
+      correct: 1,  // Correct answer is 2nd choice
+      explanation: "x + 2 is the same as x - (-2), so it is correct for point (-2, 5)."
+    },
+    {
+      title: "Question 8: Correct Equation",
+      question: "Which is the correct equation for slope 1 and point (3, 2)?",
+      options: [
+        "y + 2 = 1(x - 3)",
+        "y - 3 = 1(x - 2)",
+        "y - 2 = 1(x - 3)",
+        "y + 3 = 1(x + 2)"
+      ],
+      correct: 2,  // Correct answer is 3rd choice
+      explanation: "Substitute correctly: y - y₁ = m(x - x₁) → y - 2 = 1(x - 3)"
+    },
+    {
+      title: "Question 9: Point-Slope Example",
+      question: "Which is a correct example of a point-slope equation you can create?",
+      options: [
+        "y = 4x + 2",
+        "y - 4 = 2(x - 1)",
+        "y = x - 5",
+        "y = 3x"
+      ],
+      correct: 1,  // Correct answer is 2nd choice
+      explanation: "y - 4 = 2(x - 1) is in point-slope form: y - y₁ = m(x - x₁)."
+    },
+    {
+      title: "Question 10: Real-world Application",
+      question: "Which situation can be modeled using point-slope form?",
+      options: [
+        "A circle's radius changing unevenly",
+        "A constant value that does not change",
+        "A random pattern with no rule",
+        "A decreasing temperature at a constant rate"
+      ],
+      correct: 3,  // Correct answer is 4th choice
+      explanation: "Linear equations represent constant rate of change, which can be modeled using point-slope form."
+    }
+  ];
 
   const steps = [
     {
@@ -49,144 +152,90 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       type: "info"
     },
     {
-      title: "Example: Slope and a Point",
-      content: "Example: Write the equation of a line whose graph has a slope of -2 and passes through the point (1, 5).",
-      solution: "Step 1: Identify m = -2, x₁ = 1, y₁ = 5\nStep 2: y - 5 = -2(x - 1)\nStep 3: y - 5 = -2x + 2\nStep 4: y = -2x + 7\nFinal equation: y = -2x + 7 or 2x + y = 7",
+      title: "Lesson: Slope and a Point",
+      content: (
+        <div>
+          <p style={{ marginBottom: '15px', fontSize: '14px', color: '#555' }}>
+            <strong>m</strong> and <strong>(x₁, y₁)</strong>
+          </p>
+          
+          {/* Image Display */}
+          <div style={styles.imageContainer}>
+            <img 
+              src="/image.png" 
+              alt="Slope and Point Graph"
+              style={styles.lessonImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Ctext x='250' y='150' text-anchor='middle' fill='%23666' font-size='16'%3ESlope = -2, Point (1, 5)%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <p style={styles.imageCaption}>Figure 1: Line with slope -2 passing through point (1, 5)</p>
+          </div>
+          
+          <div style={styles.exampleBox}>
+            <h4 style={styles.exampleTitle}>📐 Example:</h4>
+            <p>Write the equation of a line whose graph has a slope of <strong>-2</strong> and passes through the point <strong>(1, 5)</strong>.</p>
+            
+            <div style={styles.solutionBox}>
+              <p><strong>Solution:</strong> If given a slope and a particular point, then we will use the <strong>Point-slope Form</strong> defined as:</p>
+              <div style={styles.formulaBox}>
+                <strong>y - y₁ = m(x - x₁)</strong>
+              </div>
+              
+              <p><strong>Step 1.</strong> Identify the slope and a point (x₁, y₁).</p>
+              <p>✓ m = -2 ; and x₁ = 1 and y₁ = 5</p>
+              
+              <p><strong>Step 2.</strong> Substitute the given values into the formula: y - y₁ = m(x - x₁)</p>
+              <div style={styles.formulaBox}>
+                y - 5 = -2(x - 1)
+              </div>
+              
+              <p><strong>Step 3.</strong> Simplify:</p>
+              <div style={styles.formulaBox}>
+                y - 5 = -2(x - 1)
+              </div>
+              
+              <p><strong>Step 4.</strong> Apply Distributive property:</p>
+              <div style={styles.formulaBox}>
+                y - 5 = -2(x) - (-2)(1)<br/>
+                y - 5 = -2x + 2
+              </div>
+              
+              <p><strong>Step 5.</strong> Apply Addition Property of Equality:</p>
+              <div style={styles.formulaBox}>
+                y - 5 + 5 = -2x + 2 + 5<br/>
+                y = -2x + 7
+              </div>
+              
+              <p><strong>Thus, the equation of a line whose graph has a slope of -2 and a point (1, 5) is:</strong></p>
+              <div style={styles.resultBox}>
+                y = -2x + 7 &nbsp;&nbsp;or&nbsp;&nbsp; 2x + y = 7 (standard form)
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
       type: "lesson"
-    },
-    {
-      title: "Question 1: Point-Slope Formula",
-      question: "What is the formula of the point-slope form of a linear equation?",
-      options: [
-        "y = mx + b",
-        "y - y₁ = m(x - x₁)",
-        "Ax + By = C",
-        "y = mx - b"
-      ],
-      correct: 1,
-      explanation: "Point-slope form uses a known slope m and a point (x₁, y₁): y - y₁ = m(x - x₁).",
-      type: "quiz"
-    },
-    {
-      title: "Question 2: What Slope Represents",
-      question: "What does the slope represent?",
-      options: [
-        "The y-intercept of the line",
-        "How steep the line is or how y changes with respect to x",
-        "The x-intercept of the line",
-        "The length of the line"
-      ],
-      correct: 1,
-      explanation: "Slope tells how steep the line is or how y changes with respect to x.",
-      type: "quiz"
-    },
-    {
-      title: "Question 3: Equation with Slope 3 through (2, -1)",
-      question: "What is the equation of a line with slope 3 passing through (2, -1)?",
-      options: [
-        "y + 1 = 3(x - 2)",
-        "y - 1 = 3(x + 2)",
-        "y + 1 = 3(x + 2)",
-        "y - 1 = 3(x - 2)"
-      ],
-      correct: 0,
-      explanation: "Substitute m=3, x₁=2, y₁=-1: y - (-1) = 3(x - 2) → y + 1 = 3(x - 2)",
-      type: "quiz"
-    },
-    {
-      title: "Question 4: Equation with Slope -4 through (0, 5)",
-      question: "Find the equation of the line with slope -4 passing through (0, 5).",
-      options: [
-        "y = -4x + 5",
-        "y = 4x + 5",
-        "y = -4x - 5",
-        "y = 4x - 5"
-      ],
-      correct: 0,
-      explanation: "Substitute m=-4, x₁=0, y₁=5: y - 5 = -4(x - 0) → y - 5 = -4x → y = -4x + 5",
-      type: "quiz"
-    },
-    {
-      title: "Question 5: Identify Slope",
-      question: "In the equation y - 2 = 5(x - 1), what is the slope?",
-      options: ["1", "2", "5", "-5"],
-      correct: 2,
-      explanation: "The slope is the coefficient of (x - x₁), which is 5.",
-      type: "quiz"
-    },
-    {
-      title: "Question 6: Comparing Graphs",
-      question: "How do the graphs of y - 3 = 2(x - 4) and y - 3 = -2(x - 4) differ?",
-      options: [
-        "One is horizontal, one is vertical",
-        "Positive slope rises; negative slope falls",
-        "They are the same line",
-        "One is steeper than the other"
-      ],
-      correct: 1,
-      explanation: "Positive slope rises from left to right; negative slope falls from left to right.",
-      type: "quiz"
-    },
-    {
-      title: "Question 7: Verify Correctness",
-      question: "Is the equation y - 5 = 3(x + 2) correct for slope 3 and point (-2, 5)?",
-      options: [
-        "Yes, because x + 2 is the same as x - (-2)",
-        "No, the point is wrong",
-        "Yes, but the slope is wrong",
-        "No, the formula is incorrect"
-      ],
-      correct: 0,
-      explanation: "x + 2 is the same as x - (-2), so it is correct for point (-2, 5).",
-      type: "quiz"
-    },
-    {
-      title: "Question 8: Correct Equation",
-      question: "Which is the correct equation for slope 1 and point (3, 2)?",
-      options: [
-        "y - 2 = 1(x - 3)",
-        "y + 2 = 1(x + 3)",
-        "y - 3 = 1(x - 2)",
-        "y + 3 = 1(x + 2)"
-      ],
-      correct: 0,
-      explanation: "Substitute correctly: y - y₁ = m(x - x₁) → y - 2 = 1(x - 3)",
-      type: "quiz"
-    },
-    {
-      title: "Question 9: Point-Slope Example",
-      question: "Which is a correct example of a point-slope equation you can create?",
-      options: [
-        "y = 2x + 4",
-        "y - 4 = 2(x - 1)",
-        "2x + y = 4",
-        "y = 4"
-      ],
-      correct: 1,
-      explanation: "y - 4 = 2(x - 1) is in point-slope form: y - y₁ = m(x - x₁).",
-      type: "quiz"
-    },
-    {
-      title: "Question 10: Real-world Application",
-      question: "Which situation can be modeled using point-slope form?",
-      options: [
-        "A situation with constant rate of change (linear relationship)",
-        "A situation with exponential growth",
-        "A situation with periodic motion",
-        "A situation with random variation"
-      ],
-      correct: 0,
-      explanation: "Linear equations represent constant rate of change, which can be modeled using point-slope form.",
-      type: "quiz"
-    },
-    {
-      title: "Mission Complete! 🎉",
-      content: "Congratulations! You've mastered the Slope and a Point mission!",
-      result: "You now know how to find equations using slope and a point!",
-      note: "The point-slope form is a powerful tool for writing linear equations!",
-      type: "complete"
     }
   ];
+
+  // Add quiz steps dynamically from questions array
+  for (let i = 0; i < questions.length; i++) {
+    steps.push({
+      ...questions[i],
+      type: "quiz"
+    });
+  }
+
+  // Add complete step
+  steps.push({
+    title: "Mission Complete! 🎉",
+    content: "Congratulations! You've mastered the Slope and a Point mission!",
+    result: "You now know how to find equations using slope and a point!",
+    note: "The point-slope form is a powerful tool for writing linear equations!",
+    type: "complete"
+  });
 
   const avatarMessages = {
     happy: [
@@ -220,6 +269,27 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     const messages = avatarMessages[type];
     return messages[Math.floor(Math.random() * messages.length)];
   };
+
+  // Check if mission is already completed on load
+  useEffect(() => {
+    const checkCompletion = async () => {
+      if (user?.dbId) {
+        const { data } = await supabase
+          .from('mission_progress')
+          .select('status')
+          .eq('mission_id', MISSION_ID)
+          .eq('student_id', user.dbId)
+          .maybeSingle();
+        
+        if (data?.status === 'completed') {
+          setIsAlreadyCompleted(true);
+          setShowRewardClaimed(true);
+          setCurrentStep(steps.length - 1);
+        }
+      }
+    };
+    checkCompletion();
+  }, [user?.dbId]);
 
   const handleResetMission = () => {
     setShowResetConfirm(true);
@@ -265,7 +335,10 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     
     setAnswers({
       ...answers,
-      [stepIndex]: answerIndex
+      [stepIndex]: {
+        selected: answerIndex,
+        isCorrect: isCorrect
+      }
     });
     
     setTimeout(() => {
@@ -276,7 +349,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       if (steps[currentStep].type === 'quiz') {
-        if (answers[currentStep] === undefined) {
+        if (!answers[currentStep]) {
           setCurrentAvatarMessage("🤔 Please select an answer first!");
           setFeedbackAvatar('wrong');
           setShowAvatarMessage(true);
@@ -301,8 +374,8 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         setCurrentAvatarMessage(getRandomMessage('info'));
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
-      } else if (steps[currentStep + 1]?.type === 'lesson') {
-        setCurrentAvatarMessage("📖 Let's learn how to use point-slope form!");
+      } else if (steps[currentStep + 1]?.type === 'complete') {
+        setCurrentAvatarMessage("🎉 You're almost there! Complete the mission to claim your reward!");
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else {
@@ -317,7 +390,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       const prevStep = steps[currentStep - 1];
       if (prevStep.type === 'quiz') {
         const prevAnswer = answers[currentStep - 1];
-        setCanProceed(prevAnswer === prevStep.correct);
+        setCanProceed(prevAnswer ? prevAnswer.isCorrect : true);
       } else {
         setCanProceed(true);
       }
@@ -349,14 +422,6 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         return false;
       }
       
-      // Save to localStorage as backup
-      const storedCompleted = localStorage.getItem('completedMissions');
-      let completedIds = storedCompleted ? JSON.parse(storedCompleted) : [];
-      if (!completedIds.includes(MISSION_ID)) {
-        completedIds.push(MISSION_ID);
-        localStorage.setItem('completedMissions', JSON.stringify(completedIds));
-      }
-      
       return true;
     } catch (error) {
       console.error('Error in saveMissionCompletion:', error);
@@ -364,10 +429,10 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     }
   };
 
-  // Function to go to mission list (back to all missions)
+  // Function to go to mission list
   const goToMissionsList = () => {
     if (onComplete) {
-      onComplete(); // Go back to missions list
+      onComplete();
     } else {
       navigate('/studenthub/missions');
     }
@@ -382,7 +447,6 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
     
-    // Save to database
     await saveMissionCompletion();
     
     const currentProgress = userData?.progress || {};
@@ -441,11 +505,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       case "lesson":
         return (
           <div style={styles.lessonContent}>
-            <p style={styles.contentText}>{step.content}</p>
-            <div style={styles.exampleBox}>
-              <h3 style={styles.exampleTitle}>Solution:</h3>
-              <pre style={styles.solutionText}>{step.solution}</pre>
-            </div>
+            {step.content}
           </div>
         );
 
@@ -453,7 +513,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         return (
           <div style={styles.quizContent}>
             <div style={styles.questionNumber}>
-              Question {currentStep - 1} of {steps.length - 2}
+              Question {currentStep - 1} of {questions.length}
             </div>
             <p style={styles.questionText}>{step.question}</p>
             <div style={styles.optionsContainer}>
@@ -462,15 +522,15 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
                   key={idx} 
                   style={{
                     ...styles.optionLabel,
-                    ...(answers[currentStep] === idx && idx === step.correct ? styles.correctOption : {}),
-                    ...(answers[currentStep] === idx && idx !== step.correct ? styles.wrongOption : {})
+                    ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? styles.correctOption : {}),
+                    ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? styles.wrongOption : {})
                   }}
                 >
                   <input
                     type="radio"
                     name={`question-${currentStep}`}
                     value={idx}
-                    checked={answers[currentStep] === idx}
+                    checked={currentAnswer && currentAnswer.selected === idx}
                     onChange={() => handleAnswer(currentStep, idx)}
                     style={styles.radio}
                   />
@@ -478,11 +538,11 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
                 </label>
               ))}
             </div>
-            {answers[currentStep] !== undefined && (
-              <div style={answers[currentStep] === step.correct ? styles.correctFeedback : styles.incorrectFeedback}>
-                {answers[currentStep] === step.correct ? 
-                  `✅ ${step.explanation}` : 
-                  `❌ ${step.explanation}`}
+            {currentAnswer && (
+              <div style={currentAnswer.isCorrect ? styles.correctFeedback : styles.incorrectFeedback}>
+                {currentAnswer.isCorrect ? 
+                  `✅ Correct! ${step.explanation}` : 
+                  `❌ Incorrect. ${step.explanation}`}
               </div>
             )}
           </div>
@@ -546,7 +606,8 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   };
 
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
-  const questionsCompleted = Math.max(0, currentStep - 1);
+  const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
+  const totalQuestions = questions.length;
 
   // If already completed, show the completed screen directly
   if (isAlreadyCompleted && currentStep !== steps.length - 1 && !showRewardClaimed) {
@@ -605,7 +666,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
 
       {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
         <div style={styles.questionProgress}>
-          <span>📐 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
+          <span>📐 Questions Mastered: {questionsCompleted}/{totalQuestions}</span>
         </div>
       )}
 
@@ -627,10 +688,10 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
             <button 
               style={{
                 ...styles.nextButton,
-                ...(steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined) ? styles.disabledButton : {})
+                ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? styles.disabledButton : {})
               }}
               onClick={handleNext}
-              disabled={steps[currentStep].type === 'quiz' && (!canProceed || answers[currentStep] === undefined)}
+              disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}
             >
               Next →
             </button>
@@ -639,7 +700,7 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
         
         <div style={styles.stepIndicator}>
           {steps[currentStep].type === 'quiz' && !showRewardClaimed
-            ? `Question ${currentStep - 1} of ${steps.length - 2}` 
+            ? `Question ${currentStep - 1} of ${totalQuestions}` 
             : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
       </div>
@@ -679,11 +740,11 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
             onError={(e) => {
               e.target.onerror = null;
               if (feedbackAvatar === 'happy') {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else if (feedbackAvatar === 'wrong') {
                 e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 70 L65 70' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               } else {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
               }
             }}
           />
@@ -813,30 +874,63 @@ const styles = {
   },
   
   lessonContent: {
-    padding: '5px',
+    padding: '15px',
+    lineHeight: '1.6',
   },
   
   exampleBox: {
-    backgroundColor: '#fef3c7',
-    padding: '15px',
-    borderRadius: '8px',
+    backgroundColor: '#f0f9ff',
+    padding: '20px',
+    borderRadius: '12px',
     marginTop: '15px',
-    borderLeft: '4px solid #f59e0b',
+    border: '1px solid #bae6fd',
   },
   
   exampleTitle: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#d97706',
-    marginBottom: '10px',
+    color: '#0369a1',
+    marginBottom: '15px',
+    fontSize: '18px',
   },
   
-  solutionText: {
+  solutionBox: {
+    backgroundColor: '#fefce8',
+    padding: '15px',
+    borderRadius: '8px',
+    marginTop: '10px',
     fontSize: '14px',
-    color: '#333',
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'monospace',
-    lineHeight: '1.6',
+    border: '1px solid #fde047',
+  },
+  
+  resultBox: {
+    backgroundColor: '#dcfce7',
+    padding: '12px',
+    borderRadius: '6px',
+    marginTop: '10px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    border: '1px solid #86efac',
+  },
+  
+  imageContainer: {
+    textAlign: 'center',
+    marginBottom: '20px',
+    padding: '10px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
+  },
+  
+  lessonImage: {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: '8px',
+  },
+  
+  imageCaption: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '8px',
+    fontStyle: 'italic',
   },
   
   quizContent: {
@@ -925,8 +1019,8 @@ const styles = {
     marginBottom: '20px',
   },
   
-  resultBox: {
-    backgroundColor: '#d1fae5',
+  finalResultBox: {
+    backgroundColor: '#ede9fe',
     padding: '15px',
     borderRadius: '12px',
     marginBottom: '15px',
@@ -1093,7 +1187,6 @@ const styles = {
     padding: '8px 12px',
     borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    animation: 'bubblePop 0.3s ease-out',
     maxWidth: '220px',
     position: 'relative',
     border: '2px solid #10b981',
@@ -1135,7 +1228,6 @@ const styles = {
     height: '70px',
     borderRadius: '50%',
     overflow: 'hidden',
-    animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     border: '3px solid white',
@@ -1161,7 +1253,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    animation: 'fadeIn 0.3s',
   },
   
   confettiMessage: {
@@ -1171,7 +1262,6 @@ const styles = {
     fontSize: '20px',
     textAlign: 'center',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    animation: 'bounce 0.5s',
   },
   
   modalOverlay: {
@@ -1185,7 +1275,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2000,
-    animation: 'fadeIn 0.2s',
   },
   
   modalContent: {
@@ -1196,7 +1285,6 @@ const styles = {
     width: '90%',
     textAlign: 'center',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-    animation: 'bounce 0.3s',
   },
   
   modalTitle: {
