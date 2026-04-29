@@ -208,7 +208,7 @@ function TeacherHub() {
   const navItems = [
     { path: "/teacherhub/home", icon: FiHome, label: "Home" },
     { path: "/teacherhub/dashboard", icon: FiBarChart2, label: "Dashboard" },
-    { path: "/teacherhub/collaboration", icon: MdPeople, label: "Collaboration Center" }
+    { path: "/teacherhub/collaboration", icon: MdPeople, label: "Collaboration" }
   ];
 
   // If no user, show loading

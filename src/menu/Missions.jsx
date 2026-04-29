@@ -1,7 +1,6 @@
 // src/menu/Missions.jsx
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
-import Mission1 from '../missions/mission1';
 import Mission2 from '../missions/mission2';
 import Mission3 from '../missions/mission3';
 import Mission4 from '../missions/mission4';
@@ -45,7 +44,7 @@ function Missions() {
     const missionParam = params.get('mission');
     if (missionParam) {
       const missionId = parseInt(missionParam);
-      if (missionId >= 1 && missionId <= 5) {
+      if (missionId >= 2 && missionId <= 5) {
         setSelectedMission(missionId);
       }
     }
@@ -166,12 +165,7 @@ function Missions() {
       return;
     }
     
-    // Check if mission is locked
-    if (missionId === 2 && !isMission1Completed()) {
-      setLockMessage("Complete Mission 1 (Linear Equations) first to unlock the Math Wizard challenge!");
-      setShowLockModal(true);
-      return;
-    }
+    // Check if mission is locked (progressive unlocking)
     if (missionId === 3 && !isMission2Completed()) {
       setLockMessage("Complete Mission 2 (Math Wizard) first to unlock the Slope and a Point mission!");
       setShowLockModal(true);
@@ -314,15 +308,13 @@ function Missions() {
   };
 
   // Check mission completion status
-  const isMission1Completed = () => localCompletedMissions.includes(1);
   const isMission2Completed = () => localCompletedMissions.includes(2);
   const isMission3Completed = () => localCompletedMissions.includes(3);
   const isMission4Completed = () => localCompletedMissions.includes(4);
   const isMission5Completed = () => localCompletedMissions.includes(5);
 
   const missions = [
-    { id: 1, title: "Linear Equations", description: "Learn to find equation of a line using two points", xp: 100, locked: false },
-    { id: 2, title: "Math Wizard", description: "Master linear equation concepts with 10 challenging questions", xp: 250, locked: !isMission1Completed() },
+    { id: 2, title: "Math Wizard", description: "Master linear equation concepts with 10 challenging questions", xp: 250, locked: false },
     { id: 3, title: "Slope and a Point", description: "Learn to find equation of a line using slope and a point", xp: 400, locked: !isMission2Completed() },
     { id: 4, title: "Slope and y-intercept", description: "Learn to find equation of a line using slope and y-intercept", xp: 500, locked: !isMission3Completed() },
     { id: 5, title: "X and Y Intercepts", description: "Learn to find equation of a line using intercepts", xp: 600, locked: !isMission4Completed() },
@@ -338,18 +330,6 @@ function Missions() {
   }
 
   // If a mission is selected, show the mission component
-  if (selectedMission === 1) {
-    return (
-      <Mission1 
-        user={user}
-        userData={userData}
-        updateUserData={updateUserData}
-        onComplete={handleBackToMissions}
-        saveToDatabase={saveMissionCompletionToDatabase}
-      />
-    );
-  }
-
   if (selectedMission === 2) {
     return (
       <Mission2 

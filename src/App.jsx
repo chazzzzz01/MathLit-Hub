@@ -23,7 +23,6 @@ import CollaborationStudent from "./menu/CollaborationStudent";
 // Import the UserProvider
 import { UserProvider } from "./context/UserContext"
 import AboutUs from "./landingmenu/aboutus";
-import Mission1 from "./missions/mission1";
 import Mission2 from "./missions/mission2";  
 import Mission3 from "./missions/mission3";
 import Mission4 from "./missions/mission4";
@@ -46,7 +45,6 @@ function App() {
             <Route index element={<Homepage />} />
             <Route path="homepage" element={<Homepage />} />
             <Route path="missions" element={<Missions />} />
-            <Route path="missions/1" element={<Mission1 />} />
             <Route path="missions/2" element={<Mission2 />} /> 
             <Route path="missions/3" element={<Mission3 />} />
             <Route path="missions/4" element={<Mission4 />} />

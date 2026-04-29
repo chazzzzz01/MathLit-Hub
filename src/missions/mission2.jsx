@@ -16,6 +16,115 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
   const [isCompleting, setIsCompleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
+  // Questions with correct answers randomized in different positions
+  const questions = [
+    {
+      title: "Question 1: Linear Equation Definition",
+      question: "What is a linear equation in two variables?",
+      options: [
+        "A first-degree equation whose graph is a straight line",
+        "An equation with variables raised to powers greater than 1",
+        "An equation whose graph is a curve",
+        "An equation with no variables"
+      ],
+      correct: 0,
+      explanation: "A linear equation has variables raised only to the first power, and its graph forms a straight line."
+    },
+    {
+      title: "Question 2: Standard Form",
+      question: "What is the standard form of a linear equation?",
+      options: [
+        "y = mx + b",
+        "Ax + By = C",
+        "x² + y² = r²",
+        "y = x²"
+      ],
+      correct: 1,
+      explanation: "The standard form is written as Ax + By = C, where A, B, and C are constants."
+    },
+    {
+      title: "Question 3: Graph of Linear Equation",
+      question: "Why is the graph of a linear equation a straight line?",
+      options: [
+        "Because it forms a curve",
+        "Because the variables are squared",
+        "Because it has no solution",
+        "Because the rate of change is constant"
+      ],
+      correct: 3,
+      explanation: "A linear equation has a constant slope (rate of change), which results in a straight line."
+    },
+    {
+      title: "Question 4: Two Points Determine a Line",
+      question: "How can two points determine a line?",
+      options: [
+        "They create a curve",
+        "They give the slope and direction of the line",
+        "They form a triangle",
+        "They are not enough"
+      ],
+      correct: 1,
+      explanation: "Two points uniquely determine a line because they allow you to compute the slope and define the line's direction."
+    },
+    {
+      title: "Question 5: Calculate Slope",
+      question: "What is the slope of the line passing through (2, 4) and (6, 8)?",
+      options: ["1", "2", "-1", "4"],
+      correct: 0,
+      explanation: "Slope = (8-4)/(6-2) = 4/4 = 1"
+    },
+    {
+      title: "Question 6: Equation from Two Points",
+      question: "What is the equation of the line passing through (0, 3) and (4, 7)?",
+      options: ["y = x + 3", "y = x - 3", "y = 2x + 3", "y = 4x + 7"],
+      correct: 0,
+      explanation: "Following the steps: x₁=0, y₁=3, x₂=4, y₂=7. y-3 = (7-3)/(4-0)(x-0) → y-3 = 4/4(x) → y-3 = x → y = x + 3"
+    },
+    {
+      title: "Question 7: Comparing Slopes",
+      question: "Compare the slopes of the lines through (1, 2) & (3, 6) and (2, 5) & (4, 9). What do you notice?",
+      options: ["They are equal", "One is negative", "They are different", "One is zero"],
+      correct: 0,
+      explanation: "First slope = (6-2)/(3-1) = 4/2 = 2, Second slope = (9-5)/(4-2) = 4/2 = 2. Both slopes are equal."
+    },
+    {
+      title: "Question 8: Parallel Lines",
+      question: "Two lines pass through the points (1, 3) & (3, 7) and (2, 4) & (4, 8). What can you conclude about the two lines?",
+      options: [
+        "The lines intersect at one point",
+        "The lines are perpendicular",
+        "The lines are parallel",
+        "The lines are the same"
+      ],
+      correct: 2,
+      explanation: "First line slope = (7-3)/(3-1)=4/2=2, Second line slope = (8-4)/(4-2)=4/2=2. Both lines have the same slope, which means they are parallel."
+    },
+    {
+      title: "Question 9: Verify Slope Claim",
+      question: "A student claims the slope of the line through (1, 2) and (3, 4) is 1. Is the student correct?",
+      options: [
+        "Yes, because the slope is 1",
+        "Yes, because the points are equal",
+        "No, the slope is 2",
+        "No, the slope is -1"
+      ],
+      correct: 0,
+      explanation: "Slope = (4-2)/(3-1) = 2/2 = 1. The student is correct."
+    },
+    {
+      title: "Question 10: Create Points for Equation",
+      question: "If you create two ordered pairs of points that will generate the linear equation y = -x + 4, which points will you pick?",
+      options: [
+        "(0, 4) and (4, 0)",
+        "(1, 1) and (2, 2)",
+        "(0, 0) and (4, 4)",
+        "(2, 4) and (4, 8)"
+      ],
+      correct: 0,
+      explanation: "Slope = (0-4)/(4-0) = -4/4 = -1. When x=0, y=4 gives (0,4). When x=4, y=0 gives (4,0). Both points satisfy y = -x + 4."
+    }
+  ];
+
   const steps = [
     {
       title: "🧙 MATH WIZARD CHALLENGE",
@@ -24,153 +133,135 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
       type: "info"
     },
     {
-      title: "Question 1: Linear Equation Definition",
-      question: "What is a linear equation in two variables?",
-      options: [
-        "An equation with variables raised to the second power",
-        "An equation with variables raised only to the first power, and its graph forms a straight line",
-        "An equation with three variables",
-        "An equation that forms a circle"
-      ],
-      correct: 1,
-      explanation: "A first-degree equation whose graph is a straight line",
-      wrongExplanation: "An equation with variables raised to powers greater than 1",
-      type: "quiz"
-    },
-    {
-      title: "Question 2: Standard Form",
-      question: "What is the standard form of a linear equation?",
-      options: [
-        "y = mx + b",
-        "ax² + bx + c = 0",
-        "Ax + By = C",
-        "x + y = 0"
-      ],
-      correct: 2,
-      explanation: "Ax + By = C",
-      wrongExplanation: "y = mx + b",
-      type: "quiz"
-    },
-    {
-      title: "Question 3: Graph of Linear Equation",
-      question: "Why is the graph of a linear equation a straight line?",
-      options: [
-        "Because it has a constant slope (rate of change)",
-        "Because it has a variable slope",
-        "Because it curves at the ends",
-        "Because it has no slope"
-      ],
-      correct: 0,
-      explanation: "Because the rate of change is constant",
-      wrongExplanation: "Because the variables are squared",
-      type: "quiz"
-    },
-    {
-      title: "Question 4: Two Points Determine a Line",
-      question: "How can two points determine a line?",
-      options: [
-        "They allow you to compute the area",
-        "They allow you to compute the slope and define the line's direction",
-        "They determine the y-intercept only",
-        "They determine the x-intercept only"
-      ],
-      correct: 1,
-      explanation: "They give the slope and direction of the line",
-      wrongExplanation: "They create a curve",
-      type: "quiz"
-    },
-    {
-      title: "Question 5: Calculate Slope",
-      question: "What is the slope of the line passing through (2, 4) and (6, 8)?",
-      options: [
-        "Slope = 0",
-        "Slope = 2",
-        "Slope = 1",
-        "Slope = 4"
-      ],
-      correct: 2,
-      explanation: "Correct! (8-4)/(6-2) = 4/4 = 1",
-      wrongExplanation: "Try again! Slope = (y₂-y₁)/(x₂-x₁)",
-      type: "quiz"
-    },
-    {
-      title: "Question 6: Equation from Two Points",
-      question: "What is the equation of the line passing through (0, 3) and (4, 7)?",
-      options: [
-        "y = x + 3",
-        "y = 2x + 3",
-        "y = x - 3",
-        "y = 4x + 3"
-      ],
-      correct: 0,
-      explanation: "Correct! Slope = (7-3)/(4-0) = 4/4 = 1, so y = x + 3",
-      wrongExplanation: "Calculate slope first: (7-3)/(4-0) = 4/4 = 1",
-      type: "quiz"
-    },
-    {
-      title: "Question 7: Comparing Slopes",
-      question: "Compare the slopes of the lines through (1, 2) & (3, 6) and (2, 5) & (4, 9). What do you notice?",
-      options: [
-        "First slope = 1, Second slope = 2",
-        "First slope = 2, Second slope = 2 (Both slopes are equal)",
-        "First slope = 3, Second slope = 1",
-        "First slope = 4, Second slope = 4"
-      ],
-      correct: 1,
-      explanation: "Correct! Both slopes = 2, they are equal",
-      wrongExplanation: "First: (6-2)/(3-1) = 4/2 = 2, Second: (9-5)/(4-2) = 4/2 = 2",
-      type: "quiz"
-    },
-    {
-      title: "Question 8: Parallel Lines",
-      question: "Two lines pass through the points (1, 3) & (3, 7) and (2, 4) & (4, 8). What can you conclude about the two lines?",
-      options: [
-        "They are perpendicular",
-        "They are the same line",
-        "They are parallel (same slope, different lines)",
-        "They intersect at one point"
-      ],
-      correct: 2,
-      explanation: "Correct! Both have slope 2, so they are parallel",
-      wrongExplanation: "Calculate both slopes: (7-3)/(3-1)=4/2=2, (8-4)/(4-2)=4/2=2",
-      type: "quiz"
-    },
-    {
-      title: "Question 9: Verify Slope Claim",
-      question: "A student claims the slope of the line through (1, 2) and (3, 4) is 1. Is the student correct?",
-      options: [
-        "No, the slope is 0",
-        "No, the slope is 2",
-        "Yes, the slope is 1",
-        "No, the slope is 3"
-      ],
-      correct: 2,
-      explanation: "Correct! (4-2)/(3-1) = 2/2 = 1",
-      wrongExplanation: "Use slope formula: (y₂-y₁)/(x₂-x₁)",
-      type: "quiz"
-    },
-    {
-      title: "Question 10: Create Points for Equation",
-      question: "If you create two ordered pairs of points that will generate the linear equation y = -x + 4, which points will you pick?",
-      options: [
-        "(0, 4) and (4, 0)",
-        "(1, 4) and (2, 4)",
-        "(0, 0) and (4, 4)",
-        "(1, 5) and (2, 6)"
-      ],
-      correct: 0,
-      explanation: "Correct! (0,4) gives 4 = -0+4 = 4, (4,0) gives 0 = -4+4 = 0",
-      wrongExplanation: "Plug each point into y = -x + 4 to check",
-      type: "quiz"
-    },
-    {
-      title: "Mission Complete! 🎉",
-      content: "Congratulations, Math Wizard! You've mastered all 10 linear equation concepts!",
-      result: "You are now a certified Math Wizard!",
-      note: "You've proven your magical math abilities in linear equations!",
-      type: "complete"
+      title: "LINEAR EQUATIONS - Lesson",
+      content: (
+        <div>
+          <p style={{ marginBottom: '15px', fontSize: '14px', color: '#555' }}>
+            <strong>LINEAR EQUATION</strong> is a first-degree polynomial involving two variables, and its graph forms a straight line.
+          </p>
+          <p style={{ marginBottom: '15px', fontSize: '14px', color: '#555' }}>
+            Its standard form is expressed as <strong>Ax + By = C</strong>. The equation of a line can be found using different methods, such as Two given points, a Slope with a Point, or a Slope-Intercept Form and the x- and y-Intercepts.
+          </p>
+          
+          {/* Main Graph Image */}
+          <div style={styles.imageContainer}>
+            <img 
+              src="/pics.png" 
+              alt="Linear Equation Graph"
+              style={styles.lessonImage}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Cline x1='100' y1='200' x2='400' y2='100' stroke='%238b5cf6' stroke-width='3'/%3E%3Ccircle cx='120' cy='190' r='6' fill='%23ef4444'/%3E%3Ctext x='110' y='180' font-size='12' fill='%23ef4444'%3E(1,2)%3C/text%3E%3Ccircle cx='380' cy='110' r='6' fill='%23ef4444'/%3E%3Ctext x='370' y='100' font-size='12' fill='%23ef4444'%3E(5,-2)%3C/text%3E%3Ctext x='250' y='280' text-anchor='middle' fill='%23666' font-size='14'%3ELine: y = -x + 3%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <p style={styles.imageCaption}>Figure 1: Line passing through points (1, 2) and (5, -2)</p>
+          </div>
+          
+          <div style={styles.exampleBox}>
+            <h4 style={styles.exampleTitle}>📐 Mission: Equation of a Line Using Two Points</h4>
+            <p><strong>Two points:</strong> (x₁, y₁) and (x₂, y₂)</p>
+            <p><strong>Example:</strong> Find the equation of the line that passes through the points (1, 2) and (5, -2).</p>
+            
+            <div style={styles.solutionBox}>
+              <p><strong>Solution:</strong> Since two points are given (1, 2) and (5, -2), we will use the <strong>Two-point Form</strong> defined as:</p>
+              <div style={styles.formulaBox}>
+                <strong>y - y₁ = (y₂ - y₁)/(x₂ - x₁) × (x - x₁)</strong>
+              </div>
+              
+              <p><strong>Step 1. Identify (x₁, y₁) and (x₂, y₂) using the given two points (1, 2) and (5, -2).</strong></p>
+              <p>✓ x₁ = 1 and y₁ = 2 ; x₂ = 5 and y₂ = -2</p>
+              
+              {/* pic1.png - Step 1 Image */}
+              <div style={styles.imageContainer}>
+                <img 
+                  src="/pic1.png" 
+                  alt="Step 1: Identifying points (1,2) and (5,-2)"
+                  style={styles.stepImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Crect width='400' height='200' fill='%23f0f9ff'/%3E%3Ctext x='200' y='80' text-anchor='middle' font-size='16' fill='%23333'%3EStep 1: Identify Points%3C/text%3E%3Ctext x='200' y='110' text-anchor='middle' font-size='14' fill='%23666'%3E(x₁, y₁) = (1, 2)%3C/text%3E%3Ctext x='200' y='130' text-anchor='middle' font-size='14' fill='%23666'%3E(x₂, y₂) = (5, -2)%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                <p style={styles.imageCaption}>Step 1: Identifying the coordinates of the two points</p>
+              </div>
+              
+              <p><strong>Step 2. Substitute these values into the formula:</strong></p>
+              <div style={styles.formulaBox}>
+                y - (2) = [(-2) - (2)]/[(5) - (1)] × (x - (1))
+              </div>
+              
+              {/* pic2.png - Step 2 Image */}
+              <div style={styles.imageContainer}>
+                <img 
+                  src="/pic2.png" 
+                  alt="Step 2: Substituting values into the formula"
+                  style={styles.stepImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Crect width='400' height='200' fill='%23f0f9ff'/%3E%3Ctext x='200' y='60' text-anchor='middle' font-size='16' fill='%23333'%3EStep 2: Substitute Values%3C/text%3E%3Ctext x='200' y='90' text-anchor='middle' font-size='13' fill='%238b5cf6'%3Ey - y₁ = (y₂ - y₁)/(x₂ - x₁) × (x - x₁)%3C/text%3E%3Ctext x='200' y='115' text-anchor='middle' font-size='13' fill='%23666'%3Ey - (2) = ((-2) - (2))/((5) - (1)) × (x - (1))%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                <p style={styles.imageCaption}>Step 2: Substituting x₁=1, y₁=2, x₂=5, y₂=-2 into the formula</p>
+              </div>
+              
+              <p><strong>Step 3. Simplify:</strong></p>
+              <div style={styles.formulaBox}>
+                y - (2) = (-4)/(4) × (x - (1))
+              </div>
+              
+              {/* pic3.png - Step 3 Image */}
+              <div style={styles.imageContainer}>
+                <img 
+                  src="/pic3.png" 
+                  alt="Step 3: Simplifying the slope"
+                  style={styles.stepImage}
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200' viewBox='0 0 400 200'%3E%3Crect width='400' height='200' fill='%23f0f9ff'/%3E%3Ctext x='200' y='60' text-anchor='middle' font-size='16' fill='%23333'%3EStep 3: Simplify%3C/text%3E%3Ctext x='200' y='90' text-anchor='middle' font-size='13' fill='%238b5cf6'%3Ey - 2 = (-4)/(4) × (x - 1)%3C/text%3E%3Ctext x='200' y='115' text-anchor='middle' font-size='13' fill='%23666'%3Ey - 2 = -1 × (x - 1)%3C/text%3E%3Ctext x='200' y='140' text-anchor='middle' font-size='13' fill='%23666'%3Ey - 2 = -x + 1%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                <p style={styles.imageCaption}>Step 3: Simplifying (-2-2) = -4 and (5-1) = 4, then dividing</p>
+              </div>
+              
+              <p><strong>Step 4. Apply Distributive property:</strong></p>
+              <div style={styles.formulaBox}>
+                y - 2 = -x + 1
+              </div>
+              
+              <p><strong>Step 5. Apply Addition Property of Equality:</strong></p>
+              <div style={styles.formulaBox}>
+                y - 2 + 2 = -x + 1 + 2<br/>
+                y = -x + 3
+              </div>
+              
+              <p><strong>Thus, the equation of the line that passes through the points (1, 2) and (5, -2) is:</strong></p>
+              <div style={styles.resultBox}>
+                y = -x + 3 &nbsp;&nbsp;or&nbsp;&nbsp; x + y = 3 (standard form)
+              </div>
+            </div>
+          </div>
+        </div>
+      ),
+      type: "lesson"
     }
   ];
+
+  // Add quiz steps dynamically from questions array
+  for (let i = 0; i < questions.length; i++) {
+    steps.push({
+      ...questions[i],
+      type: "quiz"
+    });
+  }
+
+  // Add complete step
+  steps.push({
+    title: "Mission Complete! 🎉",
+    content: "Congratulations, Math Wizard! You've mastered all linear equation concepts!",
+    result: "The equation is: y = -x + 3",
+    note: "This line passes through the points (1, 2) and (5, -2)",
+    type: "complete"
+  });
 
   const avatarMessages = {
     happy: [
@@ -195,7 +286,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
       "💡 Remember: Linear equations have a constant slope!",
       "🧙 A true wizard masters the standard form Ax + By = C!",
       "🔮 Two points uniquely determine a line!",
-      "✨ Practice finding slope using the formula!",
+      "✨ Practice finding slope using the formula m = (y₂-y₁)/(x₂-x₁)!",
       "📚 Keep practicing your linear equation skills!"
     ]
   };
@@ -310,6 +401,10 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
         setCurrentAvatarMessage(getRandomMessage('info'));
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
+      } else if (steps[currentStep + 1]?.type === 'complete') {
+        setCurrentAvatarMessage("🎉 You're almost there! Complete the mission to claim your reward!");
+        setShowAvatarMessage(true);
+        setTimeout(() => setShowAvatarMessage(false), 3000);
       } else {
         setShowAvatarMessage(false);
       }
@@ -398,7 +493,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
     setIsCompleting(true);
     
     setShowConfetti(true);
-    setCurrentAvatarMessage("🏆 CONGRATULATIONS, MATH WIZARD! You've mastered all 10 linear equation concepts! +250 XP! 🎉");
+    setCurrentAvatarMessage("🏆 CONGRATULATIONS, MATH WIZARD! You've mastered all linear equation concepts! +250 XP! 🎉");
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
     
@@ -456,7 +551,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
     // Navigate back to missions after 3 seconds
     setTimeout(() => {
       if (onComplete) {
-        onComplete(true); // Pass true to indicate refresh needed
+        onComplete(true);
       } else {
         navigate('/studenthub/missions');
       }
@@ -479,9 +574,16 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
               <div style={styles.wizardBadge}>✨</div>
             </div>
             <div style={styles.rewardPreview}>
-              <span>🏆 Complete all 10 questions to earn</span>
+              <span>🏆 Complete all questions to earn</span>
               <span style={styles.rewardPreviewAmount}>+250 XP!</span>
             </div>
+          </div>
+        );
+      
+      case "lesson":
+        return (
+          <div style={styles.lessonContent}>
+            {step.content}
           </div>
         );
 
@@ -489,7 +591,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
         return (
           <div style={styles.quizContent}>
             <div style={styles.equationNumber}>
-              Question {currentStep} of {steps.length - 2}
+              Question {currentStep - 1} of {questions.length}
             </div>
             <p style={styles.questionText}>{step.question}</p>
             <div style={styles.optionsContainer}>
@@ -517,8 +619,8 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
             {currentAnswer && (
               <div style={currentAnswer.isCorrect ? styles.correctFeedback : styles.incorrectFeedback}>
                 {currentAnswer.isCorrect ? 
-                  `✅ ${step.explanation}` : 
-                  `❌ ${step.wrongExplanation}`}
+                  `✅ Correct! ${step.explanation}` : 
+                  `❌ Incorrect. ${step.explanation}`}
               </div>
             )}
           </div>
@@ -529,7 +631,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
           <div style={styles.completeContent}>
             <p style={styles.completeText}>{step.content}</p>
             <div style={styles.resultBox}>
-              <span style={styles.resultIcon}>🧙</span>
+              <span style={styles.resultIcon}>📐</span>
               <span style={styles.resultText}>{step.result}</span>
             </div>
             <p style={styles.noteText}>{step.note}</p>
@@ -562,6 +664,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
   const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
   const XP_REWARD = 250;
+  const totalQuestions = questions.length;
 
   return (
     <div style={styles.container}>
@@ -616,7 +719,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
 
       {steps[currentStep].type === 'quiz' && (
         <div style={styles.equationProgress}>
-          <span>🧙 Questions Mastered: {questionsCompleted}/{steps.length - 2}</span>
+          <span>🧙 Questions Mastered: {questionsCompleted}/{totalQuestions}</span>
           <span style={styles.xpPreview}>✨ +{XP_REWARD} XP upon completion</span>
         </div>
       )}
@@ -651,7 +754,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
         
         <div style={styles.stepIndicator}>
           {steps[currentStep].type === 'quiz' 
-            ? `Question ${currentStep} of ${steps.length - 2}` 
+            ? `Question ${currentStep - 1} of ${totalQuestions}` 
             : `Step ${currentStep + 1} of ${steps.length}`}
         </div>
       </div>
@@ -820,10 +923,15 @@ const styles = {
     padding: '15px',
   },
   
-  contentText: {
-    fontSize: '16px',
-    color: '#666',
+  lessonContent: {
+    padding: '15px',
     lineHeight: '1.6',
+  },
+  
+  contentText: {
+    fontSize: '15px',
+    color: '#666',
+    lineHeight: '1.5',
     marginBottom: '12px',
   },
   
@@ -832,6 +940,7 @@ const styles = {
     color: '#555',
     lineHeight: '1.5',
     marginBottom: '12px',
+    fontWeight: '500',
   },
   
   wizardContainer: {
@@ -858,24 +967,23 @@ const styles = {
   },
   
   questionText: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: '20px',
-    textAlign: 'center',
+    marginBottom: '15px',
   },
   
   optionsContainer: {
     display: 'flex',
     flexDirection: 'column',
     gap: '10px',
-    marginBottom: '20px',
+    marginBottom: '15px',
   },
   
   optionLabel: {
     display: 'flex',
     alignItems: 'center',
-    padding: '12px',
+    padding: '10px',
     border: '1px solid #e5e7eb',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -898,7 +1006,7 @@ const styles = {
   },
   
   optionText: {
-    fontSize: '14px',
+    fontSize: '13px',
     color: '#333',
   },
   
@@ -943,7 +1051,7 @@ const styles = {
   },
   
   resultIcon: {
-    fontSize: '32px',
+    fontSize: '28px',
   },
   
   resultText: {
@@ -1056,7 +1164,6 @@ const styles = {
     padding: '8px 12px',
     borderRadius: '16px',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    animation: 'bubblePop 0.3s ease-out',
     maxWidth: '220px',
     position: 'relative',
     border: '2px solid #8b5cf6',
@@ -1098,7 +1205,6 @@ const styles = {
     height: '70px',
     borderRadius: '50%',
     overflow: 'hidden',
-    animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
     boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     border: '3px solid white',
@@ -1124,7 +1230,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    animation: 'fadeIn 0.3s',
   },
   
   confettiMessage: {
@@ -1134,7 +1239,6 @@ const styles = {
     fontSize: '20px',
     textAlign: 'center',
     boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    animation: 'bounce 0.5s',
   },
   
   modalOverlay: {
@@ -1148,7 +1252,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2000,
-    animation: 'fadeIn 0.2s',
   },
   
   modalContent: {
@@ -1159,7 +1262,6 @@ const styles = {
     width: '90%',
     textAlign: 'center',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-    animation: 'bounce 0.3s',
   },
   
   modalTitle: {
@@ -1204,6 +1306,78 @@ const styles = {
     fontWeight: 'bold',
     transition: 'all 0.2s',
   },
+  
+  exampleBox: {
+    backgroundColor: '#f0f9ff',
+    padding: '20px',
+    borderRadius: '12px',
+    marginTop: '15px',
+    border: '1px solid #bae6fd',
+  },
+  
+  exampleTitle: {
+    color: '#0369a1',
+    marginBottom: '15px',
+    fontSize: '18px',
+  },
+  
+  solutionBox: {
+    backgroundColor: '#fefce8',
+    padding: '15px',
+    borderRadius: '8px',
+    marginTop: '10px',
+    fontSize: '14px',
+    border: '1px solid #fde047',
+  },
+  
+  formulaBox: {
+    backgroundColor: '#e0f2fe',
+    padding: '12px',
+    borderRadius: '6px',
+    margin: '10px 0',
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    textAlign: 'center',
+    border: '1px solid #7dd3fc',
+  },
+  
+  resultBox: {
+    backgroundColor: '#dcfce7',
+    padding: '12px',
+    borderRadius: '6px',
+    marginTop: '10px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    border: '1px solid #86efac',
+  },
+  
+  imageContainer: {
+    textAlign: 'center',
+    margin: '15px 0',
+    padding: '10px',
+    backgroundColor: '#f9fafb',
+    borderRadius: '12px',
+    border: '1px solid #e5e7eb',
+  },
+  
+  lessonImage: {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: '8px',
+  },
+  
+  stepImage: {
+    maxWidth: '100%',
+    height: 'auto',
+    borderRadius: '8px',
+  },
+  
+  imageCaption: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '8px',
+    fontStyle: 'italic',
+  }
 };
 
 // Add animations to document

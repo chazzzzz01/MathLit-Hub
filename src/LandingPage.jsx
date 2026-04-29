@@ -358,7 +358,7 @@ const LandingPage = () => {
           </div>
           <div style={styles.featureCard} className="feature-card">
             <div style={styles.featureIcon}>🎮</div>
-            <h3 style={styles.featureTitle}>Game-based Learning</h3>
+            <h3 style={styles.featureTitle}>Games</h3>
             <p style={styles.featureDescription}>Practice math with fun and enjoyable interactive games</p>
           </div>
           <div style={styles.featureCard} className="feature-card">

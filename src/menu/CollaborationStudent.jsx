@@ -4,7 +4,7 @@ import { useOutletContext } from 'react-router-dom';
 import { 
   FiBookOpen, FiChevronDown, FiUsers, FiUser, FiUserCheck, FiUserX, 
   FiUserPlus, FiStar, FiClock, FiSend, FiCheckCircle, 
-  FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw
+  FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw, FiX
 } from 'react-icons/fi';
 import { supabase } from '../lib/supabase';
 
@@ -476,6 +476,44 @@ function CollaborationStudent() {
     }
   };
 
+  const handleCancelReady = async () => {
+    if (!selectedClass?.id || !teamInfo?.team || !studentUUID) {
+      setReadyError('Cannot cancel at this time.');
+      return;
+    }
+    
+    setReadyError(null);
+    
+    try {
+      // Update the ready status to false
+      const { error: updateError } = await supabase
+        .from('student_ready_status')
+        .upsert({
+          student_id: studentUUID,
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          is_ready: false,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'student_id,class_id'
+        });
+      
+      if (updateError) throw updateError;
+      
+      // Reset all ready-related states
+      setIsReady(false);
+      setReadySubmitted(false);
+      setWaitingForTeacher(false);
+      
+      console.log('❌ Cancelled ready status for team', teamInfo.team);
+      
+    } catch (error) {
+      console.error('Error canceling ready status:', error);
+      setReadyError(error.message || 'Failed to cancel ready status.');
+      setTimeout(() => setReadyError(null), 3000);
+    }
+  };
+
   // Start polling when waiting for teacher
   useEffect(() => {
     if (!selectedClass?.id || !studentUUID || !teamInfo) return;
@@ -515,10 +553,10 @@ function CollaborationStudent() {
 
   const getRoleIcon = (role) => {
     switch(role) {
-      case 'analyzer': return <FiUserCheck size={16} />;
-      case 'checker': return <FiUserX size={16} />;
-      case 'solver': return <FiUserPlus size={16} />;
-      default: return <FiUser size={16} />;
+      case 'analyzer': return <FiUserCheck size={14} />;
+      case 'checker': return <FiUserX size={14} />;
+      case 'solver': return <FiUserPlus size={14} />;
+      default: return <FiUser size={14} />;
     }
   };
 
@@ -582,14 +620,76 @@ function CollaborationStudent() {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <div style={styles.headerSection}>
+        {/* Header Section - Matching teacher style */}
+        <div style={styles.header}>
           <div style={styles.headerLeft}>
             <h1 style={styles.mainTitle}>Student Dashboard</h1>
             <p style={styles.subtitle}>Collaborate with your team and answer questions when the teacher starts</p>
           </div>
-          <button onClick={refreshClasses} style={styles.refreshButton}>
-            <FiRefreshCw size={18} /> Refresh
-          </button>
+          <div style={styles.headerRight}>
+            <div style={styles.classSelectorWrapper}>
+              <div style={styles.customDropdown} ref={dropdownRef}>
+                <button 
+                  style={styles.dropdownButton}
+                  onClick={() => setShowDropdown(!showDropdown)}
+                >
+                  <div style={styles.dropdownButtonContent}>
+                    {selectedClass ? (
+                      <>
+                        <FiBookOpen size={18} color="#6366f1" />
+                        <span style={styles.selectedClassName}>{selectedClass.name}</span>
+                      </>
+                    ) : (
+                      <span style={styles.placeholderText}>
+                        {classes.length > 0 ? 'Select a class' : 'No classes joined yet'}
+                      </span>
+                    )}
+                  </div>
+                  <FiChevronDown size={20} style={{
+                    transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease'
+                  }} />
+                </button>
+                
+                {showDropdown && (
+                  <div style={styles.dropdownMenu}>
+                    {classes.length === 0 ? (
+                      <div style={styles.emptyDropdown}>
+                        <div style={styles.emptyIcon}>📚</div>
+                        <p>You haven't joined any classes yet</p>
+                      </div>
+                    ) : (
+                      classes.map((enrollment) => (
+                        <div
+                          key={enrollment.class_id}
+                          style={{
+                            ...styles.dropdownItem,
+                            ...(selectedClass?.id === enrollment.class_id ? styles.dropdownItemSelected : {})
+                          }}
+                          onClick={() => handleClassSelect({
+                            id: enrollment.class_id,
+                            name: enrollment.class?.name,
+                            code: enrollment.class?.code,
+                            teacher: enrollment.class?.teacher_name
+                          })}
+                        >
+                          <div style={styles.dropdownItemContent}>
+                            <FiBookOpen size={16} color="#6b7280" />
+                            <span style={styles.dropdownItemName}>
+                              {enrollment.class?.name || 'Unnamed Class'}
+                            </span>
+                          </div>
+                          <span style={styles.studentCount}>
+                            <FiUsers size={12} /> 👨‍🏫 {enrollment.class?.teacher_name || 'Unknown Teacher'}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -600,77 +700,6 @@ function CollaborationStudent() {
             <button onClick={refreshClasses} style={styles.retryButton}>Try Again</button>
           </div>
         )}
-
-        <div style={styles.selectionCard}>
-          <div style={styles.selectionHeader}>
-            <FiBookOpen size={20} color="#6366f1" />
-            <span style={styles.selectionTitle}>Select Your Class</span>
-            {classes.length > 0 && <span style={styles.classCount}>{classes.length} class{classes.length !== 1 ? 'es' : ''}</span>}
-          </div>
-          
-          <div style={styles.customDropdown} ref={dropdownRef}>
-            <button style={styles.dropdownButton} onClick={() => setShowDropdown(!showDropdown)}>
-              <div style={styles.dropdownButtonContent}>
-                {selectedClass ? (
-                  <>
-                    <div style={styles.selectedClassIcon}>📚</div>
-                    <div style={styles.selectedClassInfo}>
-                      <span style={styles.selectedClassName}>{selectedClass.name}</span>
-                      <span style={styles.selectedClassCode}>Code: {selectedClass.code}</span>
-                    </div>
-                  </>
-                ) : (
-                  <span style={styles.placeholderText}>
-                    {classes.length > 0 ? 'Select a class' : 'No classes joined yet'}
-                  </span>
-                )}
-              </div>
-              <FiChevronDown size={20} />
-            </button>
-            
-            {showDropdown && (
-              <div style={styles.dropdownMenu}>
-                {classes.length === 0 ? (
-                  <div style={styles.emptyDropdown}>
-                    <div style={styles.emptyIcon}>📚</div>
-                    <p>You haven't joined any classes yet</p>
-                  </div>
-                ) : (
-                  classes.map((enrollment) => (
-                    <div
-                      key={enrollment.class_id}
-                      style={{
-                        ...styles.dropdownItem,
-                        ...(selectedClass?.id === enrollment.class_id ? styles.dropdownItemSelected : {})
-                      }}
-                      onClick={() => handleClassSelect({
-                        id: enrollment.class_id,
-                        name: enrollment.class?.name,
-                        code: enrollment.class?.code,
-                        teacher: enrollment.class?.teacher_name
-                      })}
-                    >
-                      <div style={styles.dropdownItemContent}>
-                        <div style={styles.dropdownItemIcon}>📚</div>
-                        <div style={styles.dropdownItemInfo}>
-                          <span style={styles.dropdownItemName}>
-                            {enrollment.class?.name || 'Unnamed Class'}
-                          </span>
-                          <span style={styles.dropdownItemTeacher}>
-                            👨‍🏫 {enrollment.class?.teacher_name || 'Unknown Teacher'}
-                          </span>
-                        </div>
-                      </div>
-                      <span style={styles.joinedDate}>
-                        📅 Joined: {new Date(enrollment.joined_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        </div>
 
         {readyError && (
           <div style={styles.errorCardSmall}>
@@ -782,13 +811,29 @@ function CollaborationStudent() {
                 </div>
               </div>
 
+              {/* Waiting for teacher message with cancel button */}
               {waitingForTeacher && !roundActive && !roundEnded && (
                 <div style={styles.waitingMessageModern}>
-                  <span>⏳</span>
-                  <p>You are ready! Waiting for teacher to start the game...</p>
+                  <div style={styles.waitingContent}>
+                    <div style={styles.waitingIconSection}>
+                      <span style={styles.waitingSpinner}>⏳</span>
+                      <div>
+                        <div style={styles.waitingTitle}>Waiting for Teacher</div>
+                        <p style={styles.waitingText}>You are ready! Waiting for teacher to start the game...</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={handleCancelReady}
+                      style={styles.cancelReadyButton}
+                      title="Cancel ready status"
+                    >
+                      <FiX size={18} /> Not Ready
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* Question round - only shows when roundActive is true */}
               {roundActive && currentQuestion && (
                 <div style={styles.questionCard}>
                   <div style={styles.questionHeader}>
@@ -873,6 +918,7 @@ function CollaborationStudent() {
                 </div>
               )}
 
+              {/* Ready button - only shows when not waiting and no active round */}
               {!roundActive && !roundEnded && !waitingForTeacher && (
                 <button style={styles.readyButton} onClick={handleReady}>
                   <FiUserCheck size={20} /> I'm Ready! - Team {teamInfo.team}
@@ -891,7 +937,7 @@ const styles = {
     width: '100%',
     minHeight: '100vh',
     background: 'linear-gradient(135deg, #f5f7fa 0%, #f9fafb 100%)',
-    padding: '32px 24px',
+    padding: '24px 16px',
     margin: 0,
     boxSizing: 'border-box',
   },
@@ -919,74 +965,35 @@ const styles = {
     color: '#64748b',
     fontSize: '14px',
   },
-  headerSection: {
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '32px',
     flexWrap: 'wrap',
-    gap: '16px',
+    gap: '20px',
   },
   headerLeft: {
     flex: 1,
   },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+  },
   mainTitle: {
-    fontSize: 'clamp(24px, 5vw, 32px)',
+    fontSize: '28px',
     fontWeight: '700',
-    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
+    color: '#0f172a',
     margin: 0,
+    letterSpacing: '-0.02em',
   },
   subtitle: {
-    fontSize: 'clamp(12px, 3vw, 14px)',
+    fontSize: '14px',
     color: '#64748b',
     margin: '8px 0 0 0',
   },
-  refreshButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    background: 'white',
-    border: '1px solid #e2e8f0',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#64748b',
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap',
-  },
-  selectionCard: {
-    background: 'white',
-    borderRadius: '20px',
-    padding: '20px 24px',
-    marginBottom: '24px',
-    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
-    border: '1px solid #e2e8f0',
-  },
-  selectionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-    marginBottom: '16px',
-    paddingBottom: '12px',
-    borderBottom: '1px solid #e2e8f0',
-    flexWrap: 'wrap',
-  },
-  selectionTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  classCount: {
-    fontSize: '12px',
-    color: '#64748b',
-    background: '#f1f5f9',
-    padding: '2px 8px',
-    borderRadius: '20px',
-    marginLeft: 'auto',
+  classSelectorWrapper: {
+    minWidth: '260px',
   },
   customDropdown: {
     position: 'relative',
@@ -994,44 +1001,26 @@ const styles = {
   },
   dropdownButton: {
     width: '100%',
-    padding: '14px 18px',
-    background: '#f8fafc',
-    border: '2px solid #e2e8f0',
-    borderRadius: '14px',
+    padding: '12px 16px',
+    backgroundColor: 'white',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
   },
   dropdownButtonContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: '14px',
-    flex: 1,
-    overflow: 'hidden',
-  },
-  selectedClassIcon: {
-    fontSize: '24px',
-    flexShrink: 0,
-  },
-  selectedClassInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px',
-    overflow: 'hidden',
+    gap: '10px',
   },
   selectedClassName: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1e293b',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  selectedClassCode: {
-    fontSize: '12px',
-    color: '#64748b',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#0f172a',
   },
   placeholderText: {
     color: '#94a3b8',
@@ -1042,73 +1031,60 @@ const styles = {
     top: 'calc(100% + 8px)',
     left: 0,
     right: 0,
-    background: 'white',
+    backgroundColor: 'white',
     border: '1px solid #e2e8f0',
-    borderRadius: '14px',
-    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)',
     zIndex: 1000,
-    maxHeight: '320px',
+    maxHeight: '300px',
     overflowY: 'auto',
   },
   dropdownItem: {
-    padding: '14px 18px',
+    padding: '12px 16px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     cursor: 'pointer',
+    transition: 'background 0.2s',
     borderBottom: '1px solid #f1f5f9',
-    flexWrap: 'wrap',
-    gap: '8px',
   },
   dropdownItemSelected: {
-    background: '#eef2ff',
+    backgroundColor: '#eef2ff',
   },
   dropdownItemContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    flex: 1,
-    minWidth: '180px',
-  },
-  dropdownItemIcon: {
-    fontSize: '20px',
-    flexShrink: 0,
-  },
-  dropdownItemInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
+    gap: '10px',
   },
   dropdownItemName: {
     fontSize: '14px',
     fontWeight: '500',
-    color: '#1e293b',
+    color: '#0f172a',
   },
-  dropdownItemTeacher: {
-    fontSize: '11px',
+  studentCount: {
+    fontSize: '12px',
     color: '#64748b',
-  },
-  joinedDate: {
-    fontSize: '11px',
-    color: '#94a3b8',
-    whiteSpace: 'nowrap',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   emptyDropdown: {
-    padding: '40px 20px',
+    padding: '30px',
     textAlign: 'center',
     color: '#64748b',
+    fontSize: '13px',
   },
   emptyIcon: {
-    fontSize: '48px',
-    marginBottom: '12px',
+    fontSize: '40px',
+    marginBottom: '10px',
   },
   errorCard: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'column',
-    gap: '16px',
-    padding: '40px',
+    gap: '12px',
+    padding: '32px 20px',
     background: '#fee2e2',
     borderRadius: '16px',
     marginBottom: '20px',
@@ -1120,7 +1096,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '12px 20px',
+    padding: '10px 16px',
     background: '#fee2e2',
     borderRadius: '12px',
     marginBottom: '20px',
@@ -1136,29 +1112,29 @@ const styles = {
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '11px',
   },
   retryButton: {
-    marginTop: '16px',
-    padding: '10px 24px',
+    marginTop: '12px',
+    padding: '8px 20px',
     background: '#3b82f6',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '13px',
   },
   pointsDashboard: {
-    marginBottom: '24px',
+    marginBottom: '20px',
   },
   pointsCard: {
     background: 'linear-gradient(135deg, #ffffff 0%, #fef3c7 100%)',
     borderRadius: '20px',
-    padding: 'clamp(16px, 4vw, 24px)',
+    padding: '16px',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     border: '1px solid #fde68a',
     flexWrap: 'wrap',
     gap: '16px',
@@ -1166,12 +1142,12 @@ const styles = {
   pointsCardLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: '14px',
     flexWrap: 'wrap',
   },
   pointsIcon: {
-    width: '56px',
-    height: '56px',
+    width: '48px',
+    height: '48px',
     background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
     borderRadius: '28px',
     display: 'flex',
@@ -1184,12 +1160,12 @@ const styles = {
     flexDirection: 'column',
   },
   pointsLabel: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#92400e',
     textTransform: 'uppercase',
   },
   pointsValue: {
-    fontSize: 'clamp(28px, 6vw, 36px)',
+    fontSize: 'clamp(26px, 6vw, 36px)',
     fontWeight: '700',
     color: '#d97706',
     lineHeight: 1,
@@ -1197,15 +1173,15 @@ const styles = {
   pointsCardRight: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: '12px 20px',
+    gap: '12px',
+    padding: '10px 16px',
     background: 'white',
     borderRadius: '16px',
     flexWrap: 'wrap',
   },
   teamPointsIcon: {
-    width: '40px',
-    height: '40px',
+    width: '36px',
+    height: '36px',
     background: '#eef2ff',
     borderRadius: '20px',
     display: 'flex',
@@ -1218,25 +1194,25 @@ const styles = {
     flexDirection: 'column',
   },
   teamPointsLabel: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#64748b',
   },
   teamPointsValue: {
-    fontSize: 'clamp(18px, 4vw, 20px)',
+    fontSize: 'clamp(16px, 4vw, 20px)',
     fontWeight: '700',
     color: '#6366f1',
   },
   teamInfoCard: {
     background: 'white',
     borderRadius: '24px',
-    padding: 'clamp(20px, 5vw, 32px)',
-    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+    padding: '20px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     border: '1px solid #e2e8f0',
   },
   teamHeaderSection: {
     display: 'flex',
     justifyContent: 'center',
-    marginBottom: '32px',
+    marginBottom: '24px',
   },
   teamBadge: {
     display: 'inline-flex',
@@ -1244,13 +1220,13 @@ const styles = {
     borderRadius: '60px',
     borderLeft: '4px solid',
     background: 'white',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
   },
   teamBadgeContent: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: 'clamp(8px, 3vw, 12px) clamp(20px, 5vw, 28px)',
+    gap: '12px',
+    padding: '8px 20px',
     flexWrap: 'wrap',
     justifyContent: 'center',
   },
@@ -1263,69 +1239,69 @@ const styles = {
     textAlign: 'left',
   },
   teamBadgeLabel: {
-    fontSize: '11px',
+    fontSize: '10px',
     color: '#64748b',
     textTransform: 'uppercase',
   },
   teamBadgeLetter: {
-    fontSize: 'clamp(22px, 5vw, 28px)',
+    fontSize: 'clamp(20px, 5vw, 28px)',
     fontWeight: '700',
   },
   roleCardModern: {
     display: 'flex',
     alignItems: 'center',
-    gap: '20px',
-    padding: '20px',
+    gap: '16px',
+    padding: '16px',
     background: '#f8fafc',
     borderRadius: '20px',
-    marginBottom: '32px',
+    marginBottom: '24px',
     flexWrap: 'wrap',
   },
   roleIconModern: {
-    width: '64px',
-    height: '64px',
-    borderRadius: '32px',
+    width: '56px',
+    height: '56px',
+    borderRadius: '28px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '28px',
+    fontSize: '24px',
     flexShrink: 0,
   },
   roleInfoModern: {
     flex: 1,
-    minWidth: '180px',
+    minWidth: '160px',
   },
   roleTitleModern: {
-    fontSize: 'clamp(16px, 4vw, 18px)',
+    fontSize: 'clamp(15px, 4vw, 18px)',
     fontWeight: '600',
-    marginBottom: '6px',
+    marginBottom: '4px',
     color: '#1e293b',
   },
   roleDescriptionModern: {
-    fontSize: 'clamp(12px, 3vw, 14px)',
+    fontSize: 'clamp(11px, 3vw, 13px)',
     color: '#64748b',
     margin: 0,
   },
   membersSection: {
-    marginBottom: '32px',
+    marginBottom: '24px',
   },
   sectionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    marginBottom: '20px',
-    paddingBottom: '12px',
+    gap: '8px',
+    marginBottom: '16px',
+    paddingBottom: '10px',
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
   },
   sectionTitle: {
-    fontSize: 'clamp(16px, 4vw, 18px)',
+    fontSize: 'clamp(15px, 4vw, 18px)',
     fontWeight: '600',
     color: '#1e293b',
     margin: 0,
   },
   memberCount: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#64748b',
     background: '#f1f5f9',
     padding: '2px 8px',
@@ -1333,26 +1309,26 @@ const styles = {
   },
   membersGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-    gap: '16px',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: '14px',
   },
   memberCardModern: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: '16px',
+    gap: '14px',
+    padding: '14px',
     background: '#f8fafc',
     borderRadius: '16px',
     flexWrap: 'wrap',
   },
   currentUserCardModern: {
     background: '#eef2ff',
-    border: '2px solid #c7d2fe',
+    border: '1px solid #c7d2fe',
   },
   memberAvatarModern: {
-    width: '48px',
-    height: '48px',
-    borderRadius: '24px',
+    width: '44px',
+    height: '44px',
+    borderRadius: '22px',
     overflow: 'hidden',
     flexShrink: 0,
   },
@@ -1365,84 +1341,84 @@ const styles = {
     justifyContent: 'center',
     color: 'white',
     fontWeight: '600',
-    fontSize: '18px',
+    fontSize: '16px',
   },
   memberInfoModern: {
     flex: 1,
-    minWidth: '150px',
+    minWidth: '140px',
   },
   memberNameModern: {
-    fontSize: '15px',
+    fontSize: '14px',
     fontWeight: '600',
     color: '#1e293b',
     marginBottom: '4px',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '6px',
     flexWrap: 'wrap',
   },
   youBadgeModern: {
-    fontSize: '10px',
+    fontSize: '9px',
     fontWeight: '500',
     color: '#6366f1',
     background: '#c7d2fe',
-    padding: '2px 8px',
+    padding: '2px 6px',
     borderRadius: '20px',
   },
   memberRoleModern: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: '#64748b',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '5px',
     marginBottom: '4px',
     flexWrap: 'wrap',
   },
   memberPointsModern: {
-    fontSize: '12px',
+    fontSize: '11px',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '5px',
     color: '#f59e0b',
   },
   questionCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     borderRadius: '20px',
-    padding: 'clamp(20px, 5vw, 24px)',
-    marginTop: '24px',
+    padding: '20px',
+    marginTop: '20px',
     color: 'white',
   },
   questionHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '20px',
-    paddingBottom: '12px',
+    gap: '10px',
+    marginBottom: '16px',
+    paddingBottom: '10px',
     borderBottom: '1px solid rgba(255,255,255,0.2)',
     flexWrap: 'wrap',
   },
   questionTitle: {
     flex: 1,
     margin: 0,
-    fontSize: 'clamp(18px, 4vw, 20px)',
+    fontSize: 'clamp(16px, 4vw, 20px)',
   },
   timerDisplay: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
+    gap: '5px',
+    padding: '4px 10px',
     background: 'rgba(255,255,255,0.2)',
     borderRadius: '20px',
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: '600',
   },
   questionBody: {
-    marginTop: '16px',
+    marginTop: '12px',
   },
   questionText: {
-    fontSize: 'clamp(16px, 4vw, 18px)',
+    fontSize: 'clamp(15px, 4vw, 18px)',
     lineHeight: '1.5',
-    marginBottom: '24px',
+    marginBottom: '20px',
   },
   answerArea: {
     display: 'flex',
@@ -1454,7 +1430,7 @@ const styles = {
     padding: '12px',
     borderRadius: '10px',
     border: 'none',
-    fontSize: '14px',
+    fontSize: '13px',
     fontFamily: 'inherit',
     resize: 'vertical',
     color: '#333',
@@ -1465,12 +1441,12 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     gap: '8px',
-    padding: '12px 24px',
+    padding: '10px 20px',
     background: 'white',
     color: '#667eea',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'all 0.2s ease',
@@ -1478,8 +1454,8 @@ const styles = {
   submittedMessage: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    padding: '16px',
+    gap: '12px',
+    padding: '14px',
     background: 'rgba(255,255,255,0.15)',
     borderRadius: '12px',
     flexWrap: 'wrap',
@@ -1488,7 +1464,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '12px',
+    padding: '10px',
     background: 'rgba(239,68,68,0.2)',
     borderRadius: '8px',
     color: '#fecaca',
@@ -1496,68 +1472,104 @@ const styles = {
   },
   resultCardEnded: {
     textAlign: 'center',
-    padding: 'clamp(20px, 5vw, 24px)',
+    padding: '20px',
     background: '#d1fae5',
     borderRadius: '16px',
     marginTop: '20px',
-    border: '2px solid #10b981',
+    border: '1px solid #10b981',
   },
   resultIcon: {
-    marginBottom: '12px',
+    marginBottom: '10px',
   },
   dismissResultButton: {
-    marginTop: '16px',
-    padding: '8px 24px',
+    marginTop: '12px',
+    padding: '6px 20px',
     background: '#6366f1',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '500',
   },
   readyButton: {
     width: '100%',
-    padding: '14px',
+    padding: '12px',
     background: '#10b981',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
-    fontSize: 'clamp(14px, 4vw, 16px)',
+    fontSize: 'clamp(13px, 4vw, 15px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '10px',
+    gap: '8px',
     marginTop: '20px',
     transition: 'all 0.2s ease',
     flexWrap: 'wrap',
   },
   waitingMessageModern: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    padding: '16px',
     background: '#fef3c7',
     borderRadius: '12px',
-    color: '#92400e',
     marginTop: '20px',
+    border: '1px solid #fde68a',
+  },
+  waitingContent: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '14px 20px',
     flexWrap: 'wrap',
-    textAlign: 'center',
+    gap: '16px',
+  },
+  waitingIconSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flex: 1,
+  },
+  waitingSpinner: {
+    fontSize: '24px',
+    animation: 'spin 2s linear infinite',
+  },
+  waitingTitle: {
+    fontWeight: '600',
+    color: '#92400e',
+    marginBottom: '2px',
+  },
+  waitingText: {
+    fontSize: '13px',
+    color: '#b45309',
+    margin: 0,
+  },
+  cancelReadyButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    background: '#ef4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '13px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap',
   },
   noTeamCard: {
     background: 'white',
     borderRadius: '20px',
-    padding: 'clamp(30px, 8vw, 40px)',
+    padding: '32px 20px',
     textAlign: 'center',
-    border: '2px solid #fef3c7',
+    border: '1px solid #fef3c7',
     backgroundColor: '#fffbeb',
   },
   noTeamIcon: {
     fontSize: 'clamp(48px, 12vw, 64px)',
-    marginBottom: '16px',
+    marginBottom: '12px',
   },
 };
 
@@ -1575,7 +1587,7 @@ styleSheetGlobal.textContent = `
     }
   }
   
-  button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton {
+  button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton, .cancelReadyButton {
     transition: all 0.2s ease;
   }
   
@@ -1584,7 +1596,13 @@ styleSheetGlobal.textContent = `
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
   }
   
-  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active {
+  .cancelReadyButton:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(239,68,68,0.3);
+    background: #dc2626;
+  }
+  
+  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active, .cancelReadyButton:active {
     transform: translateY(0);
   }
   
@@ -1654,6 +1672,34 @@ styleSheetGlobal.textContent = `
     .dismissButton {
       margin-left: 0;
     }
+    
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .headerRight {
+      width: 100%;
+    }
+    
+    .classSelectorWrapper {
+      width: 100%;
+    }
+    
+    .waitingContent {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .waitingIconSection {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .cancelReadyButton {
+      width: 100%;
+      justify-content: center;
+    }
   }
   
   @media (max-width: 480px) {
@@ -1662,26 +1708,8 @@ styleSheetGlobal.textContent = `
       align-items: flex-start;
     }
     
-    .joinedDate {
-      margin-left: 32px;
-    }
-    
-    .selectionHeader {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .classCount {
-      margin-left: 0;
-    }
-    
-    .headerSection {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .refreshButton {
-      align-self: flex-start;
+    .studentCount {
+      margin-left: 26px;
     }
   }
 `;
