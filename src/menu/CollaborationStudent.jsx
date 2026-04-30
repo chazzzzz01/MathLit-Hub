@@ -1,10 +1,11 @@
 // src/menu/CollaborationStudent.jsx
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
   FiBookOpen, FiChevronDown, FiUsers, FiUser, FiUserCheck, FiUserX, 
   FiUserPlus, FiStar, FiClock, FiSend, FiCheckCircle, 
-  FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw, FiX
+  FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw, FiX,
+  FiMessageSquare, FiLightbulb, FiEdit3, FiShare2, FiEye, FiEyeOff
 } from 'react-icons/fi';
 import { supabase } from '../lib/supabase';
 
@@ -40,13 +41,43 @@ function CollaborationStudent() {
   const [questionLoading, setQuestionLoading] = useState(false);
   const [roundEnded, setRoundEnded] = useState(false);
   
+  // State to control blur effect
+  const [isQuestionBlurred, setIsQuestionBlurred] = useState(true);
+  const [countdownStarted, setCountdownStarted] = useState(false);
+  
+  // Team collaboration states
+  const [showTeamAnswersModal, setShowTeamAnswersModal] = useState(false);
+  const [teamAnswers, setTeamAnswers] = useState([]);
+  const [loadingTeamAnswers, setLoadingTeamAnswers] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // NEW: Collaboration features
+  const [showCollaborationHub, setShowCollaborationHub] = useState(false);
+  const [teamNotes, setTeamNotes] = useState([]);
+  const [newNote, setNewNote] = useState('');
+  const [loadingNotes, setLoadingNotes] = useState(false);
+  const [submittingNote, setSubmittingNote] = useState(false);
+  const [showBrainstorming, setShowBrainstorming] = useState(false);
+  const [brainstormIdeas, setBrainstormIdeas] = useState([]);
+  const [newIdea, setNewIdea] = useState('');
+  const [submittingIdea, setSubmittingIdea] = useState(false);
+  const [showAnswersInRealTime, setShowAnswersInRealTime] = useState(true);
+  const [teamDiscussion, setTeamDiscussion] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [submittingMessage, setSubmittingMessage] = useState(false);
+  
   // Game session tracking
   const [studentUUID, setStudentUUID] = useState(null);
   const [currentGameSessionId, setCurrentGameSessionId] = useState(null);
   
+  // Refs
   const dropdownRef = useRef(null);
   const pollingIntervalRef = useRef(null);
   const countdownIntervalRef = useRef(null);
+  const isProcessingRef = useRef(false);
+  const lastProcessedSessionRef = useRef(null);
+  const notesPollingRef = useRef(null);
+  const discussionPollingRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -77,7 +108,7 @@ function CollaborationStudent() {
     }
   };
 
-  const startCountdown = (startTime, duration) => {
+  const startCountdown = useCallback((startTime, duration) => {
     if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
     
     const start = new Date(startTime).getTime();
@@ -88,15 +119,22 @@ function CollaborationStudent() {
       const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
       setTimeLeft(remaining);
       
+      if (remaining > 0 && !countdownStarted) {
+        setCountdownStarted(true);
+        setIsQuestionBlurred(false);
+        setCanAnswer(true);
+      }
+      
       if (remaining <= 0) {
         clearInterval(countdownIntervalRef.current);
         setCanAnswer(false);
+        countdownIntervalRef.current = null;
       }
     };
     
     updateTimer();
     countdownIntervalRef.current = setInterval(updateTimer, 1000);
-  };
+  }, [countdownStarted]);
 
   const fetchOrCreateStudentUUID = async () => {
     const authUserId = getAuthUserId();
@@ -135,6 +173,201 @@ function CollaborationStudent() {
       return newStudent.id;
     } catch (error) {
       return null;
+    }
+  };
+
+  // NEW: Load team notes
+  const loadTeamNotes = useCallback(async () => {
+    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
+    
+    setLoadingNotes(true);
+    try {
+      const { data, error } = await supabase
+        .from('team_notes')
+        .select('*')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team)
+        .eq('session_id', currentGameSessionId)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setTeamNotes(data || []);
+    } catch (error) {
+      console.error('Error loading team notes:', error);
+    } finally {
+      setLoadingNotes(false);
+    }
+  }, [teamInfo, selectedClass, currentGameSessionId]);
+
+  // NEW: Add team note
+  const addTeamNote = async () => {
+    if (!newNote.trim()) return;
+    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
+    
+    setSubmittingNote(true);
+    try {
+      const { error } = await supabase
+        .from('team_notes')
+        .insert({
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          session_id: currentGameSessionId,
+          student_id: studentUUID,
+          note: newNote.trim(),
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      setNewNote('');
+      await loadTeamNotes();
+    } catch (error) {
+      console.error('Error adding note:', error);
+    } finally {
+      setSubmittingNote(false);
+    }
+  };
+
+  // NEW: Load brainstorming ideas
+  const loadBrainstormIdeas = useCallback(async () => {
+    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('brainstorm_ideas')
+        .select('*, students(name)')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team)
+        .eq('session_id', currentGameSessionId)
+        .order('votes', { ascending: false })
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setBrainstormIdeas(data || []);
+    } catch (error) {
+      console.error('Error loading brainstorm ideas:', error);
+    }
+  }, [teamInfo, selectedClass, currentGameSessionId]);
+
+  // NEW: Add brainstorm idea
+  const addBrainstormIdea = async () => {
+    if (!newIdea.trim()) return;
+    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
+    
+    setSubmittingIdea(true);
+    try {
+      const { error } = await supabase
+        .from('brainstorm_ideas')
+        .insert({
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          session_id: currentGameSessionId,
+          student_id: studentUUID,
+          idea: newIdea.trim(),
+          votes: 0,
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      setNewIdea('');
+      await loadBrainstormIdeas();
+    } catch (error) {
+      console.error('Error adding idea:', error);
+    } finally {
+      setSubmittingIdea(false);
+    }
+  };
+
+  // NEW: Vote on brainstorm idea
+  const voteIdea = async (ideaId, currentVotes) => {
+    if (!studentUUID) return;
+    
+    try {
+      const { data: existingVote } = await supabase
+        .from('idea_votes')
+        .select('id')
+        .eq('idea_id', ideaId)
+        .eq('student_id', studentUUID)
+        .maybeSingle();
+      
+      if (existingVote) {
+        await supabase
+          .from('idea_votes')
+          .delete()
+          .eq('id', existingVote.id);
+        
+        await supabase
+          .from('brainstorm_ideas')
+          .update({ votes: currentVotes - 1 })
+          .eq('id', ideaId);
+      } else {
+        await supabase
+          .from('idea_votes')
+          .insert({
+            idea_id: ideaId,
+            student_id: studentUUID,
+            created_at: new Date().toISOString()
+          });
+        
+        await supabase
+          .from('brainstorm_ideas')
+          .update({ votes: currentVotes + 1 })
+          .eq('id', ideaId);
+      }
+      
+      await loadBrainstormIdeas();
+    } catch (error) {
+      console.error('Error voting:', error);
+    }
+  };
+
+  // NEW: Load team discussion
+  const loadTeamDiscussion = useCallback(async () => {
+    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('team_discussion')
+        .select('*, students(name)')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team)
+        .eq('session_id', currentGameSessionId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setTeamDiscussion(data || []);
+    } catch (error) {
+      console.error('Error loading discussion:', error);
+    }
+  }, [teamInfo, selectedClass, currentGameSessionId]);
+
+  // NEW: Send discussion message
+  const sendDiscussionMessage = async () => {
+    if (!newMessage.trim()) return;
+    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
+    
+    setSubmittingMessage(true);
+    try {
+      const { error } = await supabase
+        .from('team_discussion')
+        .insert({
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          session_id: currentGameSessionId,
+          student_id: studentUUID,
+          message: newMessage.trim(),
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      setNewMessage('');
+      await loadTeamDiscussion();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setSubmittingMessage(false);
     }
   };
 
@@ -211,6 +444,7 @@ function CollaborationStudent() {
         setTeamTotalPoints(total);
       }
     } catch (error) {
+      console.error('Error loading team info:', error);
     } finally {
       setLoadingTeam(false);
     }
@@ -305,7 +539,7 @@ function CollaborationStudent() {
     }
   };
 
-  const resetRoundState = () => {
+  const resetRoundState = useCallback(() => {
     setRoundActive(false);
     setCurrentQuestion(null);
     setTimeLeft(0);
@@ -318,12 +552,97 @@ function CollaborationStudent() {
     setQuestionLoading(false);
     setRoundEnded(false);
     setCurrentGameSessionId(null);
+    setIsQuestionBlurred(true);
+    setCountdownStarted(false);
+    setShowTeamAnswersModal(false);
+    setShowCollaborationHub(false);
     
     if (countdownIntervalRef.current) {
       clearInterval(countdownIntervalRef.current);
       countdownIntervalRef.current = null;
     }
-  };
+  }, []);
+
+  const fetchTeamAnswers = useCallback(async () => {
+    if (!currentGameSessionId || !teamInfo?.team || !selectedClass?.id) return;
+    
+    setLoadingTeamAnswers(true);
+    try {
+      const { data: teamAssignments } = await supabase
+        .from('team_assignments')
+        .select('student_id')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team);
+      
+      if (!teamAssignments || teamAssignments.length === 0) {
+        setLoadingTeamAnswers(false);
+        return;
+      }
+      
+      const teamStudentIds = teamAssignments.map(ta => ta.student_id);
+      
+      const { data: answers, error: answersError } = await supabase
+        .from('student_answers')
+        .select(`
+          id,
+          student_id,
+          answer,
+          created_at,
+          students (id, name, user_id)
+        `)
+        .eq('session_id', currentGameSessionId)
+        .in('student_id', teamStudentIds);
+      
+      if (answersError) throw answersError;
+      
+      const teamAnswersWithPoints = await Promise.all(
+        (answers || []).map(async (answer) => {
+          let userName = answer.students?.name || 'Student';
+          
+          if (answer.students?.user_id) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('name')
+              .eq('id', answer.students.user_id)
+              .maybeSingle();
+            if (userData?.name) userName = userData.name;
+          }
+          
+          const { data: pointData } = await supabase
+            .from('student_points')
+            .select('points')
+            .eq('student_id', answer.student_id)
+            .eq('class_id', selectedClass.id)
+            .maybeSingle();
+          
+          const { data: roleData } = await supabase
+            .from('team_assignments')
+            .select('role')
+            .eq('student_id', answer.student_id)
+            .eq('class_id', selectedClass.id)
+            .maybeSingle();
+          
+          return {
+            id: answer.id,
+            studentId: answer.student_id,
+            studentName: userName,
+            answer: answer.answer,
+            points: pointData?.points || 0,
+            role: roleData?.role || 'member',
+            createdAt: answer.created_at,
+            isCurrentUser: answer.student_id === studentUUID
+          };
+        })
+      );
+      
+      teamAnswersWithPoints.sort((a, b) => b.points - a.points);
+      setTeamAnswers(teamAnswersWithPoints);
+    } catch (error) {
+      console.error('Error fetching team answers:', error);
+    } finally {
+      setLoadingTeamAnswers(false);
+    }
+  }, [currentGameSessionId, teamInfo, selectedClass, studentUUID]);
 
   const submitAnswer = async () => {
     if (!canAnswer || answerSubmitted) {
@@ -340,8 +659,6 @@ function CollaborationStudent() {
     setSubmissionError(null);
     
     try {
-      console.log('📤 SUBMITTING ANSWER...');
-      
       const { data: gameSession, error: sessionError } = await supabase
         .from('game_sessions')
         .select('*')
@@ -366,11 +683,13 @@ function CollaborationStudent() {
       
       if (answerError) throw answerError;
       
-      console.log('✅ ANSWER SAVED!');
-      
       setAnswerSubmitted(true);
       setSubmitSuccess(true);
       setSubmittedAnswerText(studentAnswer);
+      setRoundActive(false);
+      
+      await fetchTeamAnswers();
+      setShowTeamAnswersModal(true);
       
       setTimeout(() => setSubmitSuccess(false), 3000);
       
@@ -383,11 +702,16 @@ function CollaborationStudent() {
     }
   };
 
-  // SIMPLE POLLING FUNCTION - NO SUBSCRIPTIONS
-  const checkForActiveGameSession = async () => {
-    if (!waitingForTeacher || !selectedClass?.id || !studentUUID || !teamInfo) {
-      return;
-    }
+  const refreshTeamAnswers = async () => {
+    setRefreshKey(prev => prev + 1);
+    await fetchTeamAnswers();
+  };
+
+  const checkForActiveGameSession = useCallback(async () => {
+    if (isProcessingRef.current) return;
+    if (!selectedClass?.id || !studentUUID || !teamInfo) return;
+    
+    isProcessingRef.current = true;
     
     try {
       const { data: gameSession, error } = await supabase
@@ -401,16 +725,28 @@ function CollaborationStudent() {
       
       if (error) throw error;
       
-      // New game session started
-      if (gameSession && currentGameSessionId !== gameSession.id) {
-        console.log('🎮 Game session started!');
+      const isNewSession = gameSession && lastProcessedSessionRef.current !== gameSession.id;
+      
+      if (gameSession && isNewSession) {
+        console.log('🎮 Game session started!', gameSession.id);
+        lastProcessedSessionRef.current = gameSession.id;
         
         setCurrentGameSessionId(gameSession.id);
         setCurrentQuestion(gameSession.current_question);
         setRoundActive(true);
-        setCanAnswer(true);
+        setWaitingForTeacher(false);
+        setCanAnswer(false);
         setAnswerSubmitted(false);
         setStudentAnswer('');
+        setIsQuestionBlurred(true);
+        setCountdownStarted(false);
+        
+        // Load collaboration data for new session
+        setTimeout(() => {
+          loadTeamNotes();
+          loadBrainstormIdeas();
+          loadTeamDiscussion();
+        }, 500);
         
         if (gameSession.current_question?.timeLimit && gameSession.current_question?.started_at) {
           startCountdown(
@@ -420,21 +756,31 @@ function CollaborationStudent() {
         }
       }
       
-      // Check if current session ended (no active session found)
       if (currentGameSessionId && !gameSession) {
         console.log('🏁 Round ended');
         setRoundActive(false);
         setRoundEnded(true);
         setCanAnswer(false);
-        setWaitingForTeacher(false);
-        setReadySubmitted(false);
-        setIsReady(false);
+        setIsQuestionBlurred(true);
+        setCountdownStarted(false);
+        setWaitingForTeacher(true);
+        setReadySubmitted(true);
+        setIsReady(true);
+        setCurrentGameSessionId(null);
+        lastProcessedSessionRef.current = null;
+        
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
       }
       
     } catch (error) {
       console.error('Polling error:', error);
+    } finally {
+      isProcessingRef.current = false;
     }
-  };
+  }, [selectedClass?.id, studentUUID, teamInfo, currentGameSessionId, startCountdown, loadTeamNotes, loadBrainstormIdeas, loadTeamDiscussion]);
 
   const handleReady = async () => {
     if (!selectedClass?.id || !teamInfo?.team) {
@@ -468,8 +814,6 @@ function CollaborationStudent() {
       setReadySubmitted(true);
       setWaitingForTeacher(true);
       
-      console.log('✅ Ready for team', teamInfo.team);
-      
     } catch (error) {
       console.error('Error:', error);
       setReadyError(error.message || 'Failed to set ready status.');
@@ -485,7 +829,6 @@ function CollaborationStudent() {
     setReadyError(null);
     
     try {
-      // Update the ready status to false
       const { error: updateError } = await supabase
         .from('student_ready_status')
         .upsert({
@@ -500,12 +843,9 @@ function CollaborationStudent() {
       
       if (updateError) throw updateError;
       
-      // Reset all ready-related states
       setIsReady(false);
       setReadySubmitted(false);
       setWaitingForTeacher(false);
-      
-      console.log('❌ Cancelled ready status for team', teamInfo.team);
       
     } catch (error) {
       console.error('Error canceling ready status:', error);
@@ -514,40 +854,73 @@ function CollaborationStudent() {
     }
   };
 
-  // Start polling when waiting for teacher
+  const resetAfterAnswer = useCallback(() => {
+    setShowTeamAnswersModal(false);
+    setShowCollaborationHub(false);
+    setAnswerSubmitted(false);
+    setRoundActive(false);
+    setCurrentQuestion(null);
+    setSubmittedAnswerText('');
+    setStudentAnswer('');
+    setCurrentGameSessionId(null);
+    setIsQuestionBlurred(true);
+    setCountdownStarted(false);
+    setWaitingForTeacher(true);
+    setReadySubmitted(true);
+    setIsReady(true);
+    lastProcessedSessionRef.current = null;
+    
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+  }, []);
+
+  // Polling management
   useEffect(() => {
     if (!selectedClass?.id || !studentUUID || !teamInfo) return;
     
-    // Clear any existing interval
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
       pollingIntervalRef.current = null;
     }
     
-    // Only poll if waiting for teacher OR round is active
-    if (waitingForTeacher || roundActive) {
-      console.log('🔄 Starting polling (every 3 seconds)...');
+    if ((waitingForTeacher || roundActive) && !answerSubmitted) {
       pollingIntervalRef.current = setInterval(() => {
         checkForActiveGameSession();
       }, 3000);
+      checkForActiveGameSession();
     }
     
-    // Cleanup on unmount or dependency change
     return () => {
       if (pollingIntervalRef.current) {
-        console.log('🛑 Stopping polling');
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
     };
-  }, [selectedClass?.id, studentUUID, teamInfo?.team, waitingForTeacher, roundActive]);
+  }, [selectedClass?.id, studentUUID, teamInfo?.team, waitingForTeacher, roundActive, answerSubmitted, checkForActiveGameSession]);
 
-  // Cleanup countdown on unmount
+  // Polling for collaboration data during active round
+  useEffect(() => {
+    if (!roundActive || !currentGameSessionId || !teamInfo?.team) return;
+    
+    const collaborationInterval = setInterval(() => {
+      loadTeamNotes();
+      loadTeamDiscussion();
+      if (showBrainstorming) loadBrainstormIdeas();
+    }, 5000);
+    
+    return () => clearInterval(collaborationInterval);
+  }, [roundActive, currentGameSessionId, teamInfo?.team, showBrainstorming, loadTeamNotes, loadTeamDiscussion, loadBrainstormIdeas]);
+
+  // Cleanup all intervals on unmount
   useEffect(() => {
     return () => {
-      if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
-      }
+      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+      if (notesPollingRef.current) clearInterval(notesPollingRef.current);
+      if (discussionPollingRef.current) clearInterval(discussionPollingRef.current);
+      isProcessingRef.current = false;
     };
   }, []);
 
@@ -575,6 +948,15 @@ function CollaborationStudent() {
 
   const getTeamColor = (team) => team === 'A' ? '#3b82f6' : '#ef4444';
   const getTeamBgColor = (team) => team === 'A' ? '#eff6ff' : '#fef2f2';
+  
+  const getAwardRank = (index) => {
+    switch(index) {
+      case 0: return { medal: '🥇', label: '1st Place', color: '#fbbf24' };
+      case 1: return { medal: '🥈', label: '2nd Place', color: '#94a3b8' };
+      case 2: return { medal: '🥉', label: '3rd Place', color: '#cd7f32' };
+      default: return { medal: '📋', label: `${index + 1}th Place`, color: '#64748b' };
+    }
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -603,6 +985,7 @@ function CollaborationStudent() {
     setReadySubmitted(false);
     setWaitingForTeacher(false);
     resetRoundState();
+    lastProcessedSessionRef.current = null;
     
     await loadTeamInfo(classItem.id);
     await loadStudentPoints(classItem.id);
@@ -620,7 +1003,6 @@ function CollaborationStudent() {
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        {/* Header Section - Matching teacher style */}
         <div style={styles.header}>
           <div style={styles.headerLeft}>
             <h1 style={styles.mainTitle}>Student Dashboard</h1>
@@ -811,8 +1193,20 @@ function CollaborationStudent() {
                 </div>
               </div>
 
-              {/* Waiting for teacher message with cancel button */}
-              {waitingForTeacher && !roundActive && !roundEnded && (
+              {/* Collaboration Hub Button - Shows during active round */}
+              {roundActive && !answerSubmitted && (
+                <button 
+                  style={styles.collaborationHubButton}
+                  onClick={() => setShowCollaborationHub(true)}
+                >
+                  <FiMessageSquare size={18} />
+                  Team Collaboration Hub
+                  <span style={styles.collaborationBadge}>Brainstorm & Discuss</span>
+                </button>
+              )}
+
+              {/* Waiting for teacher message */}
+              {waitingForTeacher && !roundActive && !roundEnded && !answerSubmitted && (
                 <div style={styles.waitingMessageModern}>
                   <div style={styles.waitingContent}>
                     <div style={styles.waitingIconSection}>
@@ -833,8 +1227,8 @@ function CollaborationStudent() {
                 </div>
               )}
 
-              {/* Question round - only shows when roundActive is true */}
-              {roundActive && currentQuestion && (
+              {/* Question round */}
+              {roundActive && currentQuestion && !answerSubmitted && (
                 <div style={styles.questionCard}>
                   <div style={styles.questionHeader}>
                     <FiZap size={24} color="#f59e0b" />
@@ -848,50 +1242,68 @@ function CollaborationStudent() {
                   </div>
                   
                   <div style={styles.questionBody}>
-                    <p style={styles.questionText}>{currentQuestion.text}</p>
-                    
-                    {!answerSubmitted && canAnswer && (
-                      <div style={styles.answerArea}>
-                        <textarea
-                          style={styles.answerInput}
-                          value={studentAnswer}
-                          onChange={(e) => setStudentAnswer(e.target.value)}
-                          placeholder="Type your answer here..."
-                          rows={3}
-                          disabled={!canAnswer || answerSubmitted || questionLoading}
-                        />
-                        <button 
-                          style={styles.submitButton}
-                          onClick={submitAnswer}
-                          disabled={!canAnswer || answerSubmitted || questionLoading}
-                        >
-                          {questionLoading ? 'Submitting...' : <><FiSend size={18} /> Submit Answer</>}
-                        </button>
-                      </div>
-                    )}
-                    
-                    {answerSubmitted && (
-                      <div style={styles.submittedMessage}>
-                        <FiCheckCircle size={24} color="#10b981" />
-                        <div>
-                          <strong>Answer Submitted!</strong>
-                          <p>Your answer: "{submittedAnswerText}"</p>
-                          <p>Waiting for teacher to end the round...</p>
+                    {isQuestionBlurred && !countdownStarted && (
+                      <div style={styles.blurredQuestionContainer}>
+                        <div style={styles.blurredQuestionContent}>
+                          <div style={styles.blurIcon}>🔒</div>
+                          <p style={styles.blurredText}>Question is locked</p>
+                          <p style={styles.blurredSubtext}>Wait for the timer to start...</p>
+                        </div>
+                        <div style={styles.blurredOverlay}>
+                          <p style={styles.blurredQuestionText}>
+                            {currentQuestion.text}
+                          </p>
                         </div>
                       </div>
                     )}
                     
-                    {submissionError && (
-                      <div style={styles.errorMessage}>
-                        <FiAlertCircle size={20} color="#ef4444" />
-                        <span>{submissionError}</span>
-                      </div>
+                    {!isQuestionBlurred && countdownStarted && (
+                      <>
+                        <p style={styles.questionText}>{currentQuestion.text}</p>
+                        
+                        {!answerSubmitted && canAnswer && (
+                          <div style={styles.answerArea}>
+                            <textarea
+                              style={styles.answerInput}
+                              value={studentAnswer}
+                              onChange={(e) => setStudentAnswer(e.target.value)}
+                              placeholder="Type your answer here..."
+                              rows={3}
+                              disabled={!canAnswer || answerSubmitted || questionLoading}
+                            />
+                            <button 
+                              style={styles.submitButton}
+                              onClick={submitAnswer}
+                              disabled={!canAnswer || answerSubmitted || questionLoading}
+                            >
+                              {questionLoading ? 'Submitting...' : <><FiSend size={18} /> Submit Answer</>}
+                            </button>
+                          </div>
+                        )}
+                        
+                        {submissionError && (
+                          <div style={styles.errorMessage}>
+                            <FiAlertCircle size={20} color="#ef4444" />
+                            <span>{submissionError}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
               )}
 
-              {roundEnded && (
+              {answerSubmitted && !showTeamAnswersModal && (
+                <div style={styles.submittedSuccessCard}>
+                  <FiCheckCircle size={48} color="#10b981" />
+                  <h3>Answer Submitted Successfully!</h3>
+                  <p>Your answer: "{submittedAnswerText}"</p>
+                  <p>Loading team results...</p>
+                  <div style={styles.loadingSpinnerSmall}></div>
+                </div>
+              )}
+
+              {roundEnded && !answerSubmitted && (
                 <div style={styles.resultCardEnded}>
                   <div style={styles.resultIcon}>
                     <FiCheckCircle size={48} color="#10b981" />
@@ -908,9 +1320,13 @@ function CollaborationStudent() {
                       setSubmittedAnswerText('');
                       setStudentAnswer('');
                       setCurrentGameSessionId(null);
-                      setWaitingForTeacher(false);
-                      setReadySubmitted(false);
-                      setIsReady(false);
+                      setWaitingForTeacher(true);
+                      setReadySubmitted(true);
+                      setIsReady(true);
+                      setIsQuestionBlurred(true);
+                      setCountdownStarted(false);
+                      setShowTeamAnswersModal(false);
+                      lastProcessedSessionRef.current = null;
                     }}
                   >
                     Close
@@ -918,8 +1334,7 @@ function CollaborationStudent() {
                 </div>
               )}
 
-              {/* Ready button - only shows when not waiting and no active round */}
-              {!roundActive && !roundEnded && !waitingForTeacher && (
+              {!waitingForTeacher && !roundActive && !roundEnded && !answerSubmitted && (
                 <button style={styles.readyButton} onClick={handleReady}>
                   <FiUserCheck size={20} /> I'm Ready! - Team {teamInfo.team}
                 </button>
@@ -928,6 +1343,277 @@ function CollaborationStudent() {
           </>
         )}
       </div>
+
+      {/* Team Answers Modal with Collaboration Features */}
+      {showTeamAnswersModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContainer}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalHeaderLeft}>
+                <FiAward size={24} color="#f59e0b" />
+                <h2 style={styles.modalTitle}>Team {teamInfo?.team} - Answers & Awards</h2>
+              </div>
+              <button 
+                style={styles.modalCloseButton}
+                onClick={resetAfterAnswer}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              {loadingTeamAnswers ? (
+                <div style={styles.modalLoading}>
+                  <div style={styles.loadingSpinnerSmall}></div>
+                  <p>Loading team answers...</p>
+                </div>
+              ) : teamAnswers.length === 0 ? (
+                <div style={styles.noAnswersContainer}>
+                  <p>No team answers submitted yet.</p>
+                  <p>Other team members will appear here once they submit.</p>
+                  <button 
+                    style={styles.refreshButton}
+                    onClick={refreshTeamAnswers}
+                  >
+                    <FiRefreshCw size={16} />
+                    <span>Refresh</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div style={styles.answersSummary}>
+                    <FiUsers size={16} />
+                    <span>{teamAnswers.length} / {teamMembers.length} team members have answered</span>
+                  </div>
+                  
+                  <div style={styles.awardsList}>
+                    {teamAnswers.map((member, index) => {
+                      const award = getAwardRank(index);
+                      return (
+                        <div 
+                          key={member.id} 
+                          style={{
+                            ...styles.awardCard,
+                            ...(member.isCurrentUser ? styles.currentUserAwardCard : {}),
+                            borderLeftColor: award.color
+                          }}
+                        >
+                          <div style={styles.awardRank}>
+                            <span style={styles.awardMedal}>{award.medal}</span>
+                            <span style={styles.awardPlace}>{award.label}</span>
+                          </div>
+                          <div style={styles.awardAvatar}>
+                            <div style={styles.awardAvatarInner}>
+                              {member.studentName?.charAt(0) || 'S'}
+                            </div>
+                          </div>
+                          <div style={styles.awardDetails}>
+                            <div style={styles.awardName}>
+                              {member.studentName}
+                              {member.isCurrentUser && <span style={styles.youBadge}> (You)</span>}
+                            </div>
+                            <div style={styles.awardRole}>
+                              {getRoleIcon(member.role)}
+                              <span>{getRoleInfo(member.role).label}</span>
+                            </div>
+                            <div style={styles.awardAnswer}>
+                              <strong>Answer:</strong> "{member.answer}"
+                            </div>
+                            <div style={styles.awardPoints}>
+                              <FiStar size={14} color="#f59e0b" />
+                              <span>{member.points} points awarded</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  <div style={styles.collaborationSummary}>
+                    <FiLightbulb size={18} color="#f59e0b" />
+                    <p>💡 Team Collaboration Tip: Discuss your answers and learn from each other's approaches!</p>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.closeModalButton}
+                onClick={resetAfterAnswer}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Collaboration Hub Modal - Brainstorming & Discussion */}
+      {showCollaborationHub && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.collaborationModalContainer}>
+            <div style={styles.modalHeader}>
+              <div style={styles.modalHeaderLeft}>
+                <FiMessageSquare size={24} color="#8b5cf6" />
+                <h2 style={styles.modalTitle}>Team {teamInfo?.team} Collaboration Hub</h2>
+              </div>
+              <button 
+                style={styles.modalCloseButton}
+                onClick={() => setShowCollaborationHub(false)}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+            
+            <div style={styles.collaborationTabs}>
+              <button 
+                style={!showBrainstorming ? styles.activeTab : styles.tab}
+                onClick={() => setShowBrainstorming(false)}
+              >
+                <FiMessageSquare size={16} />
+                Team Discussion
+              </button>
+              <button 
+                style={showBrainstorming ? styles.activeTab : styles.tab}
+                onClick={() => {
+                  setShowBrainstorming(true);
+                  loadBrainstormIdeas();
+                }}
+              >
+                <FiLightbulb size={16} />
+                Brainstorming
+              </button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              {!showBrainstorming ? (
+                // Team Discussion Section
+                <div style={styles.discussionSection}>
+                  <div style={styles.discussionMessages}>
+                    {teamDiscussion.length === 0 ? (
+                      <div style={styles.emptyDiscussion}>
+                        <FiMessageSquare size={48} color="#cbd5e1" />
+                        <p>No messages yet. Start the collaboration!</p>
+                        <p style={styles.emptySubtext}>Discuss the question and share ideas with your team</p>
+                      </div>
+                    ) : (
+                      teamDiscussion.map((msg) => (
+                        <div key={msg.id} style={styles.discussionMessage}>
+                          <div style={styles.messageAvatar}>
+                            {msg.students?.name?.charAt(0) || 'S'}
+                          </div>
+                          <div style={styles.messageContent}>
+                            <div style={styles.messageHeader}>
+                              <span style={styles.messageName}>{msg.students?.name || 'Student'}</span>
+                              <span style={styles.messageTime}>
+                                {new Date(msg.created_at).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <p style={styles.messageText}>{msg.message}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <div style={styles.messageInputArea}>
+                    <textarea
+                      style={styles.messageInput}
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message here... Discuss the question with your team!"
+                      rows={2}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendDiscussionMessage();
+                        }
+                      }}
+                    />
+                    <button 
+                      style={styles.sendMessageButton}
+                      onClick={sendDiscussionMessage}
+                      disabled={submittingMessage || !newMessage.trim()}
+                    >
+                      <FiSend size={16} />
+                      Send
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Brainstorming Section
+                <div style={styles.brainstormSection}>
+                  <div style={styles.brainstormHeader}>
+                    <FiLightbulb size={20} color="#f59e0b" />
+                    <h3 style={styles.brainstormHeaderTitle}>Brainstorm Ideas</h3>
+                    <p style={styles.brainstormHeaderText}>Share your ideas and vote on the best solutions!</p>
+                  </div>
+                  
+                  <div style={styles.brainstormInputArea}>
+                    <textarea
+                      style={styles.brainstormInput}
+                      value={newIdea}
+                      onChange={(e) => setNewIdea(e.target.value)}
+                      placeholder="Share your idea for solving this question..."
+                      rows={2}
+                    />
+                    <button 
+                      style={styles.addIdeaButton}
+                      onClick={addBrainstormIdea}
+                      disabled={submittingIdea || !newIdea.trim()}
+                    >
+                      <FiLightbulb size={16} />
+                      Add Idea
+                    </button>
+                  </div>
+                  
+                  <div style={styles.ideasList}>
+                    {brainstormIdeas.length === 0 ? (
+                      <div style={styles.emptyIdeas}>
+                        <FiLightbulb size={48} color="#cbd5e1" />
+                        <p>No ideas yet. Be the first to share!</p>
+                      </div>
+                    ) : (
+                      brainstormIdeas.map((idea) => (
+                        <div key={idea.id} style={styles.ideaCard}>
+                          <div style={styles.ideaVotes}>
+                            <button 
+                              style={styles.voteButton}
+                              onClick={() => voteIdea(idea.id, idea.votes)}
+                            >
+                              👍
+                            </button>
+                            <span style={styles.voteCount}>{idea.votes || 0}</span>
+                          </div>
+                          <div style={styles.ideaContent}>
+                            <p style={styles.ideaText}>{idea.idea}</p>
+                            <div style={styles.ideaMeta}>
+                              <span style={styles.ideaAuthor}>by {idea.students?.name || 'Student'}</span>
+                              <span style={styles.ideaTime}>
+                                {new Date(idea.created_at).toLocaleTimeString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div style={styles.modalFooter}>
+              <button 
+                style={styles.closeModalButton}
+                onClick={() => setShowCollaborationHub(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -960,6 +1646,15 @@ const styles = {
     borderTop: '4px solid #6366f1',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
+  },
+  loadingSpinnerSmall: {
+    width: '32px',
+    height: '32px',
+    border: '3px solid #e2e8f0',
+    borderTop: '3px solid #6366f1',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite',
+    marginTop: '12px',
   },
   loadingText: {
     color: '#64748b',
@@ -1381,6 +2076,33 @@ const styles = {
     gap: '5px',
     color: '#f59e0b',
   },
+  collaborationHubButton: {
+    width: '100%',
+    padding: '14px',
+    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '16px',
+    fontSize: '15px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    marginBottom: '20px',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+  },
+  collaborationBadge: {
+    position: 'absolute',
+    right: '12px',
+    fontSize: '10px',
+    background: 'rgba(255,255,255,0.2)',
+    padding: '4px 8px',
+    borderRadius: '20px',
+    fontWeight: '400',
+  },
   questionCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     borderRadius: '20px',
@@ -1420,6 +2142,52 @@ const styles = {
     lineHeight: '1.5',
     marginBottom: '20px',
   },
+  blurredQuestionContainer: {
+    position: 'relative',
+    marginBottom: '20px',
+  },
+  blurredQuestionContent: {
+    textAlign: 'center',
+    padding: '30px 20px',
+    background: 'rgba(255,255,255,0.1)',
+    borderRadius: '16px',
+    border: '2px dashed rgba(255,255,255,0.3)',
+  },
+  blurIcon: {
+    fontSize: '48px',
+    marginBottom: '12px',
+  },
+  blurredText: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '8px',
+  },
+  blurredSubtext: {
+    fontSize: '13px',
+    opacity: 0.8,
+  },
+  blurredOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backdropFilter: 'blur(8px)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  blurredQuestionText: {
+    fontSize: 'clamp(15px, 4vw, 18px)',
+    lineHeight: '1.5',
+    textAlign: 'center',
+    color: 'transparent',
+    textShadow: '0 0 8px rgba(255,255,255,0.5)',
+    filter: 'blur(4px)',
+  },
   answerArea: {
     display: 'flex',
     flexDirection: 'column',
@@ -1451,14 +2219,13 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.2s ease',
   },
-  submittedMessage: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '14px',
-    background: 'rgba(255,255,255,0.15)',
-    borderRadius: '12px',
-    flexWrap: 'wrap',
+  submittedSuccessCard: {
+    textAlign: 'center',
+    padding: '32px 20px',
+    background: '#d1fae5',
+    borderRadius: '20px',
+    marginTop: '20px',
+    border: '1px solid #10b981',
   },
   errorMessage: {
     display: 'flex',
@@ -1571,14 +2338,519 @@ const styles = {
     fontSize: 'clamp(48px, 12vw, 64px)',
     marginBottom: '12px',
   },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+    backdropFilter: 'blur(4px)',
+    padding: '20px',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: '28px',
+    maxWidth: '700px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    display: 'flex',
+    flexDirection: 'column',
+    animation: 'modalSlideIn 0.3s ease',
+  },
+  collaborationModalContainer: {
+    backgroundColor: 'white',
+    borderRadius: '28px',
+    maxWidth: '800px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    display: 'flex',
+    flexDirection: 'column',
+    animation: 'modalSlideIn 0.3s ease',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #e2e8f0',
+    background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+  },
+  modalHeaderLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  modalTitle: {
+    fontSize: 'clamp(18px, 5vw, 22px)',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: 0,
+  },
+  modalCloseButton: {
+    background: '#f1f5f9',
+    border: 'none',
+    borderRadius: '40px',
+    width: '36px',
+    height: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    color: '#64748b',
+  },
+  modalBody: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px 24px',
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+  },
+  closeModalButton: {
+    padding: '10px 24px',
+    background: '#6366f1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  modalLoading: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '16px',
+    padding: '48px',
+    color: '#64748b',
+  },
+  noAnswersContainer: {
+    textAlign: 'center',
+    padding: '48px 20px',
+    color: '#64748b',
+  },
+  answersSummary: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px',
+    background: '#e0e7ff',
+    borderRadius: '12px',
+    marginBottom: '16px',
+    fontSize: '13px',
+    color: '#4338ca',
+  },
+  refreshContainer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: '20px',
+  },
+  refreshButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    background: '#f8fafc',
+    border: '1px solid #e2e8f0',
+    borderRadius: '40px',
+    fontSize: '13px',
+    fontWeight: '500',
+    color: '#475569',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  awardsList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  awardCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '16px',
+    background: '#f8fafc',
+    borderRadius: '20px',
+    borderLeft: '4px solid',
+    transition: 'all 0.2s ease',
+    flexWrap: 'wrap',
+  },
+  currentUserAwardCard: {
+    background: 'linear-gradient(135deg, #eef2ff 0%, #ffffff 100%)',
+    border: '1px solid #c7d2fe',
+  },
+  awardRank: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    minWidth: '70px',
+    gap: '4px',
+  },
+  awardMedal: {
+    fontSize: '32px',
+  },
+  awardPlace: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#475569',
+  },
+  awardAvatar: {
+    width: '48px',
+    height: '48px',
+    borderRadius: '24px',
+    overflow: 'hidden',
+    flexShrink: 0,
+  },
+  awardAvatarInner: {
+    width: '100%',
+    height: '100%',
+    background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: '700',
+    fontSize: '18px',
+  },
+  awardDetails: {
+    flex: 1,
+    minWidth: '180px',
+  },
+  awardName: {
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
+  youBadge: {
+    fontSize: '10px',
+    fontWeight: '500',
+    color: '#6366f1',
+    background: '#c7d2fe',
+    padding: '2px 8px',
+    borderRadius: '20px',
+  },
+  awardRole: {
+    fontSize: '11px',
+    color: '#64748b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    marginBottom: '8px',
+  },
+  awardAnswer: {
+    fontSize: '13px',
+    color: '#334155',
+    marginBottom: '6px',
+    wordBreak: 'break-word',
+  },
+  awardPoints: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#d97706',
+  },
+  collaborationSummary: {
+    marginTop: '24px',
+    padding: '16px',
+    background: '#fef3c7',
+    borderRadius: '16px',
+    textAlign: 'center',
+    fontSize: '13px',
+    color: '#92400e',
+    border: '1px solid #fde68a',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    justifyContent: 'center',
+  },
+  // Collaboration Tabs
+  collaborationTabs: {
+    display: 'flex',
+    borderBottom: '1px solid #e2e8f0',
+    padding: '0 24px',
+  },
+  tab: {
+    flex: 1,
+    padding: '12px 16px',
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#64748b',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+  },
+  activeTab: {
+    flex: 1,
+    padding: '12px 16px',
+    background: 'none',
+    border: 'none',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#8b5cf6',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    borderBottom: '2px solid #8b5cf6',
+    transition: 'all 0.2s ease',
+  },
+  // Discussion Section
+  discussionSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100%',
+  },
+  discussionMessages: {
+    flex: 1,
+    maxHeight: '400px',
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  emptyDiscussion: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    color: '#94a3b8',
+  },
+  emptySubtext: {
+    fontSize: '12px',
+    marginTop: '8px',
+  },
+  discussionMessage: {
+    display: 'flex',
+    gap: '12px',
+    padding: '12px',
+    background: '#f8fafc',
+    borderRadius: '12px',
+  },
+  messageAvatar: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '18px',
+    background: 'linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    fontWeight: '600',
+    fontSize: '14px',
+    flexShrink: 0,
+  },
+  messageContent: {
+    flex: 1,
+  },
+  messageHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '6px',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  messageName: {
+    fontWeight: '600',
+    fontSize: '13px',
+    color: '#1e293b',
+  },
+  messageTime: {
+    fontSize: '10px',
+    color: '#94a3b8',
+  },
+  messageText: {
+    fontSize: '13px',
+    color: '#334155',
+    lineHeight: '1.5',
+    margin: 0,
+  },
+  messageInputArea: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '16px',
+  },
+  messageInput: {
+    flex: 1,
+    padding: '12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+  },
+  sendMessageButton: {
+    padding: '12px 20px',
+    background: '#8b5cf6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+  },
+  // Brainstorming Section
+  brainstormSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  brainstormHeader: {
+    textAlign: 'center',
+    padding: '16px',
+    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+    borderRadius: '16px',
+  },
+  brainstormHeaderTitle: {
+    margin: '8px 0 4px 0',
+    fontSize: '18px',
+    color: '#92400e',
+  },
+  brainstormHeaderText: {
+    margin: 0,
+    fontSize: '12px',
+    color: '#b45309',
+  },
+  brainstormInputArea: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  brainstormInput: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+  },
+  addIdeaButton: {
+    padding: '10px 20px',
+    background: '#f59e0b',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '13px',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+  },
+  ideasList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    maxHeight: '300px',
+    overflowY: 'auto',
+  },
+  emptyIdeas: {
+    textAlign: 'center',
+    padding: '40px',
+    color: '#94a3b8',
+  },
+  ideaCard: {
+    display: 'flex',
+    gap: '12px',
+    padding: '16px',
+    background: '#f8fafc',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+  },
+  ideaVotes: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  voteButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    cursor: 'pointer',
+    padding: '4px',
+    transition: 'transform 0.2s ease',
+  },
+  voteCount: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#475569',
+  },
+  ideaContent: {
+    flex: 1,
+  },
+  ideaText: {
+    fontSize: '14px',
+    color: '#1e293b',
+    margin: '0 0 8px 0',
+    lineHeight: '1.5',
+  },
+  ideaMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    fontSize: '11px',
+    color: '#94a3b8',
+  },
+  ideaAuthor: {
+    fontWeight: '500',
+  },
+  ideaTime: {
+    fontSize: '10px',
+  },
 };
 
-// Add hover effects and animations
+// Add animations
 const styleSheetGlobal = document.createElement("style");
 styleSheetGlobal.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  
+  @keyframes modalSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-20px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
   
   @media (max-width: 640px) {
@@ -1587,22 +2859,26 @@ styleSheetGlobal.textContent = `
     }
   }
   
-  button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton, .cancelReadyButton {
+  button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton, .cancelReadyButton, .refreshButton, .modalCloseButton, .closeModalButton, .collaborationHubButton, .sendMessageButton, .addIdeaButton, .voteButton {
     transition: all 0.2s ease;
   }
   
-  button:hover, .dropdownButton:hover, .submitButton:hover, .readyButton:hover, .dismissResultButton:hover, .retryButton:hover {
+  button:hover, .dropdownButton:hover, .submitButton:hover, .readyButton:hover, .dismissResultButton:hover, .retryButton:hover, .refreshButton:hover, .modalCloseButton:hover, .closeModalButton:hover, .collaborationHubButton:hover, .sendMessageButton:hover, .addIdeaButton:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  
+  .voteButton:hover {
+    transform: scale(1.1);
   }
   
   .cancelReadyButton:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(239,68,68,0.3);
+    box-shadow: 0 4px 12px rgba(239,68,68,0.3);
     background: #dc2626;
   }
   
-  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active, .cancelReadyButton:active {
+  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active, .cancelReadyButton:active, .refreshButton:active, .voteButton:active {
     transform: translateY(0);
   }
   
@@ -1659,11 +2935,6 @@ styleSheetGlobal.textContent = `
       justify-content: center;
     }
     
-    .submittedMessage {
-      flex-direction: column;
-      text-align: center;
-    }
-    
     .errorCardSmall {
       flex-direction: column;
       text-align: center;
@@ -1700,6 +2971,61 @@ styleSheetGlobal.textContent = `
       width: 100%;
       justify-content: center;
     }
+    
+    .awardCard {
+      flex-direction: column;
+      text-align: center;
+    }
+    
+    .awardRank {
+      flex-direction: row;
+      gap: 8px;
+    }
+    
+    .awardDetails {
+      text-align: center;
+    }
+    
+    .awardRole {
+      justify-content: center;
+    }
+    
+    .awardPoints {
+      justify-content: center;
+    }
+    
+    .refreshContainer {
+      justify-content: center;
+    }
+    
+    .submittedSuccessCard {
+      margin-top: 20px;
+    }
+    
+    .collaborationBadge {
+      display: none;
+    }
+    
+    .discussionMessage {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    
+    .messageAvatar {
+      width: 28px;
+      height: 28px;
+      font-size: 12px;
+    }
+    
+    .ideaCard {
+      flex-direction: column;
+    }
+    
+    .ideaVotes {
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 8px;
+    }
   }
   
   @media (max-width: 480px) {
@@ -1710,6 +3036,36 @@ styleSheetGlobal.textContent = `
     
     .studentCount {
       margin-left: 26px;
+    }
+    
+    .modalContainer, .collaborationModalContainer {
+      margin: 16px;
+      border-radius: 20px;
+    }
+    
+    .modalHeader {
+      padding: 16px;
+    }
+    
+    .modalBody {
+      padding: 16px;
+    }
+    
+    .modalFooter {
+      padding: 12px 16px;
+    }
+    
+    .collaborationTabs {
+      padding: 0 16px;
+    }
+    
+    .tab, .activeTab {
+      padding: 10px 12px;
+      font-size: 12px;
+    }
+    
+    .messageInputArea {
+      flex-direction: column;
     }
   }
 `;
