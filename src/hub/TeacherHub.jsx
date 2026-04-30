@@ -25,6 +25,7 @@ function TeacherHub() {
   const location = useLocation();
   const dropdownRef = useRef(null);
   const usernameInputRef = useRef(null);
+  const mobileMenuRef = useRef(null);
 
   // Debug: Log user data and current path
   useEffect(() => {
@@ -45,10 +46,18 @@ function TeacherHub() {
         setOpenDropdown(null);
         setIsEditingUsername(false);
       }
+      // Close mobile menu when clicking outside (but not on the hamburger button)
+      if (mobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        // Check if click is on hamburger button
+        const hamburgerButton = document.querySelector('.hamburger-button');
+        if (hamburgerButton && !hamburgerButton.contains(event.target)) {
+          setMobileMenuOpen(false);
+        }
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [mobileMenuOpen]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -131,6 +140,7 @@ function TeacherHub() {
 
   const toggleSidebar = () => {
     if (isMobile) {
+      // Toggle mobile menu - if open, close it; if closed, open it
       setMobileMenuOpen(!mobileMenuOpen);
     } else {
       setSidebarCollapsed(!sidebarCollapsed);
@@ -223,7 +233,7 @@ function TeacherHub() {
 
   return (
     <div style={styles.wrapper}>
-      {/* Sidebar - Desktop */}
+      {/* Sidebar - Desktop only */}
       {!isMobile && (
         <aside
           style={{
@@ -252,48 +262,6 @@ function TeacherHub() {
         </aside>
       )}
 
-      {/* Mobile Menu Overlay - FIXED: Now blue background */}
-      {isMobile && mobileMenuOpen && (
-        <div style={styles.mobileOverlay} onClick={() => setMobileMenuOpen(false)}>
-          <div style={styles.mobileSidebar} onClick={(e) => e.stopPropagation()}>
-            <div style={styles.mobileSidebarHeader}>
-              <div style={styles.mobileLogo}>MathLit Teacher Hub</div>
-              <button 
-                style={styles.mobileCloseButton}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                <FiX size={24} color="#ffffff" />
-              </button>
-            </div>
-            <div style={styles.mobileNavItems}>
-              {navItems.map((item, index) => {
-                const isActive = location.pathname === item.path;
-                return (
-                  <div 
-                    key={index}
-                    style={{
-                      ...styles.mobileNavItem,
-                      backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
-                    }}
-                    onClick={() => handleNavigation(item.path)}
-                  >
-                    <item.icon size={22} color="#ffffff" />
-                    <span style={{
-                      ...styles.mobileNavText,
-                      color: '#ffffff',
-                      fontWeight: isActive ? '600' : '400'
-                    }}>
-                      {item.label}
-                    </span>
-                  </div>
-                );
-              })}
-              {/* REMOVED: Logout from sidebar - Now only available in profile dropdown */}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Main content */}
       <main
         style={{
@@ -305,10 +273,16 @@ function TeacherHub() {
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger Menu Button */}
-          <button style={styles.hamburgerButton} onClick={toggleSidebar}>
-            <FiMenu size={24} color="white" />
-          </button>
+          {/* Hamburger Menu Button - Only shows on mobile */}
+          {isMobile && (
+            <button 
+              className="hamburger-button"
+              style={styles.hamburgerButton} 
+              onClick={toggleSidebar}
+            >
+              <FiMenu size={24} color="white" />
+            </button>
+          )}
 
           {/* Right section - Teacher name and profile icon */}
           <div style={styles.rightSection}>
@@ -435,6 +409,35 @@ function TeacherHub() {
             </div>
           </div>
         </header>
+
+        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked */}
+        {isMobile && mobileMenuOpen && (
+          <div ref={mobileMenuRef} style={styles.mobileDropdownMenu}>
+            {navItems.map((item, index) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <div 
+                  key={index}
+                  style={{
+                    ...styles.mobileMenuItem,
+                    backgroundColor: isActive ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
+                    borderLeft: isActive ? '4px solid #2563eb' : '4px solid transparent'
+                  }}
+                  onClick={() => handleNavigation(item.path)}
+                >
+                  <item.icon size={20} color={isActive ? '#2563eb' : '#666'} />
+                  <span style={{
+                    ...styles.mobileMenuText,
+                    color: isActive ? '#2563eb' : '#333',
+                    fontWeight: isActive ? '600' : '400'
+                  }}>
+                    {item.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* Content Area - Uses Outlet for nested routes */}
         <div style={styles.contentWrapper}>
@@ -761,85 +764,33 @@ const styles = {
     boxSizing: 'border-box',
   },
   
-  // Mobile Menu Styles - FIXED: Now blue background
-  mobileOverlay: {
+  // Mobile Dropdown Menu Styles - Shows below header
+  mobileDropdownMenu: {
     position: 'fixed',
-    top: 0,
+    top: '70px',
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 1000,
-    animation: 'fadeIn 0.3s ease',
+    backgroundColor: 'white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    zIndex: 140,
+    animation: 'slideDown 0.3s ease',
+    borderBottom: '1px solid #e0e0e0',
   },
-  mobileSidebar: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    width: '280px',
-    height: '100vh',
-    backgroundColor: '#2563eb', // Changed from white to blue to match desktop sidebar
-    boxShadow: '2px 0 8px rgba(0,0,0,0.2)',
-    animation: 'slideInLeft 0.3s ease',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  mobileSidebarHeader: {
-    padding: '20px',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  mobileLogo: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  mobileCloseButton: {
-    background: 'transparent',
-    border: 'none',
-    cursor: 'pointer',
-    padding: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-    ':hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    },
-  },
-  mobileNavItems: {
-    flex: 1,
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  mobileNavItem: {
+  mobileMenuItem: {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    padding: '12px 16px',
-    borderRadius: '8px',
+    padding: '14px 20px',
     cursor: 'pointer',
     transition: 'all 0.2s',
+    borderBottom: '1px solid #f0f0f0',
     ':hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-      transform: 'translateX(4px)',
+      backgroundColor: '#f5f5f5',
     },
   },
-  mobileNavText: {
+  mobileMenuText: {
     fontSize: '16px',
     fontWeight: '500',
-    color: '#ffffff',
-  },
-  mobileDivider: {
-    height: '1px',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    margin: '12px 0',
   },
 };
 
@@ -851,28 +802,10 @@ styleSheet.textContent = `
     100% { transform: rotate(360deg); }
   }
   
-  @keyframes slideInLeft {
-    from {
-      transform: translateX(-100%);
-    }
-    to {
-      transform: translateX(0);
-    }
-  }
-  
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-  
   @keyframes slideDown {
     from {
       opacity: 0;
-      transform: translateY(-10px);
+      transform: translateY(-20px);
     }
     to {
       opacity: 1;
@@ -899,7 +832,7 @@ styleSheet.textContent = `
   
   /* Better touch targets for mobile */
   @media (max-width: 768px) {
-    button, [role="button"], .mobile-nav-item {
+    button, [role="button"], .mobile-menu-item {
       min-height: 44px;
     }
   }

@@ -26,6 +26,7 @@ function StudentHub() {
   const location = useLocation();
   const dropdownRef = useRef(null);
   const usernameInputRef = useRef(null);
+  const mobileMenuRef = useRef(null);
 
   // Load joined classes - defined as useCallback so it can be passed to children
   const loadJoinedClasses = useCallback(async () => {
@@ -84,10 +85,17 @@ function StudentHub() {
         setOpenDropdown(null);
         setIsEditingUsername(false);
       }
+      // Close mobile menu when clicking outside
+      if (mobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
+        const hamburgerButton = document.querySelector('.hamburger-button');
+        if (hamburgerButton && !hamburgerButton.contains(event.target)) {
+          setMobileMenuOpen(false);
+        }
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [mobileMenuOpen]);
 
   // Focus input when editing starts
   useEffect(() => {
@@ -191,6 +199,7 @@ function StudentHub() {
 
   const toggleSidebar = () => {
     if (isMobile) {
+      // Toggle mobile menu - if open, close it; if closed, open it
       setMobileMenuOpen(!mobileMenuOpen);
     } else {
       setSidebarCollapsed(!sidebarCollapsed);
@@ -253,100 +262,96 @@ function StudentHub() {
     return joinedClasses;
   };
 
-  // Determine sidebar width and visibility
-  const sidebarWidth = sidebarCollapsed ? '60px' : '220px';
-  const sidebarDisplay = isMobile && !mobileMenuOpen ? 'none' : 'flex';
+  // Navigation items for mobile menu
+  const mobileNavItems = [
+    { icon: AiFillHome, label: "Home", onClick: handleHomeClick },
+    { icon: MdAssignment, label: "Missions", onClick: handleMissionsClick, locked: !hasClassAccess() && !loadingClasses },
+    { icon: IoGameController, label: "Games", onClick: handleGamesClick, locked: !hasClassAccess() && !loadingClasses },
+    { icon: FiUsers, label: "Collaboration", onClick: handleCollaborationClick },
+    { icon: GiAchievement, label: "Achievement", onClick: handleAchievementClick }
+  ];
 
   return (
     <div style={styles.wrapper}>
-      {/* Sidebar */}
-      <div
-        style={{
-          ...styles.sidebar,
-          width: isMobile ? '220px' : sidebarWidth,
-          display: sidebarDisplay,
-          transform: isMobile && mobileMenuOpen ? 'translateX(0)' : isMobile ? 'translateX(-100%)' : 'translateX(0)',
-          transition: 'transform 0.3s ease, width 0.3s ease',
-        }}
-      >
-        <div style={styles.sidebarContent}>
-          {/* Home Icon */}
-          <div 
-            style={styles.iconWrapper}
-            onClick={handleHomeClick}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <AiFillHome size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Home</span>}
-          </div>
+      {/* Sidebar - Desktop only */}
+      {!isMobile && (
+        <aside
+          style={{
+            ...styles.sidebar,
+            width: sidebarCollapsed ? '70px' : '260px',
+          }}
+        >
+          <div style={styles.sidebarContent}>
+            {/* Home Icon */}
+            <div 
+              style={styles.iconWrapper}
+              onClick={handleHomeClick}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <AiFillHome size={24} color="white" />
+              {!sidebarCollapsed && <span style={styles.iconText}>Home</span>}
+            </div>
 
-          {/* Missions Icon - Auto-locks/unlocks based on class access */}
-          <div 
-            style={styles.iconWrapper}
-            onClick={handleMissionsClick}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <MdAssignment size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && (
-              <div style={styles.iconTextWrapper}>
-                <span style={styles.iconText}>Missions</span>
-                {!hasClassAccess() && !loadingClasses && (
-                  <span style={styles.lockIcon}>🔒</span>
-                )}
-              </div>
-            )}
-          </div>
+            {/* Missions Icon - Auto-locks/unlocks based on class access */}
+            <div 
+              style={styles.iconWrapper}
+              onClick={handleMissionsClick}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <MdAssignment size={24} color="white" />
+              {!sidebarCollapsed && (
+                <div style={styles.iconTextWrapper}>
+                  <span style={styles.iconText}>Missions</span>
+                  {!hasClassAccess() && !loadingClasses && (
+                    <span style={styles.lockIcon}>🔒</span>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Games Icon - Auto-locks/unlocks based on class access */}
-          <div 
-            style={styles.iconWrapper}
-            onClick={handleGamesClick}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <IoGameController size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && (
-              <div style={styles.iconTextWrapper}>
-                <span style={styles.iconText}>Games</span>
-                {!hasClassAccess() && !loadingClasses && (
-                  <span style={styles.lockIcon}>🔒</span>
-                )}
-              </div>
-            )}
-          </div>
+            {/* Games Icon - Auto-locks/unlocks based on class access */}
+            <div 
+              style={styles.iconWrapper}
+              onClick={handleGamesClick}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <IoGameController size={24} color="white" />
+              {!sidebarCollapsed && (
+                <div style={styles.iconTextWrapper}>
+                  <span style={styles.iconText}>Games</span>
+                  {!hasClassAccess() && !loadingClasses && (
+                    <span style={styles.lockIcon}>🔒</span>
+                  )}
+                </div>
+              )}
+            </div>
 
-          {/* Collaboration Center Icon - Always accessible */}
-          <div 
-            style={styles.iconWrapper}
-            onClick={handleCollaborationClick}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <FiUsers size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Collaboration</span>}
-          </div>
+            {/* Collaboration Center Icon - Always accessible */}
+            <div 
+              style={styles.iconWrapper}
+              onClick={handleCollaborationClick}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <FiUsers size={24} color="white" />
+              {!sidebarCollapsed && <span style={styles.iconText}>Collaboration</span>}
+            </div>
 
-          {/* Achievement Icon - Always accessible */}
-          <div 
-            style={styles.iconWrapper}
-            onClick={handleAchievementClick}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-          >
-            <GiAchievement size={24} color="white" />
-            {(!sidebarCollapsed || isMobile) && <span style={styles.iconText}>Achievement</span>}
+            {/* Achievement Icon - Always accessible */}
+            <div 
+              style={styles.iconWrapper}
+              onClick={handleAchievementClick}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <GiAchievement size={24} color="white" />
+              {!sidebarCollapsed && <span style={styles.iconText}>Achievement</span>}
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile overlay */}
-      {isMobile && mobileMenuOpen && (
-        <div 
-          style={styles.mobileOverlay}
-          onClick={() => setMobileMenuOpen(false)}
-        />
+        </aside>
       )}
 
       {/* Main content */}
@@ -359,14 +364,16 @@ function StudentHub() {
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger button */}
-          <button onClick={toggleSidebar} style={styles.hamburgerButton}>
-            {isMobile && mobileMenuOpen ? (
-              <FiX size={24} color="white" />
-            ) : (
+          {/* Hamburger button - Only shows on mobile */}
+          {isMobile && (
+            <button 
+              className="hamburger-button"
+              onClick={toggleSidebar} 
+              style={styles.hamburgerButton}
+            >
               <FiMenu size={24} color="white" />
-            )}
-          </button>
+            </button>
+          )}
 
           <div style={styles.rightSection}>
             {/* Combined Profile Area - Click anywhere shows the same dropdown */}
@@ -498,6 +505,31 @@ function StudentHub() {
             </div>
           </div>
         </header>
+
+        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked */}
+        {isMobile && mobileMenuOpen && (
+          <div ref={mobileMenuRef} style={styles.mobileDropdownMenu}>
+            {mobileNavItems.map((item, index) => (
+              <div 
+                key={index}
+                style={{
+                  ...styles.mobileMenuItem,
+                  opacity: item.locked ? 0.6 : 1,
+                }}
+                onClick={item.locked ? undefined : item.onClick}
+              >
+                <item.icon size={20} color={item.locked ? '#999' : '#2563eb'} />
+                <span style={{
+                  ...styles.mobileMenuText,
+                  color: item.locked ? '#999' : '#333',
+                }}>
+                  {item.label}
+                  {item.locked && <span style={styles.mobileLockIcon}> 🔒</span>}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Content Area - Pass user data and joined classes to child routes */}
         <div style={styles.contentWrapper}>
@@ -878,15 +910,6 @@ const styles = {
       backgroundColor: '#fee2e2',
     },
   },
-  mobileOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 99,
-  },
   contentWrapper: {
     flex: 1,
     display: 'flex',
@@ -904,6 +927,41 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
   },
+  
+  // Mobile Dropdown Menu Styles
+  mobileDropdownMenu: {
+    position: 'fixed',
+    top: '70px',
+    left: 0,
+    right: 0,
+    backgroundColor: 'white',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    zIndex: 140,
+    animation: 'slideDown 0.3s ease',
+    borderBottom: '1px solid #e0e0e0',
+  },
+  mobileMenuItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '14px 20px',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    borderBottom: '1px solid #f0f0f0',
+    ':hover': {
+      backgroundColor: '#f5f5f5',
+    },
+  },
+  mobileMenuText: {
+    fontSize: '16px',
+    fontWeight: '500',
+  },
+  mobileLockIcon: {
+    fontSize: '12px',
+    marginLeft: '8px',
+    opacity: 0.7,
+  },
+  
   // Lock Modal Styles
   modalOverlay: {
     position: 'fixed',

@@ -8,7 +8,8 @@ import {
   FiUser, FiCheckCircle, FiDollarSign, FiAlertCircle,
   FiMessageSquare, FiClipboard, FiCheckSquare, FiBarChart,
   FiPlusCircle, FiZap, FiCode, FiTrendingUp as FiTrending,
-  FiHexagon, FiBox, FiSend, FiBell
+  FiHexagon, FiBox, FiSend, FiBell, FiEye, FiMaximize2,
+  FiMinimize2, FiRefreshCw
 } from 'react-icons/fi';
 import { classService } from '../services/classService';
 import { supabase } from '../lib/supabase';
@@ -43,6 +44,16 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
 
+  // Modal States
+  const [isStudentsModalOpen, setIsStudentsModalOpen] = useState(false);
+  const [isWeeklyActivityModalOpen, setIsWeeklyActivityModalOpen] = useState(false);
+  const [isClassProgressModalOpen, setIsClassProgressModalOpen] = useState(false);
+  const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
+  const [isClassPerformanceModalOpen, setIsClassPerformanceModalOpen] = useState(false);
+  const [isProgressStatsModalOpen, setIsProgressStatsModalOpen] = useState(false);
+  const [isTopPerformersModalOpen, setIsTopPerformersModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
   // Announcement State
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [announcementTitle, setAnnouncementTitle] = useState('');
@@ -50,6 +61,16 @@ function Dashboard() {
   const [selectedClassForAnnouncement, setSelectedClassForAnnouncement] = useState('');
   const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
   const [announcementSuccess, setAnnouncementSuccess] = useState('');
+
+  // Check for mobile screen size
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // --- Helper Functions for Progress Calculations ---
   const calculateStudentMissionProgress = (completedMissions, totalMissions = 4) => {
@@ -165,43 +186,6 @@ function Dashboard() {
     const spaceScore = gameProgressData.spaceShooter?.highScore || 0;
     return equationScore + battleScore + spaceScore;
   }, []);
-
-  // Calculate overall mission progress percentage
-  const getMissionProgressPercentage = useCallback(() => {
-    const totalMissions = missionProgress.totalMissions;
-    const completedCount = missionProgress.completedMissions.length;
-    return totalMissions > 0 ? Math.round((completedCount / totalMissions) * 100) : 0;
-  }, [missionProgress]);
-
-  // Calculate overall game progress percentage
-  const getGameProgressPercentage = useCallback(() => {
-    const games = ['equation', 'battle', 'spaceShooter'];
-    let totalProgress = 0;
-    
-    games.forEach(gameId => {
-      const game = gameProgress[gameId];
-      if (!game) return;
-      
-      let gameProgressPercent = 0;
-      const completionWeight = 0.5;
-      const completionScore = game.completed ? 100 : 0;
-      
-      const maxScores = { equation: 1000, battle: 1000, spaceShooter: 1000 };
-      const highScoreWeight = 0.3;
-      const highScorePercent = Math.min(100, (game.highScore / maxScores[gameId]) * 100);
-      
-      const attemptsWeight = 0.2;
-      const attemptsScore = Math.min(100, (game.attempts / 3) * 100);
-      
-      gameProgressPercent = (completionScore * completionWeight) + 
-                           (highScorePercent * highScoreWeight) + 
-                           (attemptsScore * attemptsWeight);
-      
-      totalProgress += gameProgressPercent;
-    });
-    
-    return games.length > 0 ? Math.round(totalProgress / games.length) : 0;
-  }, [gameProgress]);
 
   const loadTeacherClasses = async () => {
     if (!user?.dbId) {
@@ -681,10 +665,6 @@ function Dashboard() {
     }
   };
 
-  // Mock data for course counts
-  const coursesInProgress = 18;
-  const coursesCompleted = 23;
-
   // Get current user's XP and scores
   const currentUserXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : gameXP;
 
@@ -703,6 +683,122 @@ function Dashboard() {
     ? Math.round(studentsList.reduce((sum, student) => sum + student.gameCompletionRate, 0) / studentsList.length)
     : 0;
 
+  // Modal component for reusable structure
+  const Modal = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+    return (
+      <div style={styles.modalOverlay} onClick={onClose}>
+        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h3 style={styles.modalTitle}>{title}</h3>
+            <button style={styles.modalClose} onClick={onClose}>×</button>
+          </div>
+          <div style={styles.modalBody}>
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Full Students Table Component
+  const FullStudentsTable = () => (
+    <div style={styles.tableWrapper}>
+      <table style={styles.studentTable}>
+        <thead>
+          <tr>
+            <th style={styles.th}>Student</th>
+            <th style={styles.th}>Points</th>
+            <th style={styles.th}>XP Points</th>
+            <th style={styles.th}>Scores</th>
+            <th style={styles.th}>Missions</th>
+            <th style={styles.th}>Games</th>
+            <th style={styles.th}>Overall</th>
+            <th style={styles.th}>Date with Time</th>
+            <th style={styles.th}>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {studentsList.map((student, idx) => (
+            <tr key={student.id} style={styles.tr}>
+              <td style={styles.td}>
+                <div style={styles.studentCell}>
+                  <div style={styles.studentAvatar}>
+                    {student.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div style={styles.studentName}>{student.name}</div>
+                    <div style={styles.studentEmail}>{student.email}</div>
+                  </div>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.pointsCell}>
+                  <span style={student.points >= 80 ? styles.pointsHigh : (student.points >= 60 ? styles.pointsMedium : styles.pointsLow)}>
+                    {student.points}
+                  </span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.xpCell}>
+                  <FiZap size={14} color="#f59e0b" />
+                  <span style={styles.xpValue}>{student.xpPoints}</span>
+                  <span style={styles.xpLabel}>XP</span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.scoreCell}>
+                  <span style={student.totalScores >= 800 ? styles.scoreHigh : (student.totalScores >= 500 ? styles.scoreMedium : styles.scoreLow)}>
+                    {student.totalScores}
+                  </span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.missionCell}>
+                  <span style={styles.missionRate}>{student.missionCompletionRate}%</span>
+                  <div style={styles.progressBarSmall}>
+                    <div style={{...styles.progressFillSmall, width: `${student.missionCompletionRate}%`, backgroundColor: '#10b981'}} />
+                  </div>
+                  <span style={styles.smallText}>{student.completedMissions}/{student.totalMissions}</span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.gameCell}>
+                  <span style={styles.gameRate}>{student.gameCompletionRate}%</span>
+                  <div style={styles.progressBarSmall}>
+                    <div style={{...styles.progressFillSmall, width: `${student.gameCompletionRate}%`, backgroundColor: '#8b5cf6'}} />
+                  </div>
+                  <span style={styles.smallText}>{student.completedGames}/{student.totalGames}</span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.progressCell}>
+                  <div style={styles.progressBar}>
+                    <div style={{...styles.progressFill, width: `${student.overallProgress}%`, backgroundColor: '#8b5cf6'}} />
+                  </div>
+                  <span style={styles.progressText}>{student.overallProgress}%</span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <div style={styles.dateTimeCell}>
+                  <FiClock size={10} color="#9ca3af" />
+                  <span style={styles.dateTimeText}>
+                    {formatDateTime(student.lastActivity)}
+                  </span>
+                </div>
+              </td>
+              <td style={styles.td}>
+                <span style={student.status === 'active' ? styles.statusActive : styles.statusInactive}>
+                  {student.status === 'active' ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -714,6 +810,168 @@ function Dashboard() {
 
   return (
     <div style={styles.container}>
+      {/* Modals */}
+      <Modal isOpen={isStudentsModalOpen} onClose={() => setIsStudentsModalOpen(false)} title={`Students List (${studentsList.length})`}>
+        <FullStudentsTable />
+      </Modal>
+
+      <Modal isOpen={isWeeklyActivityModalOpen} onClose={() => setIsWeeklyActivityModalOpen(false)} title="Weekly Activity">
+        <div style={styles.chartContainer}>
+          <div style={styles.barChart}>
+            {analytics.weeklyActivity.map((value, index) => (
+              <div key={index} style={styles.barContainer}>
+                <div style={styles.barLabel}>{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</div>
+                <div style={styles.barWrapper}>
+                  <div style={{...styles.bar, height: `${value}%`, backgroundColor: index >= 5 ? '#f59e0b' : '#6366f1'}} />
+                </div>
+                <div style={styles.barValue}>{value}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isClassProgressModalOpen} onClose={() => setIsClassProgressModalOpen(false)} title="Class Overall Progress">
+        <div style={styles.classProgressContainer}>
+          <div style={styles.classProgressRing}>
+            <svg width="100" height="100" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+              <circle
+                cx="60"
+                cy="60"
+                r="50"
+                fill="none"
+                stroke="#8b5cf6"
+                strokeWidth="8"
+                strokeDasharray={`${2 * Math.PI * 50}`}
+                strokeDashoffset={`${2 * Math.PI * 50 * (1 - classOverallProgress / 100)}`}
+                transform="rotate(-90 60 60)"
+                strokeLinecap="round"
+              />
+              <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
+              <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Class Avg</text>
+            </svg>
+          </div>
+          <div style={styles.classProgressDetails}>
+            <div style={styles.classDetailItem}>
+              <span style={styles.classDetailLabel}>Missions Avg:</span>
+              <span style={styles.classDetailValue}>{classMissionProgress}%</span>
+              <div style={styles.progressBarSmall}>
+                <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
+              </div>
+            </div>
+            <div style={styles.classDetailItem}>
+              <span style={styles.classDetailLabel}>Games Avg:</span>
+              <span style={styles.classDetailValue}>{classGameProgress}%</span>
+              <div style={styles.progressBarSmall}>
+                <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
+              </div>
+            </div>
+            <div style={styles.classDetailItem}>
+              <span style={styles.classDetailLabel}>Students:</span>
+              <span style={styles.classDetailValue}>{studentsList.length}</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isPerformanceModalOpen} onClose={() => setIsPerformanceModalOpen(false)} title="Student Performance">
+        <div style={styles.performanceSummary}>
+          <div style={styles.performanceItem}>
+            <span style={styles.perfDotExcellent}></span>
+            <span>Excellent</span>
+            <span style={styles.perfCount}>
+              {studentsList.filter(s => s.overallProgress >= 80).length}
+            </span>
+          </div>
+          <div style={styles.performanceItem}>
+            <span style={styles.perfDotGood}></span>
+            <span>Good</span>
+            <span style={styles.perfCount}>
+              {studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}
+            </span>
+          </div>
+          <div style={styles.performanceItem}>
+            <span style={styles.perfDotAverage}></span>
+            <span>Average</span>
+            <span style={styles.perfCount}>
+              {studentsList.filter(s => s.overallProgress < 60).length}
+            </span>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance Distribution">
+        <div style={styles.distributionContainer}>
+          <div style={styles.distributionList}>
+            {analytics.classesData.map((classItem, idx) => (
+              <div key={idx} style={styles.distItem}>
+                <span style={styles.distLabel}>{classItem.name}</span>
+                <div style={styles.distBar}>
+                  <div style={{...styles.distFill, width: `${classItem.averageProgress}%`, backgroundColor: getPerformanceColor(classItem.averageProgress)}} />
+                </div>
+                <span style={styles.distPercent}>{classItem.averageProgress}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Detailed Progress Stats">
+        <div style={styles.progressStats}>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Class Overall Progress</span>
+            <span style={styles.progressStatValue}>{classOverallProgress}%</span>
+          </div>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Total Scores (All Students)</span>
+            <span style={styles.progressStatValue}>
+              {studentsList.reduce((sum, s) => sum + s.totalScores, 0)}
+            </span>
+          </div>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Total XP Earned</span>
+            <span style={styles.progressStatValue}>
+              {studentsList.reduce((sum, s) => sum + s.xpPoints, 0)}
+            </span>
+          </div>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Avg Mission Progress</span>
+            <span style={styles.progressStatValue}>{classMissionProgress}%</span>
+          </div>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Avg Game Progress</span>
+            <span style={styles.progressStatValue}>{classGameProgress}%</span>
+          </div>
+          <div style={styles.progressStatItem}>
+            <span style={styles.progressStatLabel}>Points Distribution</span>
+            <span style={styles.progressStatValue}>
+              80-100: {studentsList.filter(s => s.points >= 80).length} | 
+              60-79: {studentsList.filter(s => s.points >= 60 && s.points < 80).length} | 
+              &lt;60: {studentsList.filter(s => s.points < 60).length}
+            </span>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isTopPerformersModalOpen} onClose={() => setIsTopPerformersModalOpen(false)} title="Top Performers">
+        <div style={styles.topPerformersList}>
+          {analytics.topPerformers.map((student) => (
+            <div key={student.rank} style={styles.topPerformerItem}>
+              <div style={styles.topPerformerRank}>{student.rank}</div>
+              <div style={styles.topPerformerInfo}>
+                <div style={styles.topPerformerName}>{student.name}</div>
+                <div style={styles.topPerformerClass}>{student.className}</div>
+              </div>
+              <div style={styles.topPerformerScore}>
+                <span style={styles.topPerformerProgress}>{student.points || student.progress} pts</span>
+                <span style={styles.topPerformerXP}>⭐{student.xpPoints} XP</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
       {/* Announcement Success Toast */}
       {announcementSuccess && (
         <div style={styles.successToast}>
@@ -825,7 +1083,7 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Stats Cards - Key Metrics */}
+      {/* Stats Cards - Key Metrics (Courses removed) */}
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={styles.statIcon}><FiUsers size={20} color="#6366f1" /></div>
@@ -841,18 +1099,27 @@ function Dashboard() {
             <div style={styles.statLabel}>No of Classes</div>
           </div>
         </div>
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}><FiTrendingUp size={20} color="#f59e0b" /></div>
-          <div style={styles.statContent}>
-            <div style={styles.statValue}>{coursesInProgress}</div>
-            <div style={styles.statLabel}>Course in progress</div>
+      </div>
+
+      {/* Students Section - Button to open modal */}
+      <div style={styles.studentsSection}>
+        <div style={styles.studentsCard}>
+          <div style={styles.studentsCardIcon}>
+            <FiUsers size={40} color="#6366f1" />
           </div>
-        </div>
-        <div style={styles.statCard}>
-          <div style={styles.statIcon}><FiAward size={20} color="#8b5cf6" /></div>
-          <div style={styles.statContent}>
-            <div style={styles.statValue}>{coursesCompleted}</div>
-            <div style={styles.statLabel}>Course completed</div>
+          <div style={styles.studentsCardContent}>
+            <h2 style={styles.studentsCardTitle}>Manage Students</h2>
+            <p style={styles.studentsCardDesc}>
+              View and manage all {studentsList.length} students in your class
+            </p>
+            <button 
+              style={styles.viewStudentsButton}
+              onClick={() => setIsStudentsModalOpen(true)}
+            >
+              <FiEye size={18} />
+              View All Students
+              <span style={styles.studentCountBadge}>{studentsList.length}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -861,309 +1128,247 @@ function Dashboard() {
       <div style={styles.mainGrid}>
         {/* Left Column */}
         <div style={styles.leftColumn}>
-          {/* Weekly Activity Chart */}
+          {/* Weekly Activity Chart - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiActivity size={16} /> Weekly Activity
               </h3>
+              {isMobile ? (
+                <button style={styles.viewButton} onClick={() => setIsWeeklyActivityModalOpen(true)}>
+                  <FiMaximize2 size={14} /> View
+                </button>
+              ) : null}
             </div>
-            <div style={styles.chartContainer}>
-              <div style={styles.barChart}>
-                {analytics.weeklyActivity.map((value, index) => (
-                  <div key={index} style={styles.barContainer}>
-                    <div style={styles.barLabel}>{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</div>
-                    <div style={styles.barWrapper}>
-                      <div style={{...styles.bar, height: `${value}%`, backgroundColor: index >= 5 ? '#f59e0b' : '#6366f1'}} />
+            {!isMobile && (
+              <div style={styles.chartContainer}>
+                <div style={styles.barChart}>
+                  {analytics.weeklyActivity.map((value, index) => (
+                    <div key={index} style={styles.barContainer}>
+                      <div style={styles.barLabel}>{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</div>
+                      <div style={styles.barWrapper}>
+                        <div style={{...styles.bar, height: `${value}%`, backgroundColor: index >= 5 ? '#f59e0b' : '#6366f1'}} />
+                      </div>
+                      <div style={styles.barValue}>{value}%</div>
                     </div>
-                    <div style={styles.barValue}>{value}%</div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* CLASS OVERALL PROGRESS SECTION - Class Performance */}
+          {/* CLASS OVERALL PROGRESS SECTION - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiTrendingUp size={16} color="#8b5cf6" /> Class Overall Progress
               </h3>
-              <span style={{...styles.sectionBadge, backgroundColor: '#e0e7ff', color: '#4338ca'}}>
-                {classOverallProgress}% Average
-              </span>
-            </div>
-            <div style={styles.classProgressContainer}>
-              <div style={styles.classProgressRing}>
-                <svg width="100" height="100" viewBox="0 0 120 120">
-                  <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r="50"
-                    fill="none"
-                    stroke="#8b5cf6"
-                    strokeWidth="8"
-                    strokeDasharray={`${2 * Math.PI * 50}`}
-                    strokeDashoffset={`${2 * Math.PI * 50 * (1 - classOverallProgress / 100)}`}
-                    transform="rotate(-90 60 60)"
-                    strokeLinecap="round"
-                  />
-                  <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
-                  <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Class Avg</text>
-                </svg>
-              </div>
-              <div style={styles.classProgressDetails}>
-                <div style={styles.classDetailItem}>
-                  <span style={styles.classDetailLabel}>Missions Avg:</span>
-                  <span style={styles.classDetailValue}>{classMissionProgress}%</span>
-                  <div style={styles.progressBarSmall}>
-                    <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
-                  </div>
-                </div>
-                <div style={styles.classDetailItem}>
-                  <span style={styles.classDetailLabel}>Games Avg:</span>
-                  <span style={styles.classDetailValue}>{classGameProgress}%</span>
-                  <div style={styles.progressBarSmall}>
-                    <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
-                  </div>
-                </div>
-                <div style={styles.classDetailItem}>
-                  <span style={styles.classDetailLabel}>Students:</span>
-                  <span style={styles.classDetailValue}>{studentsList.length}</span>
-                </div>
+              <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                <span style={{...styles.sectionBadge, backgroundColor: '#e0e7ff', color: '#4338ca'}}>
+                  {classOverallProgress}% Average
+                </span>
+                {isMobile && (
+                  <button style={styles.viewButton} onClick={() => setIsClassProgressModalOpen(true)}>
+                    <FiMaximize2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
+            {!isMobile && (
+              <div style={styles.classProgressContainer}>
+                <div style={styles.classProgressRing}>
+                  <svg width="100" height="100" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8" />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#8b5cf6"
+                      strokeWidth="8"
+                      strokeDasharray={`${2 * Math.PI * 50}`}
+                      strokeDashoffset={`${2 * Math.PI * 50 * (1 - classOverallProgress / 100)}`}
+                      transform="rotate(-90 60 60)"
+                      strokeLinecap="round"
+                    />
+                    <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
+                    <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Class Avg</text>
+                  </svg>
+                </div>
+                <div style={styles.classProgressDetails}>
+                  <div style={styles.classDetailItem}>
+                    <span style={styles.classDetailLabel}>Missions Avg:</span>
+                    <span style={styles.classDetailValue}>{classMissionProgress}%</span>
+                    <div style={styles.progressBarSmall}>
+                      <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
+                    </div>
+                  </div>
+                  <div style={styles.classDetailItem}>
+                    <span style={styles.classDetailLabel}>Games Avg:</span>
+                    <span style={styles.classDetailValue}>{classGameProgress}%</span>
+                    <div style={styles.progressBarSmall}>
+                      <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
+                    </div>
+                  </div>
+                  <div style={styles.classDetailItem}>
+                    <span style={styles.classDetailLabel}>Students:</span>
+                    <span style={styles.classDetailValue}>{studentsList.length}</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Student Performance Summary */}
+          {/* Student Performance Summary - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiBarChart size={16} /> Student Performance
               </h3>
+              {isMobile && (
+                <button style={styles.viewButton} onClick={() => setIsPerformanceModalOpen(true)}>
+                  <FiMaximize2 size={14} /> View
+                </button>
+              )}
             </div>
-            <div style={styles.performanceSummary}>
-              <div style={styles.performanceItem}>
-                <span style={styles.perfDotExcellent}></span>
-                <span>Excellent</span>
-                <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.overallProgress >= 80).length}
-                </span>
+            {!isMobile && (
+              <div style={styles.performanceSummary}>
+                <div style={styles.performanceItem}>
+                  <span style={styles.perfDotExcellent}></span>
+                  <span>Excellent (80-100%)</span>
+                  <span style={styles.perfCount}>
+                    {studentsList.filter(s => s.overallProgress >= 80).length}
+                  </span>
+                </div>
+                <div style={styles.performanceItem}>
+                  <span style={styles.perfDotGood}></span>
+                  <span>Good (60-79%)</span>
+                  <span style={styles.perfCount}>
+                    {studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}
+                  </span>
+                </div>
+                <div style={styles.performanceItem}>
+                  <span style={styles.perfDotAverage}></span>
+                  <span>Average (&lt;60%)</span>
+                  <span style={styles.perfCount}>
+                    {studentsList.filter(s => s.overallProgress < 60).length}
+                  </span>
+                </div>
               </div>
-              <div style={styles.performanceItem}>
-                <span style={styles.perfDotGood}></span>
-                <span>Good</span>
-                <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}
-                </span>
-              </div>
-              <div style={styles.performanceItem}>
-                <span style={styles.perfDotAverage}></span>
-                <span>Average</span>
-                <span style={styles.perfCount}>
-                  {studentsList.filter(s => s.overallProgress < 60).length}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Students Table - With Points, XP Points, Scores, Mission & Game Progress */}
-          <div style={styles.sectionCard}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}>
-                <FiUsers size={16} /> Students Table
-              </h3>
-              <span style={styles.sectionBadge}>
-                {studentsList.length} total
-              </span>
-            </div>
-            <div style={styles.tableWrapper}>
-              <table style={styles.studentTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Student</th>
-                    <th style={styles.th}>Points</th>
-                    <th style={styles.th}>XP Points</th>
-                    <th style={styles.th}>Scores</th>
-                    <th style={styles.th}>Missions</th>
-                    <th style={styles.th}>Games</th>
-                    <th style={styles.th}>Overall</th>
-                    <th style={styles.th}>Date with Time</th>
-                    <th style={styles.th}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {studentsList.map((student, idx) => (
-                    <tr key={student.id} style={styles.tr}>
-                      <td style={styles.td}>
-                        <div style={styles.studentCell}>
-                          <div style={styles.studentAvatar}>
-                            {student.name.charAt(0)}
-                          </div>
-                          <div>
-                            <div style={styles.studentName}>{student.name}</div>
-                            <div style={styles.studentEmail}>{student.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.pointsCell}>
-                          <span style={student.points >= 80 ? styles.pointsHigh : (student.points >= 60 ? styles.pointsMedium : styles.pointsLow)}>
-                            {student.points}
-                          </span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.xpCell}>
-                          <FiZap size={14} color="#f59e0b" />
-                          <span style={styles.xpValue}>{student.xpPoints}</span>
-                          <span style={styles.xpLabel}>XP</span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.scoreCell}>
-                          <span style={student.totalScores >= 800 ? styles.scoreHigh : (student.totalScores >= 500 ? styles.scoreMedium : styles.scoreLow)}>
-                            {student.totalScores}
-                          </span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.missionCell}>
-                          <span style={styles.missionRate}>{student.missionCompletionRate}%</span>
-                          <div style={styles.progressBarSmall}>
-                            <div style={{...styles.progressFillSmall, width: `${student.missionCompletionRate}%`, backgroundColor: '#10b981'}} />
-                          </div>
-                          <span style={styles.smallText}>{student.completedMissions}/{student.totalMissions}</span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.gameCell}>
-                          <span style={styles.gameRate}>{student.gameCompletionRate}%</span>
-                          <div style={styles.progressBarSmall}>
-                            <div style={{...styles.progressFillSmall, width: `${student.gameCompletionRate}%`, backgroundColor: '#8b5cf6'}} />
-                          </div>
-                          <span style={styles.smallText}>{student.completedGames}/{student.totalGames}</span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.progressCell}>
-                          <div style={styles.progressBar}>
-                            <div style={{...styles.progressFill, width: `${student.overallProgress}%`, backgroundColor: '#8b5cf6'}} />
-                          </div>
-                          <span style={styles.progressText}>{student.overallProgress}%</span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <div style={styles.dateTimeCell}>
-                          <FiClock size={10} color="#9ca3af" />
-                          <span style={styles.dateTimeText}>
-                            {formatDateTime(student.lastActivity)}
-                          </span>
-                        </div>
-                      </td>
-                      <td style={styles.td}>
-                        <span style={student.status === 'active' ? styles.statusActive : styles.statusInactive}>
-                          {student.status === 'active' ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            )}
           </div>
         </div>
 
         {/* Right Column */}
         <div style={styles.rightColumn}>
-          {/* Class Performance Distribution */}
+          {/* Class Performance Distribution - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiTarget size={16} /> Class Performance
               </h3>
+              {isMobile && (
+                <button style={styles.viewButton} onClick={() => setIsClassPerformanceModalOpen(true)}>
+                  <FiMaximize2 size={14} /> View
+                </button>
+              )}
             </div>
-            <div style={styles.distributionContainer}>
-              <div style={styles.distributionList}>
-                {analytics.classesData.slice(0, 4).map((classItem, idx) => (
-                  <div key={idx} style={styles.distItem}>
-                    <span style={styles.distLabel}>{classItem.name}</span>
-                    <div style={styles.distBar}>
-                      <div style={{...styles.distFill, width: `${classItem.averageProgress}%`, backgroundColor: getPerformanceColor(classItem.averageProgress)}} />
+            {!isMobile && (
+              <div style={styles.distributionContainer}>
+                <div style={styles.distributionList}>
+                  {analytics.classesData.map((classItem, idx) => (
+                    <div key={idx} style={styles.distItem}>
+                      <span style={styles.distLabel}>{classItem.name}</span>
+                      <div style={styles.distBar}>
+                        <div style={{...styles.distFill, width: `${classItem.averageProgress}%`, backgroundColor: getPerformanceColor(classItem.averageProgress)}} />
+                      </div>
+                      <span style={styles.distPercent}>{classItem.averageProgress}%</span>
                     </div>
-                    <span style={styles.distPercent}>{classItem.averageProgress}%</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Detailed Progress Stats */}
+          {/* Detailed Progress Stats - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiPieChart size={16} /> Progress Stats
               </h3>
+              {isMobile && (
+                <button style={styles.viewButton} onClick={() => setIsProgressStatsModalOpen(true)}>
+                  <FiMaximize2 size={14} /> View
+                </button>
+              )}
             </div>
-            <div style={styles.progressStats}>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Class Overall Progress</span>
-                <span style={styles.progressStatValue}>{classOverallProgress}%</span>
+            {!isMobile && (
+              <div style={styles.progressStats}>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Class Overall Progress</span>
+                  <span style={styles.progressStatValue}>{classOverallProgress}%</span>
+                </div>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Total Scores (All Students)</span>
+                  <span style={styles.progressStatValue}>
+                    {studentsList.reduce((sum, s) => sum + s.totalScores, 0)}
+                  </span>
+                </div>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Total XP Earned</span>
+                  <span style={styles.progressStatValue}>
+                    {studentsList.reduce((sum, s) => sum + s.xpPoints, 0)}
+                  </span>
+                </div>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Avg Mission Progress</span>
+                  <span style={styles.progressStatValue}>{classMissionProgress}%</span>
+                </div>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Avg Game Progress</span>
+                  <span style={styles.progressStatValue}>{classGameProgress}%</span>
+                </div>
+                <div style={styles.progressStatItem}>
+                  <span style={styles.progressStatLabel}>Points Distribution</span>
+                  <span style={styles.progressStatValue}>
+                    80-100: {studentsList.filter(s => s.points >= 80).length} | 
+                    60-79: {studentsList.filter(s => s.points >= 60 && s.points < 80).length} | 
+                    &lt;60: {studentsList.filter(s => s.points < 60).length}
+                  </span>
+                </div>
               </div>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Total Scores (All Students)</span>
-                <span style={styles.progressStatValue}>
-                  {studentsList.reduce((sum, s) => sum + s.totalScores, 0)}
-                </span>
-              </div>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Total XP Earned</span>
-                <span style={styles.progressStatValue}>
-                  {studentsList.reduce((sum, s) => sum + s.xpPoints, 0)}
-                </span>
-              </div>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Avg Mission Progress</span>
-                <span style={styles.progressStatValue}>{classMissionProgress}%</span>
-              </div>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Avg Game Progress</span>
-                <span style={styles.progressStatValue}>{classGameProgress}%</span>
-              </div>
-              <div style={styles.progressStatItem}>
-                <span style={styles.progressStatLabel}>Points Distribution</span>
-                <span style={styles.progressStatValue}>
-                  80-100: {studentsList.filter(s => s.points >= 80).length} | 
-                  60-79: {studentsList.filter(s => s.points >= 60 && s.points < 80).length} | 
-                  &lt;60: {studentsList.filter(s => s.points < 60).length}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Top Performers */}
+          {/* Top Performers - Collapsible on mobile */}
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>
                 <FiStar size={16} /> Top Performers
               </h3>
+              {isMobile && (
+                <button style={styles.viewButton} onClick={() => setIsTopPerformersModalOpen(true)}>
+                  <FiMaximize2 size={14} /> View
+                </button>
+              )}
             </div>
-            <div style={styles.topPerformersList}>
-              {analytics.topPerformers.slice(0, 3).map((student) => (
-                <div key={student.rank} style={styles.topPerformerItem}>
-                  <div style={styles.topPerformerRank}>{student.rank}</div>
-                  <div style={styles.topPerformerInfo}>
-                    <div style={styles.topPerformerName}>{student.name}</div>
-                    <div style={styles.topPerformerClass}>{student.className}</div>
+            {!isMobile && (
+              <div style={styles.topPerformersList}>
+                {analytics.topPerformers.slice(0, 5).map((student) => (
+                  <div key={student.rank} style={styles.topPerformerItem}>
+                    <div style={styles.topPerformerRank}>{student.rank}</div>
+                    <div style={styles.topPerformerInfo}>
+                      <div style={styles.topPerformerName}>{student.name}</div>
+                      <div style={styles.topPerformerClass}>{student.className}</div>
+                    </div>
+                    <div style={styles.topPerformerScore}>
+                      <span style={styles.topPerformerProgress}>{student.points || student.progress} pts</span>
+                      <span style={styles.topPerformerXP}>⭐{student.xpPoints} XP</span>
+                    </div>
                   </div>
-                  <div style={styles.topPerformerScore}>
-                    <span style={styles.topPerformerProgress}>{student.points || student.progress} pts</span>
-                    <span style={styles.topPerformerXP}>⭐{student.xpPoints} XP</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick Actions */}
@@ -1174,6 +1379,12 @@ function Dashboard() {
             <div style={styles.quickActions}>
               <button style={styles.actionButton} onClick={() => setShowAnnouncementModal(true)}>
                 <FiBell size={16} /> Send Announcement
+              </button>
+              <button 
+                style={styles.actionButton} 
+                onClick={() => setIsStudentsModalOpen(true)}
+              >
+                <FiUsers size={16} /> View Students
               </button>
             </div>
           </div>
@@ -1186,10 +1397,9 @@ function Dashboard() {
 const styles = {
   container: {
     width: '100%',
-    height: 'calc(100vh - 70px)',
-    overflowY: 'auto',
-    padding: '20px 24px',
+    minHeight: '100vh',
     backgroundColor: '#f3f4f6',
+    padding: '20px 24px',
     boxSizing: 'border-box',
   },
   loadingContainer: {
@@ -1197,9 +1407,9 @@ const styles = {
     flexDirection: 'column',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%',
-    minHeight: '400px',
+    minHeight: '100vh',
     gap: '20px',
+    backgroundColor: '#f9fafb',
   },
   loadingSpinner: {
     width: '40px',
@@ -1221,7 +1431,7 @@ const styles = {
     flex: 1,
   },
   welcomeTitle: {
-    fontSize: '24px',
+    fontSize: 'clamp(20px, 5vw, 24px)',
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: '4px',
@@ -1234,6 +1444,7 @@ const styles = {
     display: 'flex',
     gap: '12px',
     marginTop: '8px',
+    flexWrap: 'wrap',
   },
   xpBadge: {
     backgroundColor: '#fef3c7',
@@ -1284,7 +1495,7 @@ const styles = {
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '16px',
     marginBottom: '24px',
   },
@@ -1320,9 +1531,67 @@ const styles = {
     color: '#6b7280',
     fontWeight: '500',
   },
+  studentsSection: {
+    marginBottom: '24px',
+  },
+  studentsCard: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    padding: '24px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '24px',
+    boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
+    flexWrap: 'wrap',
+  },
+  studentsCardIcon: {
+    width: '80px',
+    height: '80px',
+    backgroundColor: '#e0e7ff',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  studentsCardContent: {
+    flex: 1,
+  },
+  studentsCardTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: '8px',
+  },
+  studentsCardDesc: {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '16px',
+  },
+  viewStudentsButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '10px 20px',
+    backgroundColor: '#6366f1',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    fontFamily: 'inherit',
+  },
+  studentCountBadge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: '2px 8px',
+    borderRadius: '20px',
+    fontSize: '12px',
+    marginLeft: '8px',
+  },
   mainGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 320px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))',
     gap: '20px',
   },
   leftColumn: {
@@ -1346,6 +1615,8 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '14px',
+    flexWrap: 'wrap',
+    gap: '8px',
   },
   sectionTitle: {
     fontSize: '15px',
@@ -1362,14 +1633,50 @@ const styles = {
     borderRadius: '20px',
     color: '#6b7280',
   },
+  viewButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '4px 10px',
+    backgroundColor: '#f3f4f6',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    fontSize: '11px',
+    fontWeight: '500',
+    color: '#6366f1',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    fontFamily: 'inherit',
+  },
+  viewAllContainer: {
+    marginTop: '12px',
+    textAlign: 'center',
+  },
+  viewAllButton: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    backgroundColor: '#f3f4f6',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    fontSize: '12px',
+    fontWeight: '500',
+    color: '#6366f1',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    fontFamily: 'inherit',
+  },
   chartContainer: {
     marginBottom: '8px',
+    overflowX: 'auto',
   },
   barChart: {
     display: 'flex',
     justifyContent: 'space-around',
     alignItems: 'flex-end',
     height: '160px',
+    minWidth: '280px',
   },
   barContainer: {
     display: 'flex',
@@ -1450,6 +1757,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     gap: '12px',
+    flexWrap: 'wrap',
   },
   performanceItem: {
     flex: 1,
@@ -1492,19 +1800,21 @@ const styles = {
     width: '100%',
     borderCollapse: 'collapse',
     fontSize: '12px',
+    minWidth: '800px',
   },
   th: {
     textAlign: 'left',
-    padding: '10px 8px',
-    fontSize: '10px',
+    padding: '12px 8px',
+    fontSize: '11px',
     fontWeight: '600',
     color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-    borderBottom: '1px solid #f3f4f6',
+    borderBottom: '1px solid #e5e7eb',
   },
   tr: {
-    borderBottom: '1px solid #f9fafb',
+    borderBottom: '1px solid #f3f4f6',
+    transition: 'background-color 0.2s',
   },
   td: {
     padding: '12px 8px',
@@ -1820,6 +2130,8 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.2s',
     fontFamily: 'inherit',
+    width: '100%',
+    justifyContent: 'center',
   },
   // Modal Styles
   modalOverlay: {
@@ -1829,6 +2141,7 @@ const styles = {
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1838,10 +2151,11 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '20px',
     width: '90%',
-    maxWidth: '500px',
+    maxWidth: '95vw',
     maxHeight: '90vh',
     overflow: 'hidden',
     boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    animation: 'fadeIn 0.3s ease',
   },
   modalHeader: {
     display: 'flex',
@@ -1857,6 +2171,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
+    margin: 0,
   },
   modalClose: {
     background: 'none',
@@ -1866,9 +2181,12 @@ const styles = {
     color: '#9ca3af',
     padding: '0',
     lineHeight: 1,
+    transition: 'color 0.2s',
   },
   modalBody: {
     padding: '24px',
+    overflowY: 'auto',
+    maxHeight: 'calc(90vh - 80px)',
   },
   formGroup: {
     marginBottom: '20px',
@@ -1924,6 +2242,7 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     color: '#374151',
+    transition: 'background-color 0.2s',
   },
   sendButton: {
     display: 'flex',
@@ -1937,6 +2256,7 @@ const styles = {
     fontWeight: '500',
     cursor: 'pointer',
     color: 'white',
+    transition: 'background-color 0.2s',
   },
   successToast: {
     position: 'fixed',
@@ -1963,6 +2283,17 @@ styleSheet.textContent = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
   
   @keyframes slideInRight {
@@ -1998,6 +2329,30 @@ styleSheet.textContent = `
     background-color: #e5e7eb;
   }
   
+  .viewButton:hover {
+    background-color: #e5e7eb;
+    border-color: #c7d2fe;
+  }
+  
+  .viewAllButton:hover {
+    background-color: #e5e7eb;
+    border-color: #c7d2fe;
+  }
+  
+  .modalClose:hover {
+    color: #ef4444;
+  }
+  
+  .actionButton:hover {
+    background-color: #e5e7eb;
+    border-color: #d1d5db;
+  }
+  
+  .viewStudentsButton:hover {
+    background-color: #4f46e5;
+    transform: translateY(-2px);
+  }
+  
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -2005,12 +2360,12 @@ styleSheet.textContent = `
   
   ::-webkit-scrollbar-track {
     background: #f1f1f1;
-    borderRadius: 3px;
+    border-radius: 3px;
   }
   
   ::-webkit-scrollbar-thumb {
     background: #c1c1c1;
-    borderRadius: 3px;
+    border-radius: 3px;
   }
   
   ::-webkit-scrollbar-thumb:hover {
@@ -2019,6 +2374,84 @@ styleSheet.textContent = `
   
   tr:hover {
     background-color: #f9fafb;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1024px) {
+    .mainGrid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .container {
+      padding: 16px;
+    }
+    .statsGrid {
+      grid-template-columns: 1fr;
+    }
+    .header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .dropdownContainer {
+      width: 100%;
+    }
+    .welcomeTitle {
+      font-size: 20px;
+    }
+    .sectionCard {
+      padding: 12px;
+    }
+    .modalBody {
+      padding: 16px;
+    }
+    .modalContent {
+      width: 95%;
+      max-width: 95vw;
+    }
+    .studentTable {
+      min-width: 600px;
+    }
+    .classProgressContainer {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .performanceSummary {
+      flex-direction: column;
+    }
+    .studentsCard {
+      flex-direction: column;
+      text-align: center;
+    }
+    .viewStudentsButton {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .statValue {
+      font-size: 22px;
+    }
+    .statIcon {
+      width: 36px;
+      height: 36px;
+    }
+    .sectionTitle {
+      font-size: 14px;
+    }
+    .viewButton {
+      padding: 3px 8px;
+      font-size: 10px;
+    }
+    .studentTable {
+      min-width: 500px;
+    }
+    .studentsCardTitle {
+      font-size: 18px;
+    }
   }
 `;
 document.head.appendChild(styleSheet);

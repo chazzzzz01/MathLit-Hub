@@ -5,7 +5,7 @@ import {
   FiBookOpen, FiChevronDown, FiUsers, FiUser, FiUserCheck, FiUserX, 
   FiUserPlus, FiStar, FiClock, FiSend, FiCheckCircle, 
   FiXCircle, FiAward, FiAlertCircle, FiZap, FiRefreshCw, FiX,
-  FiMessageSquare, FiLightbulb, FiEdit3, FiShare2, FiEye, FiEyeOff
+  FiMessageSquare, FiSun, FiEdit3, FiShare2, FiEye, FiEyeOff
 } from 'react-icons/fi';
 import { supabase } from '../lib/supabase';
 
@@ -51,7 +51,7 @@ function CollaborationStudent() {
   const [loadingTeamAnswers, setLoadingTeamAnswers] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // NEW: Collaboration features
+  // Collaboration features
   const [showCollaborationHub, setShowCollaborationHub] = useState(false);
   const [teamNotes, setTeamNotes] = useState([]);
   const [newNote, setNewNote] = useState('');
@@ -61,7 +61,6 @@ function CollaborationStudent() {
   const [brainstormIdeas, setBrainstormIdeas] = useState([]);
   const [newIdea, setNewIdea] = useState('');
   const [submittingIdea, setSubmittingIdea] = useState(false);
-  const [showAnswersInRealTime, setShowAnswersInRealTime] = useState(true);
   const [teamDiscussion, setTeamDiscussion] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const [submittingMessage, setSubmittingMessage] = useState(false);
@@ -76,8 +75,6 @@ function CollaborationStudent() {
   const countdownIntervalRef = useRef(null);
   const isProcessingRef = useRef(false);
   const lastProcessedSessionRef = useRef(null);
-  const notesPollingRef = useRef(null);
-  const discussionPollingRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -173,201 +170,6 @@ function CollaborationStudent() {
       return newStudent.id;
     } catch (error) {
       return null;
-    }
-  };
-
-  // NEW: Load team notes
-  const loadTeamNotes = useCallback(async () => {
-    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
-    
-    setLoadingNotes(true);
-    try {
-      const { data, error } = await supabase
-        .from('team_notes')
-        .select('*')
-        .eq('class_id', selectedClass.id)
-        .eq('team', teamInfo.team)
-        .eq('session_id', currentGameSessionId)
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setTeamNotes(data || []);
-    } catch (error) {
-      console.error('Error loading team notes:', error);
-    } finally {
-      setLoadingNotes(false);
-    }
-  }, [teamInfo, selectedClass, currentGameSessionId]);
-
-  // NEW: Add team note
-  const addTeamNote = async () => {
-    if (!newNote.trim()) return;
-    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
-    
-    setSubmittingNote(true);
-    try {
-      const { error } = await supabase
-        .from('team_notes')
-        .insert({
-          class_id: selectedClass.id,
-          team: teamInfo.team,
-          session_id: currentGameSessionId,
-          student_id: studentUUID,
-          note: newNote.trim(),
-          created_at: new Date().toISOString()
-        });
-      
-      if (error) throw error;
-      
-      setNewNote('');
-      await loadTeamNotes();
-    } catch (error) {
-      console.error('Error adding note:', error);
-    } finally {
-      setSubmittingNote(false);
-    }
-  };
-
-  // NEW: Load brainstorming ideas
-  const loadBrainstormIdeas = useCallback(async () => {
-    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('brainstorm_ideas')
-        .select('*, students(name)')
-        .eq('class_id', selectedClass.id)
-        .eq('team', teamInfo.team)
-        .eq('session_id', currentGameSessionId)
-        .order('votes', { ascending: false })
-        .order('created_at', { ascending: true });
-      
-      if (error) throw error;
-      setBrainstormIdeas(data || []);
-    } catch (error) {
-      console.error('Error loading brainstorm ideas:', error);
-    }
-  }, [teamInfo, selectedClass, currentGameSessionId]);
-
-  // NEW: Add brainstorm idea
-  const addBrainstormIdea = async () => {
-    if (!newIdea.trim()) return;
-    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
-    
-    setSubmittingIdea(true);
-    try {
-      const { error } = await supabase
-        .from('brainstorm_ideas')
-        .insert({
-          class_id: selectedClass.id,
-          team: teamInfo.team,
-          session_id: currentGameSessionId,
-          student_id: studentUUID,
-          idea: newIdea.trim(),
-          votes: 0,
-          created_at: new Date().toISOString()
-        });
-      
-      if (error) throw error;
-      
-      setNewIdea('');
-      await loadBrainstormIdeas();
-    } catch (error) {
-      console.error('Error adding idea:', error);
-    } finally {
-      setSubmittingIdea(false);
-    }
-  };
-
-  // NEW: Vote on brainstorm idea
-  const voteIdea = async (ideaId, currentVotes) => {
-    if (!studentUUID) return;
-    
-    try {
-      const { data: existingVote } = await supabase
-        .from('idea_votes')
-        .select('id')
-        .eq('idea_id', ideaId)
-        .eq('student_id', studentUUID)
-        .maybeSingle();
-      
-      if (existingVote) {
-        await supabase
-          .from('idea_votes')
-          .delete()
-          .eq('id', existingVote.id);
-        
-        await supabase
-          .from('brainstorm_ideas')
-          .update({ votes: currentVotes - 1 })
-          .eq('id', ideaId);
-      } else {
-        await supabase
-          .from('idea_votes')
-          .insert({
-            idea_id: ideaId,
-            student_id: studentUUID,
-            created_at: new Date().toISOString()
-          });
-        
-        await supabase
-          .from('brainstorm_ideas')
-          .update({ votes: currentVotes + 1 })
-          .eq('id', ideaId);
-      }
-      
-      await loadBrainstormIdeas();
-    } catch (error) {
-      console.error('Error voting:', error);
-    }
-  };
-
-  // NEW: Load team discussion
-  const loadTeamDiscussion = useCallback(async () => {
-    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('team_discussion')
-        .select('*, students(name)')
-        .eq('class_id', selectedClass.id)
-        .eq('team', teamInfo.team)
-        .eq('session_id', currentGameSessionId)
-        .order('created_at', { ascending: true });
-      
-      if (error) throw error;
-      setTeamDiscussion(data || []);
-    } catch (error) {
-      console.error('Error loading discussion:', error);
-    }
-  }, [teamInfo, selectedClass, currentGameSessionId]);
-
-  // NEW: Send discussion message
-  const sendDiscussionMessage = async () => {
-    if (!newMessage.trim()) return;
-    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
-    
-    setSubmittingMessage(true);
-    try {
-      const { error } = await supabase
-        .from('team_discussion')
-        .insert({
-          class_id: selectedClass.id,
-          team: teamInfo.team,
-          session_id: currentGameSessionId,
-          student_id: studentUUID,
-          message: newMessage.trim(),
-          created_at: new Date().toISOString()
-        });
-      
-      if (error) throw error;
-      
-      setNewMessage('');
-      await loadTeamDiscussion();
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
-      setSubmittingMessage(false);
     }
   };
 
@@ -707,6 +509,149 @@ function CollaborationStudent() {
     await fetchTeamAnswers();
   };
 
+  // Load brainstorming ideas
+  const loadBrainstormIdeas = useCallback(async () => {
+    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('brainstorm_ideas')
+        .select('*, students(name)')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team)
+        .eq('session_id', currentGameSessionId)
+        .order('votes', { ascending: false })
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setBrainstormIdeas(data || []);
+    } catch (error) {
+      console.error('Error loading brainstorm ideas:', error);
+    }
+  }, [teamInfo, selectedClass, currentGameSessionId]);
+
+  // Add brainstorm idea
+  const addBrainstormIdea = async () => {
+    if (!newIdea.trim()) return;
+    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
+    
+    setSubmittingIdea(true);
+    try {
+      const { error } = await supabase
+        .from('brainstorm_ideas')
+        .insert({
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          session_id: currentGameSessionId,
+          student_id: studentUUID,
+          idea: newIdea.trim(),
+          votes: 0,
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      setNewIdea('');
+      await loadBrainstormIdeas();
+    } catch (error) {
+      console.error('Error adding idea:', error);
+    } finally {
+      setSubmittingIdea(false);
+    }
+  };
+
+  // Vote on brainstorm idea
+  const voteIdea = async (ideaId, currentVotes) => {
+    if (!studentUUID) return;
+    
+    try {
+      const { data: existingVote } = await supabase
+        .from('idea_votes')
+        .select('id')
+        .eq('idea_id', ideaId)
+        .eq('student_id', studentUUID)
+        .maybeSingle();
+      
+      if (existingVote) {
+        await supabase
+          .from('idea_votes')
+          .delete()
+          .eq('id', existingVote.id);
+        
+        await supabase
+          .from('brainstorm_ideas')
+          .update({ votes: currentVotes - 1 })
+          .eq('id', ideaId);
+      } else {
+        await supabase
+          .from('idea_votes')
+          .insert({
+            idea_id: ideaId,
+            student_id: studentUUID,
+            created_at: new Date().toISOString()
+          });
+        
+        await supabase
+          .from('brainstorm_ideas')
+          .update({ votes: currentVotes + 1 })
+          .eq('id', ideaId);
+      }
+      
+      await loadBrainstormIdeas();
+    } catch (error) {
+      console.error('Error voting:', error);
+    }
+  };
+
+  // Load team discussion
+  const loadTeamDiscussion = useCallback(async () => {
+    if (!teamInfo?.team || !selectedClass?.id || !currentGameSessionId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('team_discussion')
+        .select('*, students(name)')
+        .eq('class_id', selectedClass.id)
+        .eq('team', teamInfo.team)
+        .eq('session_id', currentGameSessionId)
+        .order('created_at', { ascending: true });
+      
+      if (error) throw error;
+      setTeamDiscussion(data || []);
+    } catch (error) {
+      console.error('Error loading discussion:', error);
+    }
+  }, [teamInfo, selectedClass, currentGameSessionId]);
+
+  // Send discussion message
+  const sendDiscussionMessage = async () => {
+    if (!newMessage.trim()) return;
+    if (!teamInfo?.team || !selectedClass?.id || !studentUUID) return;
+    
+    setSubmittingMessage(true);
+    try {
+      const { error } = await supabase
+        .from('team_discussion')
+        .insert({
+          class_id: selectedClass.id,
+          team: teamInfo.team,
+          session_id: currentGameSessionId,
+          student_id: studentUUID,
+          message: newMessage.trim(),
+          created_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      setNewMessage('');
+      await loadTeamDiscussion();
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setSubmittingMessage(false);
+    }
+  };
+
   const checkForActiveGameSession = useCallback(async () => {
     if (isProcessingRef.current) return;
     if (!selectedClass?.id || !studentUUID || !teamInfo) return;
@@ -743,7 +688,6 @@ function CollaborationStudent() {
         
         // Load collaboration data for new session
         setTimeout(() => {
-          loadTeamNotes();
           loadBrainstormIdeas();
           loadTeamDiscussion();
         }, 500);
@@ -780,7 +724,7 @@ function CollaborationStudent() {
     } finally {
       isProcessingRef.current = false;
     }
-  }, [selectedClass?.id, studentUUID, teamInfo, currentGameSessionId, startCountdown, loadTeamNotes, loadBrainstormIdeas, loadTeamDiscussion]);
+  }, [selectedClass?.id, studentUUID, teamInfo, currentGameSessionId, startCountdown, loadBrainstormIdeas, loadTeamDiscussion]);
 
   const handleReady = async () => {
     if (!selectedClass?.id || !teamInfo?.team) {
@@ -905,21 +849,18 @@ function CollaborationStudent() {
     if (!roundActive || !currentGameSessionId || !teamInfo?.team) return;
     
     const collaborationInterval = setInterval(() => {
-      loadTeamNotes();
       loadTeamDiscussion();
       if (showBrainstorming) loadBrainstormIdeas();
     }, 5000);
     
     return () => clearInterval(collaborationInterval);
-  }, [roundActive, currentGameSessionId, teamInfo?.team, showBrainstorming, loadTeamNotes, loadTeamDiscussion, loadBrainstormIdeas]);
+  }, [roundActive, currentGameSessionId, teamInfo?.team, showBrainstorming, loadTeamDiscussion, loadBrainstormIdeas]);
 
   // Cleanup all intervals on unmount
   useEffect(() => {
     return () => {
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
       if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
-      if (notesPollingRef.current) clearInterval(notesPollingRef.current);
-      if (discussionPollingRef.current) clearInterval(discussionPollingRef.current);
       isProcessingRef.current = false;
     };
   }, []);
@@ -1193,7 +1134,7 @@ function CollaborationStudent() {
                 </div>
               </div>
 
-              {/* Collaboration Hub Button - Shows during active round */}
+              {/* Collaboration Hub Button */}
               {roundActive && !answerSubmitted && (
                 <button 
                   style={styles.collaborationHubButton}
@@ -1219,7 +1160,6 @@ function CollaborationStudent() {
                     <button 
                       onClick={handleCancelReady}
                       style={styles.cancelReadyButton}
-                      title="Cancel ready status"
                     >
                       <FiX size={18} /> Not Ready
                     </button>
@@ -1344,7 +1284,7 @@ function CollaborationStudent() {
         )}
       </div>
 
-      {/* Team Answers Modal with Collaboration Features */}
+      {/* Team Answers Modal */}
       {showTeamAnswersModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalContainer}>
@@ -1430,7 +1370,7 @@ function CollaborationStudent() {
                   </div>
                   
                   <div style={styles.collaborationSummary}>
-                    <FiLightbulb size={18} color="#f59e0b" />
+                    <FiSun size={18} color="#f59e0b" />
                     <p>💡 Team Collaboration Tip: Discuss your answers and learn from each other's approaches!</p>
                   </div>
                 </>
@@ -1449,7 +1389,7 @@ function CollaborationStudent() {
         </div>
       )}
 
-      {/* Collaboration Hub Modal - Brainstorming & Discussion */}
+      {/* Collaboration Hub Modal */}
       {showCollaborationHub && (
         <div style={styles.modalOverlay}>
           <div style={styles.collaborationModalContainer}>
@@ -1481,14 +1421,13 @@ function CollaborationStudent() {
                   loadBrainstormIdeas();
                 }}
               >
-                <FiLightbulb size={16} />
+                <FiSun size={16} />
                 Brainstorming
               </button>
             </div>
             
             <div style={styles.modalBody}>
               {!showBrainstorming ? (
-                // Team Discussion Section
                 <div style={styles.discussionSection}>
                   <div style={styles.discussionMessages}>
                     {teamDiscussion.length === 0 ? (
@@ -1522,7 +1461,7 @@ function CollaborationStudent() {
                       style={styles.messageInput}
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
-                      placeholder="Type your message here... Discuss the question with your team!"
+                      placeholder="Type your message here..."
                       rows={2}
                       onKeyPress={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -1542,10 +1481,9 @@ function CollaborationStudent() {
                   </div>
                 </div>
               ) : (
-                // Brainstorming Section
                 <div style={styles.brainstormSection}>
                   <div style={styles.brainstormHeader}>
-                    <FiLightbulb size={20} color="#f59e0b" />
+                    <FiSun size={20} color="#f59e0b" />
                     <h3 style={styles.brainstormHeaderTitle}>Brainstorm Ideas</h3>
                     <p style={styles.brainstormHeaderText}>Share your ideas and vote on the best solutions!</p>
                   </div>
@@ -1563,7 +1501,7 @@ function CollaborationStudent() {
                       onClick={addBrainstormIdea}
                       disabled={submittingIdea || !newIdea.trim()}
                     >
-                      <FiLightbulb size={16} />
+                      <FiSun size={16} />
                       Add Idea
                     </button>
                   </div>
@@ -1571,7 +1509,7 @@ function CollaborationStudent() {
                   <div style={styles.ideasList}>
                     {brainstormIdeas.length === 0 ? (
                       <div style={styles.emptyIdeas}>
-                        <FiLightbulb size={48} color="#cbd5e1" />
+                        <FiSun size={48} color="#cbd5e1" />
                         <p>No ideas yet. Be the first to share!</p>
                       </div>
                     ) : (
@@ -2455,11 +2393,6 @@ const styles = {
     fontSize: '13px',
     color: '#4338ca',
   },
-  refreshContainer: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    marginBottom: '20px',
-  },
   refreshButton: {
     display: 'flex',
     alignItems: 'center',
@@ -2585,7 +2518,6 @@ const styles = {
     gap: '12px',
     justifyContent: 'center',
   },
-  // Collaboration Tabs
   collaborationTabs: {
     display: 'flex',
     borderBottom: '1px solid #e2e8f0',
@@ -2622,7 +2554,6 @@ const styles = {
     borderBottom: '2px solid #8b5cf6',
     transition: 'all 0.2s ease',
   },
-  // Discussion Section
   discussionSection: {
     display: 'flex',
     flexDirection: 'column',
@@ -2720,7 +2651,6 @@ const styles = {
     gap: '8px',
     transition: 'all 0.2s ease',
   },
-  // Brainstorming Section
   brainstormSection: {
     display: 'flex',
     flexDirection: 'column',
@@ -2853,12 +2783,6 @@ styleSheetGlobal.textContent = `
     }
   }
   
-  @media (max-width: 640px) {
-    .refresh-button-text {
-      display: none;
-    }
-  }
-  
   button, .dropdownButton, .submitButton, .readyButton, .dismissResultButton, .retryButton, .cancelReadyButton, .refreshButton, .modalCloseButton, .closeModalButton, .collaborationHubButton, .sendMessageButton, .addIdeaButton, .voteButton {
     transition: all 0.2s ease;
   }
@@ -2878,181 +2802,31 @@ styleSheetGlobal.textContent = `
     background: #dc2626;
   }
   
-  button:active, .dropdownButton:active, .submitButton:active, .readyButton:active, .cancelReadyButton:active, .refreshButton:active, .voteButton:active {
-    transform: translateY(0);
-  }
-  
   @media (max-width: 768px) {
-    .memberCardModern {
+    .memberCardModern, .awardCard, .ideaCard, .discussionMessage {
       flex-direction: column;
       text-align: center;
-    }
-    
-    .memberInfoModern {
-      text-align: center;
-    }
-    
-    .memberNameModern {
-      justify-content: center;
-    }
-    
-    .memberRoleModern {
-      justify-content: center;
-    }
-    
-    .memberPointsModern {
-      justify-content: center;
-    }
-    
-    .roleCardModern {
-      text-align: center;
-      justify-content: center;
-    }
-    
-    .roleInfoModern {
-      text-align: center;
-    }
-    
-    .teamBadgeContent {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .teamBadgeText {
-      text-align: center;
-    }
-    
-    .pointsCard {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .pointsCardLeft {
-      justify-content: center;
-    }
-    
-    .pointsCardRight {
-      justify-content: center;
-    }
-    
-    .errorCardSmall {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .dismissButton {
-      margin-left: 0;
-    }
-    
-    .header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .headerRight {
-      width: 100%;
-    }
-    
-    .classSelectorWrapper {
-      width: 100%;
-    }
-    
-    .waitingContent {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .waitingIconSection {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .cancelReadyButton {
-      width: 100%;
-      justify-content: center;
-    }
-    
-    .awardCard {
-      flex-direction: column;
-      text-align: center;
-    }
-    
-    .awardRank {
-      flex-direction: row;
-      gap: 8px;
-    }
-    
-    .awardDetails {
-      text-align: center;
-    }
-    
-    .awardRole {
-      justify-content: center;
-    }
-    
-    .awardPoints {
-      justify-content: center;
-    }
-    
-    .refreshContainer {
-      justify-content: center;
-    }
-    
-    .submittedSuccessCard {
-      margin-top: 20px;
     }
     
     .collaborationBadge {
       display: none;
     }
     
-    .discussionMessage {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .messageAvatar {
-      width: 28px;
-      height: 28px;
-      font-size: 12px;
-    }
-    
-    .ideaCard {
-      flex-direction: column;
-    }
-    
     .ideaVotes {
       flex-direction: row;
-      justify-content: flex-start;
+      justify-content: center;
       gap: 8px;
+    }
+    
+    .messageInputArea {
+      flex-direction: column;
     }
   }
   
   @media (max-width: 480px) {
-    .dropdownItem {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    
-    .studentCount {
-      margin-left: 26px;
-    }
-    
     .modalContainer, .collaborationModalContainer {
       margin: 16px;
       border-radius: 20px;
-    }
-    
-    .modalHeader {
-      padding: 16px;
-    }
-    
-    .modalBody {
-      padding: 16px;
-    }
-    
-    .modalFooter {
-      padding: 12px 16px;
     }
     
     .collaborationTabs {
@@ -3062,10 +2836,6 @@ styleSheetGlobal.textContent = `
     .tab, .activeTab {
       padding: 10px 12px;
       font-size: 12px;
-    }
-    
-    .messageInputArea {
-      flex-direction: column;
     }
   }
 `;
