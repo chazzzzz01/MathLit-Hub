@@ -22,163 +22,19 @@ const BattleArena = ({
     { name: "Equation Lord", health: 400, maxHealth: 400, attack: 50, defense: 25, difficulty: "Boss", points: 800, color: "#d32f2f" }
   ];
 
-  // ✅ FIXED: Proper equation solver
-  const solveEquation = (equation) => {
-    try {
-      equation = equation.replace(/\s/g, '');
-      const sides = equation.split('=');
-      if (sides.length !== 2) return null;
-      
-      let left = sides[0];
-      let right = sides[1];
-      
-      while (left.includes('(') || right.includes('(')) {
-        const expandParentheses = (expr) => {
-          const match = expr.match(/(\d*)\(([^)]+)\)/);
-          if (match) {
-            const multiplier = match[1] === '' ? 1 : parseInt(match[1]);
-            const inner = match[2];
-            const terms = inner.split(/([+-])/);
-            let expanded = '';
-            let currentSign = '+';
-            
-            for (let i = 0; i < terms.length; i++) {
-              const term = terms[i];
-              if (term === '+' || term === '-') {
-                currentSign = term;
-              } else if (term.trim()) {
-                const multiplied = multiplier * parseInt(term) || term;
-                expanded += `${currentSign}${multiplied}`;
-              }
-            }
-            return expr.replace(match[0], expanded.replace(/^\+/, ''));
-          }
-          return expr;
-        };
-        
-        left = expandParentheses(left);
-        right = expandParentheses(right);
-      }
-      
-      let leftCoeff = 0;
-      let rightConst = 0;
-      
-      const leftTerms = left.split(/([+-])/);
-      let currentSign = '+';
-      for (let i = 0; i < leftTerms.length; i++) {
-        const term = leftTerms[i];
-        if (term === '+' || term === '-') {
-          currentSign = term;
-        } else if (term && term !== '') {
-          const sign = currentSign === '+' ? 1 : -1;
-          if (term.includes('x')) {
-            const coeff = term === 'x' ? 1 : parseInt(term.replace('x', '')) || 1;
-            leftCoeff += sign * coeff;
-          } else {
-            rightConst -= sign * parseInt(term);
-          }
-        }
-      }
-      
-      const rightTerms = right.split(/([+-])/);
-      currentSign = '+';
-      for (let i = 0; i < rightTerms.length; i++) {
-        const term = rightTerms[i];
-        if (term === '+' || term === '-') {
-          currentSign = term;
-        } else if (term && term !== '') {
-          const sign = currentSign === '+' ? 1 : -1;
-          if (term.includes('x')) {
-            const coeff = term === 'x' ? 1 : parseInt(term.replace('x', '')) || 1;
-            leftCoeff -= sign * coeff;
-          } else {
-            rightConst += sign * parseInt(term);
-          }
-        }
-      }
-      
-      if (leftCoeff === 0) return null;
-      const answer = rightConst / leftCoeff;
-      return Math.round(answer * 10) / 10;
-      
-    } catch (error) {
-      console.error('Error solving equation:', error);
-      return null;
-    }
-  };
-  
-  // ✅ FIXED: Reliable equation generator
-  const generateEquation = (difficulty) => {
-    const generateBasic = () => {
-      const a = Math.floor(Math.random() * 5) + 2;
-      const b = Math.floor(Math.random() * 20) + 1;
-      const c = a * Math.floor(Math.random() * 10) + b + Math.floor(Math.random() * 10);
-      return `${a}x + ${b} = ${c}`;
-    };
-    
-    const generateIntermediate = () => {
-      const a = Math.floor(Math.random() * 5) + 2;
-      const b = Math.floor(Math.random() * 15) + 5;
-      const c = Math.floor(Math.random() * 40) + 20;
-      return `${a}x + ${b} = ${c}`;
-    };
-    
-    const generateAdvanced = () => {
-      const a = Math.floor(Math.random() * 5) + 2;
-      const b = Math.floor(Math.random() * 10) + 3;
-      const c = Math.floor(Math.random() * 4) + 2;
-      const d = Math.floor(Math.random() * 20) + 10;
-      return `${a}x + ${b} = ${c}x + ${d}`;
-    };
-    
-    const generateExpert = () => {
-      const a = Math.floor(Math.random() * 10) + 5;
-      const b = Math.floor(Math.random() * 5) + 2;
-      const c = Math.floor(Math.random() * 50) + 30;
-      return `${a}(x + ${b}) = ${c}`;
-    };
-    
-    const generateBoss = () => {
-      const a = Math.floor(Math.random() * 15) + 8;
-      const b = Math.floor(Math.random() * 25) + 10;
-      const c = Math.floor(Math.random() * 10) + 5;
-      const d = Math.floor(Math.random() * 40) + 20;
-      return `${a}x + ${b} = ${c}x + ${d}`;
-    };
-    
-    let equation;
-    switch(difficulty) {
-      case 'Basic':
-        equation = generateBasic();
-        break;
-      case 'Intermediate':
-        equation = generateIntermediate();
-        break;
-      case 'Advanced':
-        equation = generateAdvanced();
-        break;
-      case 'Expert':
-        equation = generateExpert();
-        break;
-      case 'Boss':
-        equation = generateBoss();
-        break;
-      default:
-        equation = generateBasic();
-    }
-    
-    const answer = solveEquation(equation);
-    
-    if (answer === null || isNaN(answer)) {
-      const x = Math.floor(Math.random() * 20) + 1;
-      const a = Math.floor(Math.random() * 5) + 2;
-      const b = Math.floor(Math.random() * 20) + 1;
-      equation = `${a}x + ${b} = ${a * x + b}`;
-      return { equation, answer: x };
-    }
-    
-    return { equation, answer };
-  };
+  // 10 Math Concept Questions (replaces equation-solving)
+  const conceptQuestions = [
+    { question: "Why does slope formula compare 'change in y' over 'change in x'?", options: ["To confuse students", "To measure rate of change", "To find intercept", "To avoid graphing"], correct: 1, explanation: "Slope measures rate of change: how y changes per unit of x." },
+    { question: "A salary increases steadily every year. What does this imply?", options: ["Nonlinear graph", "Linear graph", "Circular graph", "No graph"], correct: 1, explanation: "Steady increase means constant rate of change → linear graph." },
+    { question: "Two workers earn money at the same rate but start with different savings. What will their graphs look like?", options: ["Intersecting", "Parallel", "Same line", "Perpendicular"], correct: 1, explanation: "Same rate = same slope, different savings = different y-intercepts → parallel lines." },
+    { question: "Which situation represents y = 4x − 8?", options: ["Starts at −8, increases by 4", "Starts at 8, decreases by 4", "Starts at 4, increases by 8", "Starts at 0, increases by 4"], correct: 0, explanation: "y = mx + b: m=4 (increase by 4), b=-8 (starts at -8)." },
+    { question: "Why is it important to interpret equations in real life?", options: ["To memorize formulas", "To connect math to real situations", "To avoid solving", "To make equations longer"], correct: 1, explanation: "Interpreting equations helps apply math to practical scenarios." },
+    { question: "Which describes x/5 + y/10 = 1?", options: ["Intercepts at (5,0) and (0,10)", "Slope 5", "No intercept", "Vertical line"], correct: 0, explanation: "Set y=0 → x/5=1 → x=5. Set x=0 → y/10=1 → y=10." },
+    { question: "What does the x-intercept represent in real life?", options: ["Starting value", "When output becomes zero", "Rate of change", "Maximum slope"], correct: 1, explanation: "x-intercept is where y=0, often the 'break-even' or 'zero' point." },
+    { question: "Why is graphing useful?", options: ["It replaces equations", "It visualizes relationships", "It removes variables", "It simplifies nothing"], correct: 1, explanation: "Graphs make relationships visible and easier to understand." },
+    { question: "Which real-life situation could produce a negative slope?", options: ["Saving money", "Spending money over time", "Growing plants", "Increasing population"], correct: 1, explanation: "Spending money decreases your balance over time → negative slope." },
+    { question: "A student says: 'All linear equations are useful in real life.' Which best justifies this?", options: ["They are easy", "They model constant change", "They use x and y", "They are straight"], correct: 1, explanation: "Linear equations model many real-life situations involving constant rates." }
+  ];
 
   // Game state
   const [currentEnemyIndex, setCurrentEnemyIndex] = useState(() => {
@@ -209,15 +65,6 @@ const BattleArena = ({
     return challengeScore || 0;
   });
   
-  const [currentEquation, setCurrentEquation] = useState(() => {
-    if (savedGameState && savedGameState.currentEquation) {
-      return savedGameState.currentEquation;
-    }
-    const enemy = enemies[currentEnemyIndex];
-    const { equation, answer } = generateEquation(enemy.difficulty);
-    return { equation, answer, userAnswer: '' };
-  });
-  
   const [feedback, setFeedback] = useState(() => {
     if (savedGameState && savedGameState.feedback) {
       return savedGameState.feedback;
@@ -244,31 +91,48 @@ const BattleArena = ({
     return { heal: 2, doubleDamage: 1, shield: 1 };
   });
 
+  // Quiz state
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(() => {
+    if (savedGameState && savedGameState.currentQuestionIndex !== undefined) {
+      return savedGameState.currentQuestionIndex;
+    }
+    return 0;
+  });
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [waitingForNext, setWaitingForNext] = useState(false);
+
   const currentEnemy = enemies[currentEnemyIndex];
   const isBoss = currentEnemy.difficulty === 'Boss';
   const isLastEnemy = currentEnemyIndex === enemies.length - 1;
+  const currentQuestion = conceptQuestions[currentQuestionIndex];
 
   // Save game state
   useEffect(() => {
-    if (onGameStateUpdate && gameActive && !showCongratulations) {
+    if (onGameStateUpdate && gameActive && !showCongratulations && !quizCompleted) {
       onGameStateUpdate({
         currentEnemyIndex,
         enemyHealth,
         playerHealth,
         challengeScore: score,
-        currentEquation,
         feedback,
         gameActive,
         powerUps,
         attacksCount,
         correctAnswers,
         wrongAnswers,
-        defenseMode
+        defenseMode,
+        currentQuestionIndex,
+        selectedOption,
+        showExplanation,
+        quizCompleted,
+        waitingForNext
       });
     }
-  }, [currentEnemyIndex, enemyHealth, playerHealth, score, currentEquation, feedback, gameActive, powerUps, attacksCount, correctAnswers, wrongAnswers, defenseMode, onGameStateUpdate]);
+  }, [currentEnemyIndex, enemyHealth, playerHealth, score, feedback, gameActive, powerUps, attacksCount, correctAnswers, wrongAnswers, defenseMode, onGameStateUpdate, currentQuestionIndex, selectedOption, showExplanation, quizCompleted, waitingForNext]);
 
-  // ✅ Send real-time score updates to parent
+  // Send real-time score updates to parent
   useEffect(() => {
     if (window.parent !== window) {
       const scoreUpdate = {
@@ -290,7 +154,7 @@ const BattleArena = ({
     }
   }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers, wrongAnswers]);
 
-  // ✅ Handle messages from parent
+  // Handle messages from parent
   useEffect(() => {
     const handleMessage = (event) => {
       console.log('BattleArena received message:', event.data);
@@ -444,117 +308,124 @@ const BattleArena = ({
     }
   };
 
-  // ✅ FIXED: Send XP updates consistently
-  const handleAttack = () => {
-    if (!gameActive) return;
+  // Handle quiz answer - CORRECT = ATTACK, WRONG = ENEMY ATTACKS
+  const handleQuizAnswer = (optionIndex) => {
+    if (selectedOption !== null || waitingForNext) return;
     
-    const userAnswer = parseFloat(currentEquation.userAnswer);
+    setSelectedOption(optionIndex);
+    const isCorrect = optionIndex === currentQuestion.correct;
     
-    if (isNaN(userAnswer)) {
-      setFeedback("⚠️ Please enter a valid answer!");
-      return;
-    }
-    
-    const isCorrect = Math.abs(userAnswer - currentEquation.answer) < 0.01;
-    setAttacksCount(prev => prev + 1);
-    
-    // ✅ SEND XP UPDATE TO PARENT (CORRECT = +10 XP, WRONG = -5 XP)
+    // Send XP update
     if (window.parent !== window) {
       const xpUpdate = {
         type: 'XP_UPDATE',
         gameId: 'battle',
-        xpChange: isCorrect ? 10 : -5,
+        xpChange: isCorrect ? 15 : -5,
         isCorrect: isCorrect,
-        correctAnswer: currentEquation.answer,
-        userAnswer: userAnswer,
-        equation: currentEquation.equation,
+        correctAnswer: currentQuestion.options[currentQuestion.correct],
+        userAnswer: currentQuestion.options[optionIndex],
+        question: currentQuestion.question,
         timestamp: new Date().toISOString()
       };
       window.parent.postMessage(xpUpdate, '*');
-      console.log('Sent XP_UPDATE from Battle Arena:', xpUpdate);
+      console.log('Sent XP_UPDATE from Quiz Attack:', xpUpdate);
     }
     
+    setAttacksCount(prev => prev + 1);
+    
     if (isCorrect) {
+      // CORRECT ANSWER = PLAYER ATTACKS ENEMY
       setCorrectAnswers(prev => prev + 1);
       
-      let damage = currentEnemy.attack;
+      let damage = currentEnemy ? currentEnemy.attack : 25;
       const doubleDamageActive = powerUps.doubleDamage === 0;
       
       if (doubleDamageActive) {
         damage *= 2;
-        setFeedback(`🔥 CRITICAL HIT! ${damage} damage! +10 XP!`);
+        setFeedback(`🔥 CORRECT! CRITICAL HIT! ${damage} damage to ${currentEnemy.name}! +15 XP! ${currentQuestion.explanation}`);
         setPowerUps(prev => ({ ...prev, doubleDamage: 1 }));
       } else {
-        setFeedback(`⚔️ You hit the ${currentEnemy.name} for ${damage} damage! +10 XP!`);
+        setFeedback(`✅ CORRECT! You hit ${currentEnemy.name} for ${damage} damage! +15 XP! ${currentQuestion.explanation}`);
       }
       
       const newEnemyHealth = Math.max(0, enemyHealth - damage);
       setEnemyHealth(newEnemyHealth);
       
-      const pointsEarned = currentEnemy.points * (doubleDamageActive ? 2 : 1);
+      const pointsEarned = (currentEnemy ? currentEnemy.points : 100) * (doubleDamageActive ? 2 : 1);
       const newScore = score + pointsEarned;
       setScore(newScore);
       if (onScore) onScore(newScore);
       
+      // Check if enemy is defeated
       if (newEnemyHealth <= 0) {
-        setFeedback(`🎉 Victory! You defeated the ${currentEnemy.name}! +${pointsEarned} points!`);
+        setFeedback(prev => `${prev}\n\n🎉 Victory! You defeated the ${currentEnemy.name}! +${pointsEarned} points!`);
         
         if (isLastEnemy) {
           setGameActive(false);
           setShowCongratulations(true);
-          
           const finalScore = newScore;
           saveProgressToLocalStorage(true, finalScore);
           sendResultToParent(true, finalScore);
-          
           if (onComplete) onComplete(true);
           if (clearSavedState) clearSavedState();
         } else {
+          setWaitingForNext(true);
           setTimeout(() => {
             const nextIndex = currentEnemyIndex + 1;
             setCurrentEnemyIndex(nextIndex);
             setEnemyHealth(enemies[nextIndex].health);
-            
-            const { equation, answer } = generateEquation(enemies[nextIndex].difficulty);
-            setCurrentEquation({ equation, answer, userAnswer: '' });
+            // Reset question index for new enemy (or continue? Let's continue from where we left off)
+            // Move to next question
+            if (currentQuestionIndex + 1 < conceptQuestions.length) {
+              setCurrentQuestionIndex(prev => prev + 1);
+            }
+            setSelectedOption(null);
+            setShowExplanation(false);
             setFeedback(`New enemy appears: ${enemies[nextIndex].name}!`);
-          }, 1500);
+            setWaitingForNext(false);
+          }, 2000);
+          return;
         }
-      } else {
-        setTimeout(() => {
-          let enemyDamage = Math.max(5, currentEnemy.attack - currentEnemy.defense);
-          
-          if (defenseMode) {
-            enemyDamage = Math.floor(enemyDamage / 2);
-            setFeedback(`🛡️ Shield reduced damage to ${enemyDamage}!`);
-            setDefenseMode(false);
-          }
-          
-          const newPlayerHealth = Math.max(0, playerHealth - enemyDamage);
-          setPlayerHealth(newPlayerHealth);
-          
-          setFeedback(prev => prev + `\n💔 ${currentEnemy.name} counter-attacks for ${enemyDamage} damage!`);
-          
-          if (newPlayerHealth <= 0) {
-            setGameActive(false);
-            setFeedback("💀 Game Over! You have been defeated!");
-            saveProgressToLocalStorage(false, score);
-            sendResultToParent(false, score);
-            if (onComplete) onComplete(false);
-          }
-        }, 500);
-        
-        const { equation, answer } = generateEquation(currentEnemy.difficulty);
-        setCurrentEquation({ equation, answer, userAnswer: '' });
       }
-    } else {
-      setWrongAnswers(prev => prev + 1);
-      setFeedback(`❌ Incorrect! The correct answer was ${currentEquation.answer}. -5 XP! The enemy counter-attacks!`);
       
-      let enemyDamage = Math.max(8, currentEnemy.attack);
+      // Move to next question after correct answer (if enemy not defeated)
+      setWaitingForNext(true);
+      setTimeout(() => {
+        if (currentQuestionIndex + 1 < conceptQuestions.length) {
+          setCurrentQuestionIndex(prev => prev + 1);
+          setSelectedOption(null);
+          setShowExplanation(false);
+          setWaitingForNext(false);
+          setFeedback("");
+        } else {
+          // All questions answered but enemies remain? Loop or complete?
+          // For now, show completion
+          setQuizCompleted(true);
+          const bonusPoints = 500;
+          const finalScore = score + pointsEarned + bonusPoints;
+          setScore(finalScore);
+          if (onScore) onScore(finalScore);
+          setFeedback(`🎉 Quiz Complete! You've mastered the concepts! +${bonusPoints} bonus points!`);
+          setGameActive(false);
+          setShowCongratulations(true);
+          saveProgressToLocalStorage(true, finalScore);
+          sendResultToParent(true, finalScore);
+          if (onComplete) onComplete(true);
+          if (clearSavedState) clearSavedState();
+        }
+      }, 2500);
+      
+    } else {
+      // WRONG ANSWER = ENEMY ATTACKS PLAYER
+      setWrongAnswers(prev => prev + 1);
+      
+      let enemyDamage = currentEnemy ? Math.max(8, currentEnemy.attack) : 20;
       if (defenseMode) {
         enemyDamage = Math.floor(enemyDamage / 2);
+        setFeedback(`❌ INCORRECT! ${currentEnemy ? currentEnemy.name : "Enemy"} counter-attacks for ${enemyDamage} damage (reduced by shield)! -5 XP!`);
         setDefenseMode(false);
+      } else {
+        setFeedback(`❌ INCORRECT! The correct answer was: ${currentQuestion.options[currentQuestion.correct]}. -5 XP! ${currentEnemy ? currentEnemy.name : "Enemy"} deals ${enemyDamage} damage! ${currentQuestion.explanation}`);
       }
       
       const newPlayerHealth = Math.max(0, playerHealth - enemyDamage);
@@ -566,14 +437,31 @@ const BattleArena = ({
         saveProgressToLocalStorage(false, score);
         sendResultToParent(false, score);
         if (onComplete) onComplete(false);
+        return;
       }
       
-      setCurrentEquation(prev => ({ ...prev, userAnswer: '' }));
+      // Move to next question after wrong answer
+      setWaitingForNext(true);
+      setTimeout(() => {
+        if (currentQuestionIndex + 1 < conceptQuestions.length) {
+          setCurrentQuestionIndex(prev => prev + 1);
+          setSelectedOption(null);
+          setShowExplanation(false);
+          setWaitingForNext(false);
+          setFeedback("");
+        } else {
+          // All questions answered but game still active? Loop the questions?
+          // Reset question index to 0 to continue fighting
+          setCurrentQuestionIndex(0);
+          setSelectedOption(null);
+          setShowExplanation(false);
+          setWaitingForNext(false);
+          setFeedback("📚 New set of questions! Keep fighting!");
+        }
+      }, 2500);
     }
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') handleAttack();
+    
+    setShowExplanation(true);
   };
 
   const getHealthBarColor = (health, maxHealth) => {
@@ -584,21 +472,25 @@ const BattleArena = ({
   };
 
   if (showCongratulations) {
-    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
-    const bonusCompletionXP = 100; // Bonus for completing all enemies
+    const xpEarned = (correctAnswers * 15) - (wrongAnswers * 5);
+    const bonusCompletionXP = quizCompleted ? 150 : 100;
     const totalXP = xpEarned + bonusCompletionXP;
     
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
           <div style={styles.trophyIcon}>🏆</div>
-          <h2 style={styles.completionTitle}>Victory!</h2>
-          <p style={styles.completionText}>You have conquered all enemies in the Math Battle Arena!</p>
+          <h2 style={styles.completionTitle}>{quizCompleted ? "Quiz Master!" : "Victory!"}</h2>
+          <p style={styles.completionText}>
+            {quizCompleted 
+              ? "You have mastered all math concepts! Outstanding!" 
+              : "You have conquered all enemies in the Math Battle Arena!"}
+          </p>
           <div style={styles.finalScore}>
             <div>Final Score: {score}</div>
-            <div>Enemies Defeated: {enemies.length}/{enemies.length}</div>
+            <div>{quizCompleted ? "Questions Answered: " : "Enemies Defeated: "}{quizCompleted ? conceptQuestions.length : enemies.length}/{quizCompleted ? conceptQuestions.length : enemies.length}</div>
             <div>Attacks Made: {attacksCount}</div>
-            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 15} XP)</div>
             <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
             <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
             <div>⭐ XP Earned: {xpEarned}</div>
@@ -615,8 +507,8 @@ const BattleArena = ({
     );
   }
 
-  if (!gameActive) {
-    const xpEarned = (correctAnswers * 10) - (wrongAnswers * 5);
+  if (!gameActive && !showCongratulations) {
+    const xpEarned = (correctAnswers * 15) - (wrongAnswers * 5);
     return (
       <div style={styles.completionContainer}>
         <div style={styles.completionCard}>
@@ -626,7 +518,7 @@ const BattleArena = ({
           <div style={styles.finalScore}>
             <div>Final Score: {score}</div>
             <div>Enemies Defeated: {currentEnemyIndex}/{enemies.length}</div>
-            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 15} XP)</div>
             <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
             <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
             <div>⭐ XP Earned: {xpEarned}</div>
@@ -645,6 +537,7 @@ const BattleArena = ({
   const playerHealthPercent = (playerHealth / 200) * 100;
   const enemyHealthPercent = (enemyHealth / currentEnemy.maxHealth) * 100;
 
+  // Main Game UI (Quiz Attack Mode - replacing equation solver)
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -673,7 +566,7 @@ const BattleArena = ({
           </div>
         </div>
 
-        <div style={styles.vsDivider}>⚔️ VS ⚔️</div>
+        <div style={styles.vsDivider}>❓ QUIZ ❓</div>
 
         <div style={styles.playerSection}>
           <div style={styles.playerCard}>
@@ -694,22 +587,32 @@ const BattleArena = ({
 
       <div style={styles.mathChallenge}>
         <div style={styles.equationBox}>
-          <div style={styles.equationText}>{currentEquation.equation}</div>
-          <div style={styles.inputArea}>
-            <input
-              type="number"
-              step="0.1"
-              value={currentEquation.userAnswer}
-              onChange={(e) => setCurrentEquation(prev => ({ ...prev, userAnswer: e.target.value }))}
-              onKeyPress={handleKeyPress}
-              placeholder="Enter your answer... (+10 XP if correct, -5 XP if wrong)"
-              style={styles.answerInput}
-              autoFocus
-            />
-            <button onClick={handleAttack} style={styles.attackButton}>
-              ⚔️ ATTACK!
-            </button>
+          <div style={styles.equationText}>{currentQuestion.question}</div>
+          <div style={styles.optionsGrid}>
+            {currentQuestion.options.map((option, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleQuizAnswer(idx)}
+                disabled={selectedOption !== null || waitingForNext}
+                style={{
+                  ...styles.optionButton,
+                  backgroundColor: selectedOption === idx 
+                    ? (idx === currentQuestion.correct ? '#4caf50' : '#f44336')
+                    : (selectedOption !== null && idx === currentQuestion.correct ? '#4caf50' : 'rgba(255,255,255,0.15)'),
+                  cursor: (selectedOption !== null || waitingForNext) ? 'default' : 'pointer',
+                  opacity: (selectedOption !== null || waitingForNext) && idx !== currentQuestion.correct && idx !== selectedOption ? 0.6 : 1
+                }}
+              >
+                {String.fromCharCode(65 + idx)}. {option}
+                {selectedOption === idx && (idx === currentQuestion.correct ? " ✓" : " ✗")}
+              </button>
+            ))}
           </div>
+          {waitingForNext && (
+            <div style={styles.waitingMessage}>
+              ⏳ Moving to next...
+            </div>
+          )}
           {feedback && <div style={styles.feedback}>{feedback}</div>}
         </div>
       </div>
@@ -720,21 +623,21 @@ const BattleArena = ({
           <button 
             onClick={() => usePowerUp('heal')} 
             style={{...styles.powerUpButton, backgroundColor: '#4caf50'}}
-            disabled={powerUps.heal === 0}
+            disabled={powerUps.heal === 0 || waitingForNext}
           >
             💚 Heal (+50 HP) {powerUps.heal > 0 ? `(${powerUps.heal})` : '(Used)'}
           </button>
           <button 
             onClick={() => usePowerUp('doubleDamage')} 
             style={{...styles.powerUpButton, backgroundColor: '#ff9800'}}
-            disabled={powerUps.doubleDamage === 0}
+            disabled={powerUps.doubleDamage === 0 || waitingForNext}
           >
             ⚡ Double Damage {powerUps.doubleDamage > 0 ? `(${powerUps.doubleDamage})` : '(Used)'}
           </button>
           <button 
             onClick={() => usePowerUp('shield')} 
             style={{...styles.powerUpButton, backgroundColor: '#2196f3'}}
-            disabled={powerUps.shield === 0}
+            disabled={powerUps.shield === 0 || waitingForNext}
           >
             🛡️ Shield (50% reduction) {powerUps.shield > 0 ? `(${powerUps.shield})` : '(Used)'}
           </button>
@@ -742,11 +645,12 @@ const BattleArena = ({
       </div>
       
       <div style={styles.statsDisplay}>
-        <div>⚔️ Attacks: {attacksCount}</div>
-        <div>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</div>
+        <div>❓ Questions: {currentQuestionIndex + 1}/{conceptQuestions.length}</div>
+        <div>✅ Correct: {correctAnswers} (+{correctAnswers * 15} XP)</div>
         <div>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
         <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
-        <div>⭐ Total XP: {(correctAnswers * 10) - (wrongAnswers * 5)}</div>
+        <div>⭐ Total XP: {(correctAnswers * 15) - (wrongAnswers * 5)}</div>
+        <div>⚔️ Attacks: {attacksCount}</div>
       </div>
     </div>
   );
@@ -893,52 +797,43 @@ const styles = {
     border: '1px solid rgba(255,255,255,0.2)',
   },
   equationText: {
-    fontSize: 'clamp(24px, 8vw, 48px)',
+    fontSize: 'clamp(20px, 5vw, 28px)',
     fontWeight: 'bold',
     marginBottom: 'clamp(15px, 4vw, 25px)',
-    fontFamily: 'monospace',
     textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-    letterSpacing: '2px',
     wordBreak: 'break-word',
+    lineHeight: 1.4,
   },
-  inputArea: {
+  optionsGrid: {
     display: 'flex',
-    gap: 'clamp(10px, 3vw, 15px)',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '10px',
   },
-  answerInput: {
-    flex: 2,
-    minWidth: 'clamp(180px, 40vw, 300px)',
-    padding: 'clamp(10px, 2.5vw, 15px) clamp(12px, 3vw, 20px)',
-    fontSize: 'clamp(14px, 4vw, 18px)',
-    border: '2px solid #ffd700',
-    borderRadius: '12px',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    color: '#333',
-    outline: 'none',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    transition: 'all 0.3s',
-    boxSizing: 'border-box',
-  },
-  attackButton: {
-    padding: 'clamp(10px, 2.5vw, 15px) clamp(20px, 5vw, 40px)',
-    fontSize: 'clamp(14px, 4vw, 18px)',
-    backgroundColor: '#ff4757',
+  optionButton: {
+    padding: 'clamp(10px, 2.5vw, 14px) clamp(15px, 4vw, 20px)',
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
     color: 'white',
-    border: 'none',
+    border: '1px solid rgba(255,255,255,0.3)',
     borderRadius: '12px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    transition: 'all 0.3s',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.2)',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    whiteSpace: 'nowrap',
-    '@media (max-width: 480px)': {
-      whiteSpace: 'normal',
+    transition: 'all 0.2s',
+    textAlign: 'left',
+    '&:hover': {
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      transform: 'scale(1.01)',
     },
+  },
+  waitingMessage: {
+    marginTop: 'clamp(15px, 3vw, 20px)',
+    padding: 'clamp(8px, 2vw, 12px)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: '8px',
+    fontSize: 'clamp(12px, 3vw, 14px)',
+    color: '#ffd700',
+    textAlign: 'center',
   },
   feedback: {
     marginTop: 'clamp(15px, 3vw, 20px)',
@@ -1085,20 +980,6 @@ styleSheet.textContent = `
     }
   }
   
-  .attack-button:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
-  }
-  
-  .attack-button:active {
-    transform: scale(0.95);
-  }
-  
-  .answer-input:focus {
-    border-color: #ff4757;
-    box-shadow: 0 0 10px rgba(255,71,87,0.5);
-  }
-  
   button {
     transition: all 0.2s ease;
   }
@@ -1141,10 +1022,6 @@ styleSheet.textContent = `
     button {
       min-height: 44px;
       min-width: 44px;
-    }
-    
-    .answer-input {
-      font-size: 16px; /* Prevents zoom on iOS */
     }
   }
 `;

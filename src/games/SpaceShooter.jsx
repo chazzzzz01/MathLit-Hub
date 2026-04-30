@@ -10,7 +10,7 @@ const SpaceShooter = () => {
   const [gameState, setGameState] = useState('menu');
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
-  const [targetEquation, setTargetEquation] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
   const [feedback, setFeedback] = useState({ message: '', type: '' });
   const [showLevelAnnouncement, setShowLevelAnnouncement] = useState(false);
   const [levelAnnouncement, setLevelAnnouncement] = useState('');
@@ -30,7 +30,7 @@ const SpaceShooter = () => {
   const [totalShots, setTotalShots] = useState(0);
   const [timeSpent, setTimeSpent] = useState(0);
   
-  // ✅ XP tracking (matches other games)
+  // XP tracking (matches other games)
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [wrongAnswers, setWrongAnswers] = useState(0);
 
@@ -47,13 +47,14 @@ const SpaceShooter = () => {
     spawnTimer: 0,
     baseEnemySpeed: 0.8,
     currentSpeedMultiplier: 1.0,
+    spawnDelay: 120,
   });
 
-  // ✅ Calculate XP earned so far
-  const xpSoFar = (correctAnswers * 10) - (wrongAnswers * 5);
+  // Calculate XP earned so far
+  const xpSoFar = React.useMemo(() => (correctAnswers * 10) - (wrongAnswers * 5), [correctAnswers, wrongAnswers]);
 
-  // ✅ Send XP_UPDATE to parent (consistent with other games)
-  const sendXPUpdate = useCallback((isCorrect, userAnswer, correctAnswer, equation) => {
+  // Send XP_UPDATE to parent
+  const sendXPUpdate = useCallback((isCorrect, userAnswer, correctAnswer, questionText) => {
     if (window.parent !== window) {
       const xpUpdate = {
         type: 'XP_UPDATE',
@@ -62,7 +63,7 @@ const SpaceShooter = () => {
         isCorrect: isCorrect,
         correctAnswer: correctAnswer,
         userAnswer: userAnswer,
-        equation: equation,
+        equation: questionText,
         timestamp: new Date().toISOString()
       };
       window.parent.postMessage(xpUpdate, '*');
@@ -70,7 +71,7 @@ const SpaceShooter = () => {
     }
   }, []);
 
-  // ✅ Send real-time score updates to parent
+  // Send real-time score updates to parent
   const sendScoreUpdate = useCallback((currentScore, currentStats) => {
     if (window.parent !== window) {
       const scoreUpdate = {
@@ -83,7 +84,7 @@ const SpaceShooter = () => {
           totalShots: totalShots,
           accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
           wrongShots: totalWrong,
-          timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0,
+          timeSpent: Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000) || 0,
           xpEarned: xpSoFar,
           correctAnswers: correctAnswers,
           wrongAnswers: wrongAnswers
@@ -94,7 +95,7 @@ const SpaceShooter = () => {
     }
   }, [level, totalCorrect, totalShots, totalWrong, gameStartTime, xpSoFar, correctAnswers, wrongAnswers]);
 
-  // ✅ Send score update whenever score changes
+  // Send score update whenever score changes
   useEffect(() => {
     if (gameState === 'playing' && !showLevelAnnouncement) {
       sendScoreUpdate(score, {
@@ -108,10 +109,9 @@ const SpaceShooter = () => {
   }, [score, gameState, showLevelAnnouncement, level, totalCorrect, totalShots, totalWrong, sendScoreUpdate, xpSoFar]);
 
   // Function to send game result to parent window
-  const sendGameResult = (completed, finalScore, timeSpentSeconds, stats) => {
-    if (gameResultSent) return; // Prevent sending multiple times
+  const sendGameResult = useCallback((completed, finalScore, timeSpentSeconds, stats) => {
+    if (gameResultSent) return;
     
-    // Calculate accuracy
     const accuracy = stats.totalShots > 0 
       ? Math.round((stats.correctShots / stats.totalShots) * 100) 
       : 0;
@@ -145,36 +145,26 @@ const SpaceShooter = () => {
     console.log('Correct Answers:', correctAnswers);
     console.log('Wrong Answers:', wrongAnswers);
     console.log('XP Earned:', xpEarned);
-    console.log('Game Result:', gameResult);
     
-    // Send to parent window (for iframe)
     if (window.parent !== window) {
       window.parent.postMessage(gameResult, '*');
-      console.log('Sent to parent window');
     }
-    
-    // Send to opener (for popup)
     if (window.opener) {
       window.opener.postMessage(gameResult, '*');
-      console.log('Sent to opener');
     }
     
     setGameResultSent(true);
     
-    // Also store in localStorage for backup
     const previousResults = localStorage.getItem('spaceShooterResults');
     const results = previousResults ? JSON.parse(previousResults) : [];
     results.push(gameResult);
     localStorage.setItem('spaceShooterResults', JSON.stringify(results));
-  };
+  }, [gameResultSent, correctAnswers, wrongAnswers, totalShots]);
 
-  // ✅ Handle messages from parent (like score requests)
+  // Handle messages from parent
   useEffect(() => {
     const handleMessage = (event) => {
-      console.log('SpaceShooter received message:', event.data);
-      
       if (event.data && event.data.type === 'REQUEST_SCORE') {
-        // Send current score back to parent
         const scoreUpdate = {
           type: 'SCORE_UPDATE',
           gameId: 'spaceShooter',
@@ -185,7 +175,7 @@ const SpaceShooter = () => {
             totalShots: totalShots,
             accuracy: totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0,
             wrongShots: totalWrong,
-            timeSpent: Math.floor((Date.now() - gameStartTime) / 1000) || 0,
+            timeSpent: Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000) || 0,
             xpEarned: xpSoFar,
             correctAnswers: correctAnswers,
             wrongAnswers: wrongAnswers
@@ -194,7 +184,6 @@ const SpaceShooter = () => {
         if (window.parent !== window) {
           window.parent.postMessage(scoreUpdate, '*');
         }
-        console.log('Sent score response to parent:', score);
       }
     };
     
@@ -203,7 +192,6 @@ const SpaceShooter = () => {
   }, [score, level, totalCorrect, totalShots, totalWrong, gameStartTime, xpSoFar, correctAnswers, wrongAnswers]);
 
   const handleBackToGames = () => {
-    // Send result if game is in progress but not completed
     if (gameState === 'playing' && !gameResultSent && gameStartTime) {
       const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
       sendGameResult(false, score, currentTimeSpent, {
@@ -233,7 +221,6 @@ const SpaceShooter = () => {
       const isMobileDevice = window.innerWidth <= 768;
       setIsMobile(isMobileDevice);
       
-      // Calculate canvas scale based on container width
       const container = document.querySelector('.game-wrapper');
       if (container) {
         const containerWidth = container.clientWidth;
@@ -241,7 +228,6 @@ const SpaceShooter = () => {
         setCanvasScale(Math.min(scale, 1));
       }
       
-      // Set canvas size based on device
       if (isMobileDevice) {
         setCanvasSize({ width: 800, height: 600 });
       } else {
@@ -252,7 +238,6 @@ const SpaceShooter = () => {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     
-    // Add resize observer for canvas container
     const resizeObserver = new ResizeObserver(() => {
       const container = document.querySelector('.game-wrapper');
       if (container) {
@@ -288,35 +273,96 @@ const SpaceShooter = () => {
     };
   }, []);
 
-  // ------------------ LINEAR EQUATIONS ------------------
-  const generateLinearEquation = useCallback(() => {
-    const a = Math.floor(Math.random() * 5) + 2;
-    const b = Math.floor(Math.random() * 10) + 1;
-    const x = Math.floor(Math.random() * 10) + 1;
-    const c = (a * x) + b;
-    
-    return { 
-      equation: `${a}x + ${b} = ${c}`, 
-      answer: x, 
-      type: 'linear' 
-    };
+  // ------------------ NEW MATH QUESTIONS (Linear Equation Concepts) ------------------
+  const questions = [
+    {
+      text: "A linear equation always makes a straight line because:",
+      correctAnswer: "B",
+      options: ["A. Because x is always positive", "B. Because the rate of change is constant", "C. Because the graph curves upward", "D. Because y is always bigger than x"],
+      explanation: "A linear equation has a constant rate of change (slope), which creates a straight line, not curves."
+    },
+    {
+      text: "A tricycle fare increases by ₱5 per kilometer. What does this tell you about the graph?",
+      correctAnswer: "C",
+      options: ["A. It is curved", "B. It is horizontal", "C. It is a straight line rising", "D. It is decreasing"],
+      explanation: "A constant increase means a straight line going upward (positive slope)."
+    },
+    {
+      text: "A water container already has 20 liters before filling starts. What does 20 represent in the equation?",
+      correctAnswer: "B",
+      options: ["A. Rate of filling", "B. Initial amount", "C. Final amount", "D. Time"],
+      explanation: "The y-intercept represents the starting value before change happens."
+    },
+    {
+      text: "A phone load starts at ₱100 and decreases by ₱10 per hour of use. Which equation best represents this?",
+      correctAnswer: "B",
+      options: ["A. y = 10x + 100", "B. y = -10x + 100", "C. y = 100x - 10", "D. y = -10x - 100"],
+      explanation: "Decreasing value → negative slope, starting value = 100."
+    },
+    {
+      text: "In a savings plan, the slope is 50. What does this mean?",
+      correctAnswer: "B",
+      options: ["A. You start with ₱50", "B. You save ₱50 each time period", "C. You lose ₱50", "D. You have ₱50 total"],
+      explanation: "Slope represents how much the value changes per unit."
+    },
+    {
+      text: "Which situation best matches y = 3x + 2?",
+      correctAnswer: "B",
+      options: ["A. Starting at 3, adding 2 each time", "B. Starting at 2, adding 3 each time", "C. Starting at 3, subtracting 2", "D. Starting at 2, subtracting 3"],
+      explanation: "b = 2 (start), m = 3 (increase)."
+    },
+    {
+      text: "Why is a negative slope important in real life?",
+      correctAnswer: "B",
+      options: ["A. It shows no change", "B. It shows decrease over time", "C. It shows doubling", "D. It shows randomness"],
+      explanation: "A negative slope indicates a decreasing relationship between variables."
+    },
+    {
+      text: "Why is intercept form useful in real-life problems?",
+      correctAnswer: "A",
+      options: ["A. It shows exact crossing points on axes", "B. It avoids using slope", "C. It makes equations longer", "D. It removes variables"],
+      explanation: "It directly shows where the graph meets axes—useful in budgeting, limits, etc."
+    },
+    {
+      text: "A budget line crosses (0,500) and (5,0). What does (5,0) mean?",
+      correctAnswer: "B",
+      options: ["A. You have ₱5 left", "B. You can buy 5 items with no money left", "C. You earn ₱5", "D. You spend ₱500"],
+      explanation: "x-intercept = maximum quantity when money is zero."
+    },
+    {
+      text: "If two lines have the same slope but different intercepts, what does this mean in real life?",
+      correctAnswer: "B",
+      options: ["A. Same starting point", "B. Same rate but different starting values", "C. Different rates", "D. Same line"],
+      explanation: "Same slope means same rate of change; different intercepts mean different starting points."
+    }
+  ];
+
+  const getRandomQuestion = useCallback(() => {
+    const randomIndex = Math.floor(Math.random() * questions.length);
+    return { ...questions[randomIndex] };
   }, []);
 
-  const generateWrongAnswers = (correct) => {
-    const arr = [];
-    const range = 3;
-    while (arr.length < 3) {
-      let w = correct + (Math.random() < 0.5 ? -1 : 1) * (Math.floor(Math.random() * range) + 1);
-      if (w > 0 && w !== correct && !arr.includes(w)) arr.push(w);
-    }
-    return arr;
+  const generateWrongAnswersForQuestion = (correctAnswer, options) => {
+    // Return all options except the correct one (shuffled later)
+    return options.filter(opt => !opt.startsWith(correctAnswer));
   };
 
   const createEnemy = useCallback(() => {
-    if (!targetEquation) return null;
+    if (!currentQuestion) return null;
 
-    const wrong = generateWrongAnswers(targetEquation.answer);
+    const allOptions = [...currentQuestion.options];
+    const correctOptionText = allOptions.find(opt => opt.startsWith(currentQuestion.correctAnswer));
+    const wrongOptions = generateWrongAnswersForQuestion(currentQuestion.correctAnswer, allOptions);
+    
+    // 40% chance of being correct, 60% chance of being wrong
     const isCorrect = Math.random() < 0.4;
+    let displayAnswer;
+    
+    if (isCorrect) {
+      displayAnswer = correctOptionText;
+    } else {
+      displayAnswer = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+    }
     
     const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
     const currentSpeed = levelBaseSpeed * gameRef.current.currentSpeedMultiplier;
@@ -330,11 +376,14 @@ const SpaceShooter = () => {
       speed: currentSpeed,
       horizontalSpeed: (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * gameRef.current.currentSpeedMultiplier),
       direction: (Math.random() < 0.5 ? -1 : 1),
-      equation: targetEquation.equation,
-      answer: isCorrect ? targetEquation.answer : wrong[Math.floor(Math.random() * wrong.length)],
-      isCorrect,
+      questionText: currentQuestion.text,
+      displayAnswer: displayAnswer,
+      isCorrect: isCorrect,
+      correctAnswerLetter: currentQuestion.correctAnswer,
+      allOptions: currentQuestion.options,
+      explanation: currentQuestion.explanation,
     };
-  }, [targetEquation, level]);
+  }, [currentQuestion, level]);
 
   const showLevelStart = (levelNum) => {
     setLevelAnnouncement(`LEVEL ${levelNum}`);
@@ -378,8 +427,8 @@ const SpaceShooter = () => {
       gameRef.current.waitingForSpace = true;
       gameRef.current.gameActive = false;
       
-      const eq = generateLinearEquation();
-      setTargetEquation(eq);
+      const newQuestion = getRandomQuestion();
+      setCurrentQuestion(newQuestion);
       
       gameRef.current.enemies = [];
       gameRef.current.bullets = [];
@@ -399,7 +448,7 @@ const SpaceShooter = () => {
     });
     
     setCorrectShots(0);
-  }, [generateLinearEquation, createEnemy]);
+  }, [getRandomQuestion, createEnemy]);
 
   const initLevel = useCallback(() => {
     const game = gameRef.current;
@@ -422,8 +471,8 @@ const SpaceShooter = () => {
     setCorrectAnswers(0);
     setWrongAnswers(0);
 
-    const eq = generateLinearEquation();
-    setTargetEquation(eq);
+    const firstQuestion = getRandomQuestion();
+    setCurrentQuestion(firstQuestion);
 
     for (let i = 0; i < 3; i++) {
       const e = createEnemy();
@@ -434,7 +483,7 @@ const SpaceShooter = () => {
     }
     
     showLevelStart(1);
-  }, [generateLinearEquation, createEnemy]);
+  }, [getRandomQuestion, createEnemy]);
 
   const startGame = () => {
     const game = gameRef.current;
@@ -472,7 +521,7 @@ const SpaceShooter = () => {
     }, 100);
   };
 
-  const shoot = () => {
+  const shoot = useCallback(() => {
     const game = gameRef.current;
     const now = Date.now();
 
@@ -489,14 +538,14 @@ const SpaceShooter = () => {
     });
 
     game.lastShot = now;
-  };
+  }, []);
 
   const increaseSpeed = useCallback(() => {
     const game = gameRef.current;
     game.currentSpeedMultiplier = Math.min(2.5, game.currentSpeedMultiplier + 0.1);
     
+    const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15);
     game.enemies.forEach(enemy => {
-      const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15);
       const newSpeed = levelBaseSpeed * game.currentSpeedMultiplier;
       enemy.speed = newSpeed;
       enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * game.currentSpeedMultiplier);
@@ -545,17 +594,21 @@ const SpaceShooter = () => {
     const game = gameRef.current;
     if (!game.gameActive || game.waitingForSpace) return;
 
+    // Player movement
     if (game.keys['ArrowLeft']) game.player.x -= 5;
     if (game.keys['ArrowRight']) game.player.x += 5;
     game.player.x = Math.max(0, Math.min(760, game.player.x));
 
+    // Shooting
     if (game.keys['Space']) shoot();
 
+    // Update bullets
     game.bullets = game.bullets.filter(b => {
       b.y -= b.speed;
       return b.y > -20;
     });
 
+    // Enemy spawning
     game.spawnTimer++;
     const maxEnemies = Math.min(12, 8 + Math.floor(level / 2));
     const spawnDelay = game.spawnDelay || 120;
@@ -569,14 +622,17 @@ const SpaceShooter = () => {
       }
     }
 
+    // Update enemy positions
     game.enemies.forEach(e => {
       e.x += e.horizontalSpeed * e.direction;
       if (e.x <= 0 || e.x >= 730) e.direction *= -1;
       e.y += e.speed;
     });
 
+    // Remove enemies that are off screen
     game.enemies = game.enemies.filter(e => e.y < 650);
 
+    // Collision detection
     for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
       const b = game.bullets[bi];
 
@@ -589,25 +645,25 @@ const SpaceShooter = () => {
           b.y < e.y + e.height &&
           b.y + b.height > e.y
         ) {
-          const isCorrectHit = e.answer === targetEquation.answer;
+          const isCorrectHit = e.isCorrect;
+          const correctAnswerLetter = e.correctAnswerLetter;
           
-          // ✅ Send XP_UPDATE for consistent tracking
-          sendXPUpdate(isCorrectHit, e.answer, targetEquation.answer, targetEquation.equation);
+          sendXPUpdate(isCorrectHit, e.displayAnswer, correctAnswerLetter, e.questionText);
           
           if (isCorrectHit) {
-            // ✅ Update XP tracking variables
             setCorrectAnswers(prev => prev + 1);
             setScore(s => s + 100);
             setTotalCorrect(prev => prev + 1);
             setCorrectShots(prev => {
               const newCorrectShots = prev + 1;
               setFeedback({ 
-                message: `+100 Correct! x = ${e.answer} | +10 XP! | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x | Level: ${level}`, 
+                message: `+100 Correct! ✓ ${e.displayAnswer} | +10 XP! | Speed: ${(gameRef.current.currentSpeedMultiplier).toFixed(1)}x | Level: ${level}`, 
                 type: 'success' 
               });
               return newCorrectShots;
             });
             
+            // Add explosion particles
             for (let i = 0; i < 20; i++) {
               game.particles.push({
                 x: e.x + e.width/2,
@@ -620,24 +676,37 @@ const SpaceShooter = () => {
             
             increaseSpeed();
             
-            const newEquation = generateLinearEquation();
-            setTargetEquation(newEquation);
+            const newQuestion = getRandomQuestion();
+            setCurrentQuestion(newQuestion);
             
+            // Update existing enemies with new question
             game.enemies.forEach(enemy => {
-              enemy.equation = newEquation.equation;
+              enemy.questionText = newQuestion.text;
+              enemy.allOptions = newQuestion.options;
+              enemy.correctAnswerLetter = newQuestion.correctAnswer;
+              // Randomly reassign if this enemy is correct or wrong
+              const wrongOptions = newQuestion.options.filter(opt => !opt.startsWith(newQuestion.correctAnswer));
+              const isEnemyCorrect = Math.random() < 0.4;
+              if (isEnemyCorrect) {
+                enemy.isCorrect = true;
+                enemy.displayAnswer = newQuestion.options.find(opt => opt.startsWith(newQuestion.correctAnswer));
+              } else {
+                enemy.isCorrect = false;
+                enemy.displayAnswer = wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+              }
             });
           } else {
-            // ✅ Update XP tracking variables
             setWrongAnswers(prev => prev + 1);
             setTotalWrong(prev => prev + 1);
             setWrongShots(prev => {
               const newWrongShots = prev + 1;
               setScore(s => Math.max(0, s - 10));
               setFeedback({ 
-                message: `-10 Wrong! Answer was ${targetEquation.answer} (-5 XP!) (${newWrongShots}/3 mistakes) | Speed reset!`, 
+                message: `-10 Wrong! ❌ ${e.displayAnswer} | Correct: ${e.allOptions.find(opt => opt.startsWith(e.correctAnswerLetter))} (-5 XP!) (${newWrongShots}/3 mistakes) | Speed reset!`, 
                 type: 'error' 
               });
               
+              // Reset speed multiplier on wrong answer
               gameRef.current.currentSpeedMultiplier = 1.0;
               const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
               gameRef.current.spawnDelay = Math.max(60, 120 - (level - 1) * 8);
@@ -648,6 +717,7 @@ const SpaceShooter = () => {
                 enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1));
               });
               
+              // Add particles for wrong answer
               for (let i = 0; i < 15; i++) {
                 game.particles.push({
                   x: e.x + e.width/2,
@@ -658,10 +728,11 @@ const SpaceShooter = () => {
                 });
               }
               
+              // Game over if 3 wrong answers
               if (newWrongShots >= 3) {
                 game.gameActive = false;
                 game.waitingForSpace = false;
-                const finalTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
+                const finalTimeSpent = Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000);
                 sendGameResult(false, score, finalTimeSpent, {
                   correctShots: totalCorrect,
                   totalShots: totalShots,
@@ -683,22 +754,25 @@ const SpaceShooter = () => {
       }
     }
     
+    // Check for level advancement
     const requiredCorrectShots = 5 + Math.floor(level / 2);
     if (correctShots >= requiredCorrectShots && game.gameActive && !game.waitingForSpace) {
       advanceToNextLevel();
     }
     
+    // Update particles
     game.particles = game.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
       p.life--;
       return p.life > 0;
     });
-  }, [targetEquation, generateLinearEquation, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate]);
+  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, shoot, createEnemy]);
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
 
+    // Dynamic background based on level
     const intensity = Math.min(0.5, 0.2 + (level - 1) * 0.05);
     const gradient = ctx.createLinearGradient(0, 0, 0, 600);
     gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`);
@@ -706,12 +780,14 @@ const SpaceShooter = () => {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 800, 600);
     
+    // Stars
     ctx.fillStyle = 'white';
     const starCount = 150 + Math.floor(level * 5);
     for (let i = 0; i < starCount; i++) {
       ctx.fillRect((i * 131) % 800, (i * 253) % 600, 1.5, 1.5);
     }
 
+    // Draw player ship
     ctx.save();
     ctx.shadowBlur = 8;
     ctx.shadowColor = '#00ffff';
@@ -747,6 +823,7 @@ const SpaceShooter = () => {
     
     ctx.restore();
 
+    // Draw bullets
     ctx.fillStyle = '#ffff00';
     ctx.shadowBlur = 5;
     ctx.shadowColor = '#ffff00';
@@ -754,11 +831,13 @@ const SpaceShooter = () => {
       ctx.fillRect(b.x, b.y, b.width, b.height);
     });
 
+    // Draw particles
     game.particles.forEach(p => {
       ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`;
       ctx.fillRect(p.x, p.y, 4, 4);
     });
 
+    // Draw enemies
     game.enemies.forEach(e => {
       ctx.shadowBlur = 5;
       
@@ -771,6 +850,7 @@ const SpaceShooter = () => {
       ctx.fillStyle = gradient;
       ctx.fillRect(e.x, e.y, e.width, e.height);
       
+      // Enemy details
       ctx.fillStyle = '#882222';
       ctx.fillRect(e.x + 10, e.y + 12, e.width - 20, 6);
       ctx.fillRect(e.x + 10, e.y + 30, e.width - 20, 6);
@@ -783,10 +863,16 @@ const SpaceShooter = () => {
       ctx.fillRect(e.x + e.width - 20, e.y + 9, 6, 4);
       
       ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${Math.min(28, Math.max(18, 28 * canvasScale))}px "Courier New", monospace`;
+      ctx.font = `bold ${Math.min(24, Math.max(18, 24 * canvasScale))}px "Courier New", monospace`;
       ctx.shadowBlur = 3;
       ctx.shadowColor = '#000000';
-      ctx.fillText(e.answer, e.x + 27, e.y + 45);
+      
+      // Display the answer choice (e.g., "B. Because the rate of change is constant")
+      let displayText = e.displayAnswer;
+      if (displayText.length > 35) {
+        displayText = displayText.substring(0, 32) + '...';
+      }
+      ctx.fillText(displayText, e.x + 5, e.y + 45);
       
       ctx.strokeStyle = level > 3 ? '#ffaa44' : '#ffffff';
       ctx.lineWidth = 2;
@@ -795,6 +881,7 @@ const SpaceShooter = () => {
 
     ctx.shadowBlur = 0;
 
+    // Show feedback message
     if (feedback.message) {
       ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336';
       ctx.font = `bold ${Math.min(24, Math.max(16, 24 * canvasScale))}px Arial`;
@@ -807,6 +894,7 @@ const SpaceShooter = () => {
       }, 1500);
     }
 
+    // Level announcement overlay
     if (showLevelAnnouncement) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
       ctx.fillRect(0, 0, 800, 600);
@@ -822,11 +910,11 @@ const SpaceShooter = () => {
       ctx.fillText('Press SPACE to start!', 290, 360);
       ctx.fillStyle = '#88ff88';
       ctx.font = `${Math.min(20, Math.max(14, 20 * canvasScale))}px Arial`;
-      ctx.fillText('Solve for x in each equation!', 290, 420);
+      ctx.fillText('Shoot the correct answer for each question!', 250, 420);
       ctx.shadowBlur = 0;
     }
 
-    // Adjust font sizes based on screen size
+    // HUD display
     const titleFontSize = Math.min(22, Math.max(16, 22 * canvasScale));
     const subFontSize = Math.min(18, Math.max(12, 18 * canvasScale));
     const smallFontSize = Math.min(16, Math.max(10, 16 * canvasScale));
@@ -841,7 +929,6 @@ const SpaceShooter = () => {
     ctx.font = `bold ${Math.min(28, Math.max(20, 28 * canvasScale))}px Arial`;
     ctx.fillText(`LEVEL ${level}`, 20, 120);
     
-    // ✅ Display XP earned (consistent with other games)
     ctx.fillStyle = '#aaffaa';
     ctx.font = `bold ${subFontSize}px Arial`;
     ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
@@ -861,7 +948,6 @@ const SpaceShooter = () => {
     ctx.font = `${smallFontSize}px Arial`;
     ctx.fillText(`${correctShots}/${requiredCorrect} correct to level up`, 20, 195);
     
-    // Display accuracy stats
     if (totalShots > 0) {
       const accuracy = Math.round((totalCorrect / totalShots) * 100);
       ctx.fillStyle = '#88ff88';
@@ -869,19 +955,23 @@ const SpaceShooter = () => {
       ctx.fillText(`Accuracy: ${accuracy}% (${totalCorrect}/${totalShots})`, 20, 230);
     }
     
-    // ✅ Display XP breakdown (consistent with other games)
     ctx.fillStyle = '#ffaa88';
     ctx.font = `${tinyFontSize}px Arial`;
     ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
     ctx.fillText(`✅ Correct: ${correctAnswers} | ❌ Wrong: ${wrongAnswers}`, 20, 265);
     
-    if (targetEquation && !showLevelAnnouncement && game.gameActive) {
+    if (currentQuestion && !showLevelAnnouncement && game.gameActive) {
       ctx.fillStyle = '#ffd700';
-      ctx.font = `bold ${Math.min(28, Math.max(20, 28 * canvasScale))}px Arial`;
-      ctx.fillText(`Solve: ${targetEquation.equation}`, 260, 50);
+      ctx.font = `bold ${Math.min(22, Math.max(16, 22 * canvasScale))}px Arial`;
+      // Wrap question text if too long
+      let questionText = currentQuestion.text;
+      if (questionText.length > 45) {
+        questionText = questionText.substring(0, 42) + '...';
+      }
+      ctx.fillText(`Q: ${questionText}`, 200, 40);
       ctx.fillStyle = '#88ff88';
       ctx.font = `${subFontSize}px Arial`;
-      ctx.fillText('Find x = ?', 360, 85);
+      ctx.fillText('Shoot the correct answer!', 260, 70);
     }
     
     ctx.fillStyle = '#888888';
@@ -900,7 +990,6 @@ const SpaceShooter = () => {
       ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40);
     }
     
-    // Display timer
     if (gameState === 'playing' && !showLevelAnnouncement) {
       ctx.fillStyle = '#aaaaaa';
       ctx.font = `${tinyFontSize}px Arial`;
@@ -910,56 +999,62 @@ const SpaceShooter = () => {
     }
     
     game.frame++;
-  }, [score, targetEquation, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasScale]);
+  }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasScale]);
 
+  // Game loop
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    let id;
+    let animationId;
     const loop = () => {
       if (gameState === 'playing') updateGame();
-      drawGame(ctx);
-      id = requestAnimationFrame(loop);
+      if (ctx) drawGame(ctx);
+      animationId = requestAnimationFrame(loop);
     };
     loop();
 
-    return () => cancelAnimationFrame(id);
+    return () => cancelAnimationFrame(animationId);
   }, [gameState, updateGame, drawGame]);
 
+  // Keyboard controls
   useEffect(() => {
-    const down = (e) => {
+    const handleKeyDown = (e) => {
       if (e.code === 'Space') {
         e.preventDefault();
         gameRef.current.keys['Space'] = true;
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        gameRef.current.keys[e.key] = true;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        gameRef.current.keys['ArrowLeft'] = true;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        gameRef.current.keys['ArrowRight'] = true;
       }
     };
 
-    const up = (e) => {
+    const handleKeyUp = (e) => {
       if (e.code === 'Space') {
         gameRef.current.keys['Space'] = false;
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        gameRef.current.keys[e.key] = false;
+      } else if (e.key === 'ArrowLeft') {
+        gameRef.current.keys['ArrowLeft'] = false;
+      } else if (e.key === 'ArrowRight') {
+        gameRef.current.keys['ArrowRight'] = false;
       }
     };
 
-    window.addEventListener('keydown', down);
-    window.addEventListener('keyup', up);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      window.removeEventListener('keydown', down);
-      window.removeEventListener('keyup', up);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
   const totalXPEarned = (correctAnswers * 10) - (wrongAnswers * 5);
-  const completionBonus = gameState === 'gameOver' ? 0 : (level >= 5 ? 100 : 0);
 
   return (
     <div style={styles.container}>
-      {/* Back button - always visible */}
       <button onClick={handleBackToGames} style={styles.backButton}>
         <FaArrowLeft style={styles.backIcon} />
         Back to Games
@@ -987,20 +1082,19 @@ const SpaceShooter = () => {
           <div style={styles.menuOverlay}>
             <div style={styles.menuContent}>
               <h1 style={styles.gameTitle}>🚀 Linear Equation Shooter 🚀</h1>
-              <p style={styles.gameSubtitle}>Solve linear equations by shooting the correct x value!</p>
+              <p style={styles.gameSubtitle}>Answer linear equation concept questions by shooting the correct choice!</p>
               <div style={styles.features}>
-                <p>📐 <strong style={{color: '#ffd700'}}>Linear Equations:</strong> ax + b = c</p>
-                <p>🎯 Example: <strong style={{color: '#88ff88'}}>3x + 5 = 14</strong> → Solve for x (x = 3)</p>
-                <p>💡 Shoot enemies with the <strong style={{color: '#ffff00'}}>correct x value</strong> to earn points!</p>
+                <p>📐 <strong style={{color: '#ffd700'}}>How to Play:</strong></p>
+                <p>🎯 Read the question at the top of the screen</p>
+                <p>💡 Each enemy has a possible answer choice on it</p>
+                <p>🔫 Shoot the enemy with the <strong style={{color: '#88ff88'}}>CORRECT answer</strong> to earn points!</p>
                 <p>⚠️ Shooting wrong answers loses 10 points AND counts as a mistake!</p>
                 <p>⭐ <strong style={{color: '#aaffaa'}}>XP SYSTEM:</strong> +10 XP per correct answer, -5 XP per wrong answer!</p>
                 <p>💀 Make 3 mistakes and the game is over!</p>
                 <p>⭐ <strong style={{color: '#ffaa44'}}>LEVEL SYSTEM:</strong> Each level is faster than the last!</p>
                 <p>⚡ <strong style={{color: '#ffaa44'}}>SPEED MECHANIC:</strong> Each correct answer increases enemy speed by 10%!</p>
                 <p>🔥 Make a mistake and speed resets to normal!</p>
-                <p>🔄 New enemies spawn faster as speed increases!</p>
                 <p>🏆 <strong style={{color: '#ffd700'}}>LEVEL UP:</strong> Get 5+ correct answers to advance to the next level!</p>
-                <p>📊 <strong style={{color: '#88ff88'}}>PROGRESS TRACKING:</strong> Your XP and stats are saved!</p>
               </div>
               <button onClick={startGame} style={styles.startButton}>
                 Start Game
@@ -1029,7 +1123,7 @@ const SpaceShooter = () => {
         )}
       </div>
 
-      {/* Mobile Controls - Fixed layout: arrows on left, shoot button on right */}
+      {/* Mobile Controls */}
       {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
         <div style={styles.mobileControls}>
           <div style={styles.leftControls}>
@@ -1274,7 +1368,7 @@ const styles = {
   }
 };
 
-// Add hover effects with CSS (since inline styles don't support :hover)
+// Add hover effects with CSS
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   button:hover {
@@ -1304,7 +1398,6 @@ styleSheet.textContent = `
     }
   }
   
-  /* Scrollbar styling for features section */
   .game-wrapper + div ~ div div::-webkit-scrollbar {
     width: 6px;
   }
