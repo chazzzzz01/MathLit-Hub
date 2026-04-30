@@ -119,8 +119,10 @@ function StudentHub() {
   // Check screen size for mobile detection
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-      if (window.innerWidth > 768) {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      // On desktop, ensure mobile menu is closed when resizing up
+      if (!mobile) {
         setMobileMenuOpen(false);
       }
     };
@@ -202,6 +204,7 @@ function StudentHub() {
       // Toggle mobile menu - if open, close it; if closed, open it
       setMobileMenuOpen(!mobileMenuOpen);
     } else {
+      // On desktop, toggle sidebar collapse state
       setSidebarCollapsed(!sidebarCollapsed);
     }
   };
@@ -273,7 +276,7 @@ function StudentHub() {
 
   return (
     <div style={styles.wrapper}>
-      {/* Sidebar - Desktop only */}
+      {/* Sidebar - Desktop only (can be collapsed) */}
       {!isMobile && (
         <aside
           style={{
@@ -364,19 +367,22 @@ function StudentHub() {
       >
         {/* Header */}
         <header style={styles.header}>
-          {/* Hamburger button - Only shows on mobile */}
-          {isMobile && (
+          {/* Left section - Hamburger button (visible on both mobile and desktop) */}
+          <div style={styles.leftSection}>
             <button 
               className="hamburger-button"
               onClick={toggleSidebar} 
               style={styles.hamburgerButton}
+              title={!isMobile ? (sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar") : "Menu"}
             >
-              <FiMenu size={24} color="white" />
+              {!isMobile && sidebarCollapsed ? <FiMenu size={24} color="white" /> : 
+               !isMobile && !sidebarCollapsed ? <FiX size={24} color="white" /> :
+               <FiMenu size={24} color="white" />}
             </button>
-          )}
+          </div>
 
+          {/* Right section - Profile (always on the right) */}
           <div style={styles.rightSection}>
-            {/* Combined Profile Area - Click anywhere shows the same dropdown */}
             <div style={styles.profileContainer} ref={dropdownRef}>
               <div style={styles.profileContent} onClick={handleProfileClick}>
                 {/* Name and XP Section */}
@@ -506,7 +512,7 @@ function StudentHub() {
           </div>
         </header>
 
-        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked */}
+        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked on mobile */}
         {isMobile && mobileMenuOpen && (
           <div ref={mobileMenuRef} style={styles.mobileDropdownMenu}>
             {mobileNavItems.map((item, index) => (
@@ -700,6 +706,11 @@ const styles = {
     zIndex: 150,
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   },
+  leftSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+  },
   hamburgerButton: {
     background: 'transparent',
     border: 'none',
@@ -718,6 +729,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
+    marginLeft: 'auto', // This ensures it stays on the right
   },
   profileContainer: {
     position: 'relative',

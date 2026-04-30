@@ -1,4 +1,4 @@
-// src/games/BattleArena.jsx
+// src/games/BattleArena.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
 import React, { useState, useEffect, useCallback } from 'react';
 
 const BattleArena = ({ 
@@ -10,7 +10,6 @@ const BattleArena = ({
   savedGameState,
   clearSavedState
 }) => {
-  // Enemy types with different difficulty levels
   const enemies = [
     { name: "Slime", health: 50, maxHealth: 50, attack: 10, defense: 2, difficulty: "Basic", points: 100, color: "#8bc34a" },
     { name: "Goblin", health: 80, maxHealth: 80, attack: 15, defense: 5, difficulty: "Basic", points: 150, color: "#cddc39" },
@@ -22,7 +21,6 @@ const BattleArena = ({
     { name: "Equation Lord", health: 400, maxHealth: 400, attack: 50, defense: 25, difficulty: "Boss", points: 800, color: "#d32f2f" }
   ];
 
-  // 10 Math Concept Questions (replaces equation-solving)
   const conceptQuestions = [
     { question: "Why does slope formula compare 'change in y' over 'change in x'?", options: ["To confuse students", "To measure rate of change", "To find intercept", "To avoid graphing"], correct: 1, explanation: "Slope measures rate of change: how y changes per unit of x." },
     { question: "A salary increases steadily every year. What does this imply?", options: ["Nonlinear graph", "Linear graph", "Circular graph", "No graph"], correct: 1, explanation: "Steady increase means constant rate of change → linear graph." },
@@ -30,74 +28,25 @@ const BattleArena = ({
     { question: "Which situation represents y = 4x − 8?", options: ["Starts at −8, increases by 4", "Starts at 8, decreases by 4", "Starts at 4, increases by 8", "Starts at 0, increases by 4"], correct: 0, explanation: "y = mx + b: m=4 (increase by 4), b=-8 (starts at -8)." },
     { question: "Why is it important to interpret equations in real life?", options: ["To memorize formulas", "To connect math to real situations", "To avoid solving", "To make equations longer"], correct: 1, explanation: "Interpreting equations helps apply math to practical scenarios." },
     { question: "Which describes x/5 + y/10 = 1?", options: ["Intercepts at (5,0) and (0,10)", "Slope 5", "No intercept", "Vertical line"], correct: 0, explanation: "Set y=0 → x/5=1 → x=5. Set x=0 → y/10=1 → y=10." },
-    { question: "What does the x-intercept represent in real life?", options: ["Starting value", "When output becomes zero", "Rate of change", "Maximum slope"], correct: 1, explanation: "x-intercept is where y=0, often the 'break-even' or 'zero' point." },
+    { question: "What does the x-intercept represent in real life?", options: ["Starting value", "When output becomes zero", "Rate of change", "Maximum slope"], correct: 1, explanation: "x-intercept is where y=0, often the 'break-even' point." },
     { question: "Why is graphing useful?", options: ["It replaces equations", "It visualizes relationships", "It removes variables", "It simplifies nothing"], correct: 1, explanation: "Graphs make relationships visible and easier to understand." },
     { question: "Which real-life situation could produce a negative slope?", options: ["Saving money", "Spending money over time", "Growing plants", "Increasing population"], correct: 1, explanation: "Spending money decreases your balance over time → negative slope." },
     { question: "A student says: 'All linear equations are useful in real life.' Which best justifies this?", options: ["They are easy", "They model constant change", "They use x and y", "They are straight"], correct: 1, explanation: "Linear equations model many real-life situations involving constant rates." }
   ];
 
-  // Game state
-  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(() => {
-    if (savedGameState && savedGameState.currentEnemyIndex !== undefined) {
-      return savedGameState.currentEnemyIndex;
-    }
-    return 0;
-  });
-  
-  const [enemyHealth, setEnemyHealth] = useState(() => {
-    if (savedGameState && savedGameState.enemyHealth !== undefined) {
-      return savedGameState.enemyHealth;
-    }
-    return enemies[0].health;
-  });
-  
-  const [playerHealth, setPlayerHealth] = useState(() => {
-    if (savedGameState && savedGameState.playerHealth !== undefined) {
-      return savedGameState.playerHealth;
-    }
-    return 200;
-  });
-  
-  const [score, setScore] = useState(() => {
-    if (savedGameState && savedGameState.challengeScore !== undefined) {
-      return savedGameState.challengeScore;
-    }
-    return challengeScore || 0;
-  });
-  
-  const [feedback, setFeedback] = useState(() => {
-    if (savedGameState && savedGameState.feedback) {
-      return savedGameState.feedback;
-    }
-    return '';
-  });
-  
-  const [gameActive, setGameActive] = useState(() => {
-    if (savedGameState && savedGameState.gameActive !== undefined) {
-      return savedGameState.gameActive;
-    }
-    return true;
-  });
-  
+  const [currentEnemyIndex, setCurrentEnemyIndex] = useState(() => savedGameState?.currentEnemyIndex ?? 0);
+  const [enemyHealth, setEnemyHealth] = useState(() => savedGameState?.enemyHealth ?? enemies[0].health);
+  const [playerHealth, setPlayerHealth] = useState(() => savedGameState?.playerHealth ?? 200);
+  const [score, setScore] = useState(() => savedGameState?.challengeScore ?? (challengeScore || 0));
+  const [feedback, setFeedback] = useState(() => savedGameState?.feedback || '');
+  const [gameActive, setGameActive] = useState(() => savedGameState?.gameActive ?? true);
   const [showCongratulations, setShowCongratulations] = useState(false);
   const [attacksCount, setAttacksCount] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [wrongAnswers, setWrongAnswers] = useState(0);
   const [defenseMode, setDefenseMode] = useState(false);
-  const [powerUps, setPowerUps] = useState(() => {
-    if (savedGameState && savedGameState.powerUps !== undefined) {
-      return savedGameState.powerUps;
-    }
-    return { heal: 2, doubleDamage: 1, shield: 1 };
-  });
-
-  // Quiz state
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(() => {
-    if (savedGameState && savedGameState.currentQuestionIndex !== undefined) {
-      return savedGameState.currentQuestionIndex;
-    }
-    return 0;
-  });
+  const [powerUps, setPowerUps] = useState(() => savedGameState?.powerUps ?? { heal: 2, doubleDamage: 1, shield: 1 });
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(() => savedGameState?.currentQuestionIndex ?? 0);
   const [selectedOption, setSelectedOption] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [quizCompleted, setQuizCompleted] = useState(false);
@@ -108,923 +57,212 @@ const BattleArena = ({
   const isLastEnemy = currentEnemyIndex === enemies.length - 1;
   const currentQuestion = conceptQuestions[currentQuestionIndex];
 
-  // Save game state
   useEffect(() => {
     if (onGameStateUpdate && gameActive && !showCongratulations && !quizCompleted) {
-      onGameStateUpdate({
-        currentEnemyIndex,
-        enemyHealth,
-        playerHealth,
-        challengeScore: score,
-        feedback,
-        gameActive,
-        powerUps,
-        attacksCount,
-        correctAnswers,
-        wrongAnswers,
-        defenseMode,
-        currentQuestionIndex,
-        selectedOption,
-        showExplanation,
-        quizCompleted,
-        waitingForNext
-      });
+      onGameStateUpdate({ currentEnemyIndex, enemyHealth, playerHealth, challengeScore: score, feedback, gameActive, powerUps, attacksCount, correctAnswers, wrongAnswers, defenseMode, currentQuestionIndex, selectedOption, showExplanation, quizCompleted, waitingForNext });
     }
   }, [currentEnemyIndex, enemyHealth, playerHealth, score, feedback, gameActive, powerUps, attacksCount, correctAnswers, wrongAnswers, defenseMode, onGameStateUpdate, currentQuestionIndex, selectedOption, showExplanation, quizCompleted, waitingForNext]);
 
-  // Send real-time score updates to parent
   useEffect(() => {
     if (window.parent !== window) {
-      const scoreUpdate = {
-        type: 'SCORE_UPDATE',
-        gameId: 'battle',
-        score: score,
-        stats: {
-          currentEnemy: currentEnemyIndex,
-          playerHealth: playerHealth,
-          enemyHealth: enemyHealth,
-          attacksMade: attacksCount,
-          correctAnswers: correctAnswers,
-          wrongAnswers: wrongAnswers,
-          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
-        }
-      };
-      window.parent.postMessage(scoreUpdate, '*');
-      console.log('Sent score update to parent:', score);
+      window.parent.postMessage({ type: 'SCORE_UPDATE', gameId: 'battle', score: score, stats: { currentEnemy: currentEnemyIndex, playerHealth, enemyHealth, attacksMade: attacksCount, correctAnswers, wrongAnswers, accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0 } }, '*');
     }
   }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers, wrongAnswers]);
 
-  // Handle messages from parent
   useEffect(() => {
     const handleMessage = (event) => {
-      console.log('BattleArena received message:', event.data);
-      
-      if (event.data && event.data.type === 'REQUEST_SCORE') {
-        const scoreUpdate = {
-          type: 'SCORE_UPDATE',
-          gameId: 'battle',
-          score: score,
-          stats: {
-            currentEnemy: currentEnemyIndex,
-            playerHealth: playerHealth,
-            enemyHealth: enemyHealth,
-            attacksMade: attacksCount,
-            correctAnswers: correctAnswers,
-            wrongAnswers: wrongAnswers,
-            accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0
-          }
-        };
-        window.parent.postMessage(scoreUpdate, '*');
-        console.log('Sent score response to parent:', score);
+      if (event.data?.type === 'REQUEST_SCORE') {
+        window.parent.postMessage({ type: 'SCORE_UPDATE', gameId: 'battle', score: score, stats: { currentEnemy: currentEnemyIndex, playerHealth, enemyHealth, attacksMade: attacksCount, correctAnswers, wrongAnswers, accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0 } }, '*');
       }
     };
-    
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [score, currentEnemyIndex, playerHealth, enemyHealth, attacksCount, correctAnswers, wrongAnswers]);
 
-  // Send game result
   const sendResultToParent = useCallback((completed, finalScore) => {
-    const totalEnemies = enemies.length;
     const accuracy = attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0;
-    
-    const gameResult = {
-      type: 'GAME_RESULT',
-      gameId: 'battle',
-      completed: completed,
-      score: finalScore,
-      timeSpent: 0,
-      stats: {
-        finalScore: finalScore,
-        totalEnemies: totalEnemies,
-        enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0),
-        accuracy: accuracy,
-        attacksMade: attacksCount,
-        correctAnswers: correctAnswers,
-        wrongAnswers: wrongAnswers,
-        powerUpsUsed: {
-          heals: 2 - powerUps.heal,
-          doubleDamage: 1 - powerUps.doubleDamage,
-          shield: 1 - powerUps.shield
-        }
-      }
-    };
-
-    console.log('=== SENDING BATTLE GAME RESULT ===');
-    console.log('Final Score:', finalScore);
-    console.log('Completed:', completed);
-    console.log('Correct Answers:', correctAnswers);
-    console.log('Wrong Answers:', wrongAnswers);
-    
-    if (window.parent !== window) {
-      window.parent.postMessage(gameResult, '*');
-      console.log('Sent to parent window');
-    }
-    
-    if (window.opener) {
-      window.opener.postMessage(gameResult, '*');
-      console.log('Sent to opener');
-    }
-    
-    if (sendGameResult) {
-      sendGameResult(completed, finalScore, 0, currentEnemyIndex + (completed ? 1 : 0), gameResult.stats);
-      console.log('Called sendGameResult prop');
-    }
+    const gameResult = { type: 'GAME_RESULT', gameId: 'battle', completed, score: finalScore, timeSpent: 0, stats: { finalScore, totalEnemies: enemies.length, enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0), accuracy, attacksMade: attacksCount, correctAnswers, wrongAnswers, powerUpsUsed: { heals: 2 - powerUps.heal, doubleDamage: 1 - powerUps.doubleDamage, shield: 1 - powerUps.shield } } };
+    if (window.parent !== window) window.parent.postMessage(gameResult, '*');
+    if (window.opener) window.opener.postMessage(gameResult, '*');
+    if (sendGameResult) sendGameResult(completed, finalScore, 0, currentEnemyIndex + (completed ? 1 : 0), gameResult.stats);
   }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, wrongAnswers, powerUps, sendGameResult]);
 
-  // Save progress to localStorage
   const saveProgressToLocalStorage = useCallback((completed, finalScore) => {
     try {
-      console.log('=== SAVING BATTLE PROGRESS ===');
-      console.log('Final Score:', finalScore);
-      console.log('Completed:', completed);
-      
       const existingProgress = localStorage.getItem('gameProgress');
-      let progress = existingProgress ? JSON.parse(existingProgress) : {
-        equation: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
-        battle: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 },
-        spaceShooter: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 }
-      };
-      
-      const currentBattle = progress.battle || {
-        completed: false,
-        highScore: 0,
-        attempts: 0,
-        bestTime: null,
-        lastPlayed: null,
-        lastScore: 0
-      };
-      
+      let progress = existingProgress ? JSON.parse(existingProgress) : { equation: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 }, battle: { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 }, spaceShooter: {} };
+      const currentBattle = progress.battle || { completed: false, highScore: 0, attempts: 0, bestTime: null, lastPlayed: null, lastScore: 0 };
       const newHighScore = Math.max(currentBattle.highScore || 0, finalScore || 0);
-      const newAttempts = (currentBattle.attempts || 0) + 1;
-      
-      progress.battle = {
-        ...currentBattle,
-        completed: completed || currentBattle.completed,
-        highScore: newHighScore,
-        lastScore: finalScore,
-        attempts: newAttempts,
-        bestTime: currentBattle.bestTime,
-        lastPlayed: new Date().toISOString(),
-        lastGameStats: {
-          enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0),
-          totalEnemies: enemies.length,
-          finalScore: finalScore,
-          accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0,
-          correctAnswers: correctAnswers,
-          wrongAnswers: wrongAnswers
-        }
-      };
-      
+      progress.battle = { ...currentBattle, completed: completed || currentBattle.completed, highScore: newHighScore, lastScore: finalScore, attempts: (currentBattle.attempts || 0) + 1, lastPlayed: new Date().toISOString(), lastGameStats: { enemiesDefeated: currentEnemyIndex + (completed ? 1 : 0), totalEnemies: enemies.length, finalScore, accuracy: attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0, correctAnswers, wrongAnswers } };
       localStorage.setItem('gameProgress', JSON.stringify(progress));
-      console.log('Battle progress saved to localStorage:', progress.battle);
-    } catch (error) {
-      console.error('Error saving to localStorage:', error);
-    }
+    } catch (error) { console.error('Error saving to localStorage:', error); }
   }, [enemies.length, currentEnemyIndex, attacksCount, correctAnswers, wrongAnswers]);
 
   const usePowerUp = (type) => {
-    if (powerUps[type] > 0) {
+    if (powerUps[type] > 0 && !waitingForNext) {
       setPowerUps(prev => ({ ...prev, [type]: prev[type] - 1 }));
-      
-      switch(type) {
-        case 'heal':
-          setPlayerHealth(prev => Math.min(prev + 50, 200));
-          setFeedback("💚 You used a healing potion! +50 HP");
-          break;
-        case 'doubleDamage':
-          setDefenseMode(false);
-          setFeedback("⚡ Double damage activated! Your next attack will deal 2x damage!");
-          break;
-        case 'shield':
-          setDefenseMode(true);
-          setFeedback("🛡️ Shield activated! Next enemy attack will be reduced by 50%!");
-          break;
-        default:
-          break;
-      }
-    } else {
-      setFeedback(`No ${type} power-ups left!`);
-    }
+      if (type === 'heal') { setPlayerHealth(prev => Math.min(prev + 50, 200)); setFeedback("💚 Heal! +50 HP"); }
+      else if (type === 'doubleDamage') { setDefenseMode(false); setFeedback("⚡ Double damage active!"); }
+      else if (type === 'shield') { setDefenseMode(true); setFeedback("🛡️ Shield active! 50% reduction!"); }
+    } else if (powerUps[type] === 0) setFeedback(`No ${type} power-ups left!`);
   };
 
-  // Handle quiz answer - CORRECT = ATTACK, WRONG = ENEMY ATTACKS
   const handleQuizAnswer = (optionIndex) => {
     if (selectedOption !== null || waitingForNext) return;
-    
     setSelectedOption(optionIndex);
     const isCorrect = optionIndex === currentQuestion.correct;
-    
-    // Send XP update
-    if (window.parent !== window) {
-      const xpUpdate = {
-        type: 'XP_UPDATE',
-        gameId: 'battle',
-        xpChange: isCorrect ? 15 : -5,
-        isCorrect: isCorrect,
-        correctAnswer: currentQuestion.options[currentQuestion.correct],
-        userAnswer: currentQuestion.options[optionIndex],
-        question: currentQuestion.question,
-        timestamp: new Date().toISOString()
-      };
-      window.parent.postMessage(xpUpdate, '*');
-      console.log('Sent XP_UPDATE from Quiz Attack:', xpUpdate);
-    }
-    
+    if (window.parent !== window) window.parent.postMessage({ type: 'XP_UPDATE', gameId: 'battle', xpChange: isCorrect ? 15 : -5, isCorrect, correctAnswer: currentQuestion.options[currentQuestion.correct], userAnswer: currentQuestion.options[optionIndex], question: currentQuestion.question }, '*');
     setAttacksCount(prev => prev + 1);
-    
     if (isCorrect) {
-      // CORRECT ANSWER = PLAYER ATTACKS ENEMY
       setCorrectAnswers(prev => prev + 1);
-      
       let damage = currentEnemy ? currentEnemy.attack : 25;
       const doubleDamageActive = powerUps.doubleDamage === 0;
-      
-      if (doubleDamageActive) {
-        damage *= 2;
-        setFeedback(`🔥 CORRECT! CRITICAL HIT! ${damage} damage to ${currentEnemy.name}! +15 XP! ${currentQuestion.explanation}`);
-        setPowerUps(prev => ({ ...prev, doubleDamage: 1 }));
-      } else {
-        setFeedback(`✅ CORRECT! You hit ${currentEnemy.name} for ${damage} damage! +15 XP! ${currentQuestion.explanation}`);
-      }
-      
+      if (doubleDamageActive) { damage *= 2; setFeedback(`🔥 CRITICAL! ${damage} damage! +15 XP!`); setPowerUps(prev => ({ ...prev, doubleDamage: 1 })); }
+      else setFeedback(`✅ CORRECT! ${damage} damage! +15 XP! ${currentQuestion.explanation}`);
       const newEnemyHealth = Math.max(0, enemyHealth - damage);
       setEnemyHealth(newEnemyHealth);
-      
       const pointsEarned = (currentEnemy ? currentEnemy.points : 100) * (doubleDamageActive ? 2 : 1);
       const newScore = score + pointsEarned;
       setScore(newScore);
       if (onScore) onScore(newScore);
-      
-      // Check if enemy is defeated
       if (newEnemyHealth <= 0) {
-        setFeedback(prev => `${prev}\n\n🎉 Victory! You defeated the ${currentEnemy.name}! +${pointsEarned} points!`);
-        
+        setFeedback(prev => `${prev}\n🎉 Defeated ${currentEnemy.name}! +${pointsEarned} points!`);
         if (isLastEnemy) {
-          setGameActive(false);
-          setShowCongratulations(true);
-          const finalScore = newScore;
-          saveProgressToLocalStorage(true, finalScore);
-          sendResultToParent(true, finalScore);
+          setGameActive(false); setShowCongratulations(true);
+          saveProgressToLocalStorage(true, newScore);
+          sendResultToParent(true, newScore);
           if (onComplete) onComplete(true);
           if (clearSavedState) clearSavedState();
+          return;
         } else {
           setWaitingForNext(true);
           setTimeout(() => {
             const nextIndex = currentEnemyIndex + 1;
             setCurrentEnemyIndex(nextIndex);
             setEnemyHealth(enemies[nextIndex].health);
-            // Reset question index for new enemy (or continue? Let's continue from where we left off)
-            // Move to next question
-            if (currentQuestionIndex + 1 < conceptQuestions.length) {
-              setCurrentQuestionIndex(prev => prev + 1);
-            }
-            setSelectedOption(null);
-            setShowExplanation(false);
-            setFeedback(`New enemy appears: ${enemies[nextIndex].name}!`);
+            if (currentQuestionIndex + 1 < conceptQuestions.length) setCurrentQuestionIndex(prev => prev + 1);
+            setSelectedOption(null); setShowExplanation(false);
+            setFeedback(`New enemy: ${enemies[nextIndex].name}!`);
             setWaitingForNext(false);
           }, 2000);
           return;
         }
       }
-      
-      // Move to next question after correct answer (if enemy not defeated)
       setWaitingForNext(true);
       setTimeout(() => {
-        if (currentQuestionIndex + 1 < conceptQuestions.length) {
-          setCurrentQuestionIndex(prev => prev + 1);
-          setSelectedOption(null);
-          setShowExplanation(false);
-          setWaitingForNext(false);
-          setFeedback("");
-        } else {
-          // All questions answered but enemies remain? Loop or complete?
-          // For now, show completion
+        if (currentQuestionIndex + 1 < conceptQuestions.length) { setCurrentQuestionIndex(prev => prev + 1); setSelectedOption(null); setShowExplanation(false); setWaitingForNext(false); setFeedback(""); }
+        else {
           setQuizCompleted(true);
           const bonusPoints = 500;
           const finalScore = score + pointsEarned + bonusPoints;
           setScore(finalScore);
           if (onScore) onScore(finalScore);
-          setFeedback(`🎉 Quiz Complete! You've mastered the concepts! +${bonusPoints} bonus points!`);
-          setGameActive(false);
-          setShowCongratulations(true);
+          setFeedback(`🎉 Quiz Complete! +${bonusPoints} bonus!`);
+          setGameActive(false); setShowCongratulations(true);
           saveProgressToLocalStorage(true, finalScore);
           sendResultToParent(true, finalScore);
           if (onComplete) onComplete(true);
           if (clearSavedState) clearSavedState();
         }
       }, 2500);
-      
     } else {
-      // WRONG ANSWER = ENEMY ATTACKS PLAYER
       setWrongAnswers(prev => prev + 1);
-      
       let enemyDamage = currentEnemy ? Math.max(8, currentEnemy.attack) : 20;
-      if (defenseMode) {
-        enemyDamage = Math.floor(enemyDamage / 2);
-        setFeedback(`❌ INCORRECT! ${currentEnemy ? currentEnemy.name : "Enemy"} counter-attacks for ${enemyDamage} damage (reduced by shield)! -5 XP!`);
-        setDefenseMode(false);
-      } else {
-        setFeedback(`❌ INCORRECT! The correct answer was: ${currentQuestion.options[currentQuestion.correct]}. -5 XP! ${currentEnemy ? currentEnemy.name : "Enemy"} deals ${enemyDamage} damage! ${currentQuestion.explanation}`);
-      }
-      
+      if (defenseMode) { enemyDamage = Math.floor(enemyDamage / 2); setFeedback(`❌ INCORRECT! Counter-attack ${enemyDamage} damage (shielded)! -5 XP!`); setDefenseMode(false); }
+      else setFeedback(`❌ INCORRECT! Correct: ${currentQuestion.options[currentQuestion.correct]}. ${currentEnemy.name} deals ${enemyDamage} damage! -5 XP!`);
       const newPlayerHealth = Math.max(0, playerHealth - enemyDamage);
       setPlayerHealth(newPlayerHealth);
-      
       if (newPlayerHealth <= 0) {
         setGameActive(false);
-        setFeedback("💀 Game Over! You have been defeated!");
+        setFeedback("💀 Game Over!");
         saveProgressToLocalStorage(false, score);
         sendResultToParent(false, score);
         if (onComplete) onComplete(false);
         return;
       }
-      
-      // Move to next question after wrong answer
       setWaitingForNext(true);
       setTimeout(() => {
-        if (currentQuestionIndex + 1 < conceptQuestions.length) {
-          setCurrentQuestionIndex(prev => prev + 1);
-          setSelectedOption(null);
-          setShowExplanation(false);
-          setWaitingForNext(false);
-          setFeedback("");
-        } else {
-          // All questions answered but game still active? Loop the questions?
-          // Reset question index to 0 to continue fighting
-          setCurrentQuestionIndex(0);
-          setSelectedOption(null);
-          setShowExplanation(false);
-          setWaitingForNext(false);
-          setFeedback("📚 New set of questions! Keep fighting!");
-        }
+        if (currentQuestionIndex + 1 < conceptQuestions.length) { setCurrentQuestionIndex(prev => prev + 1); setSelectedOption(null); setShowExplanation(false); setWaitingForNext(false); setFeedback(""); }
+        else { setCurrentQuestionIndex(0); setSelectedOption(null); setShowExplanation(false); setWaitingForNext(false); setFeedback("📚 New questions! Keep fighting!"); }
       }, 2500);
     }
-    
     setShowExplanation(true);
   };
 
-  const getHealthBarColor = (health, maxHealth) => {
-    const percentage = (health / maxHealth) * 100;
-    if (percentage > 60) return '#4caf50';
-    if (percentage > 30) return '#ff9800';
-    return '#f44336';
-  };
+  const getHealthBarColor = (health, maxHealth) => { const p = (health / maxHealth) * 100; return p > 60 ? '#4caf50' : p > 30 ? '#ff9800' : '#f44336'; };
 
   if (showCongratulations) {
     const xpEarned = (correctAnswers * 15) - (wrongAnswers * 5);
     const bonusCompletionXP = quizCompleted ? 150 : 100;
-    const totalXP = xpEarned + bonusCompletionXP;
-    
-    return (
-      <div style={styles.completionContainer}>
-        <div style={styles.completionCard}>
-          <div style={styles.trophyIcon}>🏆</div>
-          <h2 style={styles.completionTitle}>{quizCompleted ? "Quiz Master!" : "Victory!"}</h2>
-          <p style={styles.completionText}>
-            {quizCompleted 
-              ? "You have mastered all math concepts! Outstanding!" 
-              : "You have conquered all enemies in the Math Battle Arena!"}
-          </p>
-          <div style={styles.finalScore}>
-            <div>Final Score: {score}</div>
-            <div>{quizCompleted ? "Questions Answered: " : "Enemies Defeated: "}{quizCompleted ? conceptQuestions.length : enemies.length}/{quizCompleted ? conceptQuestions.length : enemies.length}</div>
-            <div>Attacks Made: {attacksCount}</div>
-            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 15} XP)</div>
-            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
-            <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
-            <div>⭐ XP Earned: {xpEarned}</div>
-            <div>🎉 Completion Bonus: +{bonusCompletionXP} XP</div>
-            <div style={{marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '8px', fontWeight: 'bold', color: '#ffd700'}}>
-              Total XP: {totalXP}
-            </div>
-          </div>
-          <button onClick={() => onComplete && onComplete(true)} style={styles.continueButton}>
-            Return to Menu
-          </button>
-        </div>
-      </div>
-    );
+    return (<div style={styles.completionContainer}><div style={styles.completionCard}><div style={styles.trophyIcon}>🏆</div><h2 style={styles.completionTitle}>{quizCompleted ? "Quiz Master!" : "Victory!"}</h2><p style={styles.completionText}>{quizCompleted ? "You mastered all math concepts!" : "You conquered all enemies!"}</p><div style={styles.finalScore}><div>Final Score: {score}</div><div>Attacks: {attacksCount}</div><div>✅ Correct: {correctAnswers} (+{correctAnswers * 15} XP)</div><div>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</div><div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div><div>⭐ XP: {xpEarned}</div><div>🎉 Bonus: +{bonusCompletionXP} XP</div><div style={{marginTop:'8px',borderTop:'1px solid rgba(255,255,255,0.2)',paddingTop:'8px',fontWeight:'bold',color:'#ffd700'}}>Total XP: {xpEarned + bonusCompletionXP}</div></div><button onClick={() => onComplete && onComplete(true)} style={styles.continueButton}>Return to Menu</button></div></div>);
   }
 
   if (!gameActive && !showCongratulations) {
     const xpEarned = (correctAnswers * 15) - (wrongAnswers * 5);
-    return (
-      <div style={styles.completionContainer}>
-        <div style={styles.completionCard}>
-          <div style={styles.sadIcon}>💀</div>
-          <h2 style={styles.completionTitle}>Game Over</h2>
-          <p style={styles.completionText}>You were defeated in battle. Try again!</p>
-          <div style={styles.finalScore}>
-            <div>Final Score: {score}</div>
-            <div>Enemies Defeated: {currentEnemyIndex}/{enemies.length}</div>
-            <div>✅ Correct Answers: {correctAnswers} (+{correctAnswers * 15} XP)</div>
-            <div>❌ Wrong Answers: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
-            <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
-            <div>⭐ XP Earned: {xpEarned}</div>
-          </div>
-          <button onClick={() => {
-            clearSavedState?.();
-            onComplete && onComplete(false);
-          }} style={styles.continueButton}>
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
+    return (<div style={styles.completionContainer}><div style={styles.completionCard}><div style={styles.sadIcon}>💀</div><h2 style={styles.completionTitle}>Game Over</h2><p style={styles.completionText}>You were defeated! Try again!</p><div style={styles.finalScore}><div>Final Score: {score}</div><div>Enemies: {currentEnemyIndex}/{enemies.length}</div><div>✅ Correct: {correctAnswers} (+{correctAnswers * 15} XP)</div><div>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</div><div>Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div><div>⭐ XP: {xpEarned}</div></div><button onClick={() => { clearSavedState?.(); onComplete && onComplete(false); }} style={styles.continueButton}>Try Again</button></div></div>);
   }
 
   const playerHealthPercent = (playerHealth / 200) * 100;
   const enemyHealthPercent = (enemyHealth / currentEnemy.maxHealth) * 100;
 
-  // Main Game UI (Quiz Attack Mode - replacing equation solver)
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.scoreDisplay}>⭐ Score: {score}</div>
-        <div style={styles.enemyCount}>
-          Enemy: {currentEnemyIndex + 1} / {enemies.length}
-          {isBoss && <span style={styles.bossBadge}>BOSS</span>}
-        </div>
-      </div>
-
+      <div style={styles.header}><div style={styles.scoreDisplay}>⭐ {score}</div><div style={styles.enemyCount}>{currentEnemyIndex + 1}/{enemies.length}{isBoss && <span style={styles.bossBadge}>BOSS</span>}</div></div>
       <div style={styles.battleArena}>
-        <div style={styles.enemySection}>
-          <div style={{...styles.enemyCard, backgroundColor: currentEnemy.color}}>
-            <div style={styles.enemyName}>{currentEnemy.name}</div>
-            <div style={styles.enemyDifficulty}>{currentEnemy.difficulty}</div>
-            <div style={styles.healthBarContainer}>
-              <div style={styles.healthBarLabel}>Health: {enemyHealth}/{currentEnemy.maxHealth}</div>
-              <div style={styles.healthBar}>
-                <div style={{
-                  ...styles.healthFill,
-                  width: `${enemyHealthPercent}%`,
-                  backgroundColor: getHealthBarColor(enemyHealth, currentEnemy.maxHealth)
-                }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={styles.vsDivider}>❓ QUIZ ❓</div>
-
-        <div style={styles.playerSection}>
-          <div style={styles.playerCard}>
-            <div style={styles.playerName}>You</div>
-            <div style={styles.healthBarContainer}>
-              <div style={styles.healthBarLabel}>Health: {playerHealth}/200</div>
-              <div style={styles.healthBar}>
-                <div style={{
-                  ...styles.healthFill,
-                  width: `${playerHealthPercent}%`,
-                  backgroundColor: getHealthBarColor(playerHealth, 200)
-                }} />
-              </div>
-            </div>
-          </div>
-        </div>
+        <div style={styles.enemySection}><div style={{...styles.enemyCard, backgroundColor: currentEnemy.color}}><div style={styles.enemyName}>{currentEnemy.name}</div><div style={styles.enemyDifficulty}>{currentEnemy.difficulty}</div><div style={styles.healthBarContainer}><div style={styles.healthBarLabel}>❤️ {enemyHealth}/{currentEnemy.maxHealth}</div><div style={styles.healthBar}><div style={{...styles.healthFill, width: `${enemyHealthPercent}%`, backgroundColor: getHealthBarColor(enemyHealth, currentEnemy.maxHealth)}} /></div></div></div></div>
+        <div style={styles.vsDivider}>❓</div>
+        <div style={styles.playerSection}><div style={styles.playerCard}><div style={styles.playerName}>You</div><div style={styles.healthBarContainer}><div style={styles.healthBarLabel}>❤️ {playerHealth}/200</div><div style={styles.healthBar}><div style={{...styles.healthFill, width: `${playerHealthPercent}%`, backgroundColor: getHealthBarColor(playerHealth, 200)}} /></div></div></div></div>
       </div>
-
-      <div style={styles.mathChallenge}>
-        <div style={styles.equationBox}>
-          <div style={styles.equationText}>{currentQuestion.question}</div>
-          <div style={styles.optionsGrid}>
-            {currentQuestion.options.map((option, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleQuizAnswer(idx)}
-                disabled={selectedOption !== null || waitingForNext}
-                style={{
-                  ...styles.optionButton,
-                  backgroundColor: selectedOption === idx 
-                    ? (idx === currentQuestion.correct ? '#4caf50' : '#f44336')
-                    : (selectedOption !== null && idx === currentQuestion.correct ? '#4caf50' : 'rgba(255,255,255,0.15)'),
-                  cursor: (selectedOption !== null || waitingForNext) ? 'default' : 'pointer',
-                  opacity: (selectedOption !== null || waitingForNext) && idx !== currentQuestion.correct && idx !== selectedOption ? 0.6 : 1
-                }}
-              >
-                {String.fromCharCode(65 + idx)}. {option}
-                {selectedOption === idx && (idx === currentQuestion.correct ? " ✓" : " ✗")}
-              </button>
-            ))}
-          </div>
-          {waitingForNext && (
-            <div style={styles.waitingMessage}>
-              ⏳ Moving to next...
-            </div>
-          )}
-          {feedback && <div style={styles.feedback}>{feedback}</div>}
-        </div>
-      </div>
-
-      <div style={styles.powerUpsSection}>
-        <h3 style={styles.powerUpsTitle}>💪 POWER-UPS</h3>
-        <div style={styles.powerUpsContainer}>
-          <button 
-            onClick={() => usePowerUp('heal')} 
-            style={{...styles.powerUpButton, backgroundColor: '#4caf50'}}
-            disabled={powerUps.heal === 0 || waitingForNext}
-          >
-            💚 Heal (+50 HP) {powerUps.heal > 0 ? `(${powerUps.heal})` : '(Used)'}
-          </button>
-          <button 
-            onClick={() => usePowerUp('doubleDamage')} 
-            style={{...styles.powerUpButton, backgroundColor: '#ff9800'}}
-            disabled={powerUps.doubleDamage === 0 || waitingForNext}
-          >
-            ⚡ Double Damage {powerUps.doubleDamage > 0 ? `(${powerUps.doubleDamage})` : '(Used)'}
-          </button>
-          <button 
-            onClick={() => usePowerUp('shield')} 
-            style={{...styles.powerUpButton, backgroundColor: '#2196f3'}}
-            disabled={powerUps.shield === 0 || waitingForNext}
-          >
-            🛡️ Shield (50% reduction) {powerUps.shield > 0 ? `(${powerUps.shield})` : '(Used)'}
-          </button>
-        </div>
-      </div>
-      
-      <div style={styles.statsDisplay}>
-        <div>❓ Questions: {currentQuestionIndex + 1}/{conceptQuestions.length}</div>
-        <div>✅ Correct: {correctAnswers} (+{correctAnswers * 15} XP)</div>
-        <div>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</div>
-        <div>📊 Accuracy: {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(1) : 0}%</div>
-        <div>⭐ Total XP: {(correctAnswers * 15) - (wrongAnswers * 5)}</div>
-        <div>⚔️ Attacks: {attacksCount}</div>
-      </div>
+      <div style={styles.mathChallenge}><div style={styles.equationBox}><div style={styles.equationText}>{currentQuestion.question}</div><div style={styles.optionsGrid}>{currentQuestion.options.map((opt, idx) => (<button key={idx} onClick={() => handleQuizAnswer(idx)} disabled={selectedOption !== null || waitingForNext} style={{...styles.optionButton, backgroundColor: selectedOption === idx ? (idx === currentQuestion.correct ? '#4caf50' : '#f44336') : (selectedOption !== null && idx === currentQuestion.correct ? '#4caf50' : 'rgba(255,255,255,0.15)'), cursor: (selectedOption !== null || waitingForNext) ? 'default' : 'pointer', opacity: (selectedOption !== null || waitingForNext) && idx !== currentQuestion.correct && idx !== selectedOption ? 0.6 : 1}}>{String.fromCharCode(65 + idx)}. {opt}{selectedOption === idx && (idx === currentQuestion.correct ? " ✓" : " ✗")}</button>))}</div>{waitingForNext && <div style={styles.waitingMessage}>⏳ Next...</div>}{feedback && <div style={styles.feedback}>{feedback}</div>}</div></div>
+      <div style={styles.powerUpsSection}><h3 style={styles.powerUpsTitle}>💪 POWER-UPS</h3><div style={styles.powerUpsContainer}><button onClick={() => usePowerUp('heal')} style={{...styles.powerUpButton, backgroundColor: '#4caf50'}} disabled={powerUps.heal === 0 || waitingForNext}>💚 Heal {powerUps.heal > 0 ? `(${powerUps.heal})` : '(Used)'}</button><button onClick={() => usePowerUp('doubleDamage')} style={{...styles.powerUpButton, backgroundColor: '#ff9800'}} disabled={powerUps.doubleDamage === 0 || waitingForNext}>⚡ 2x Dmg {powerUps.doubleDamage > 0 ? `(${powerUps.doubleDamage})` : '(Used)'}</button><button onClick={() => usePowerUp('shield')} style={{...styles.powerUpButton, backgroundColor: '#2196f3'}} disabled={powerUps.shield === 0 || waitingForNext}>🛡️ Shield {powerUps.shield > 0 ? `(${powerUps.shield})` : '(Used)'}</button></div></div>
+      <div style={styles.statsDisplay}><div>Q: {currentQuestionIndex + 1}/{conceptQuestions.length}</div><div>✅ {correctAnswers} (+{correctAnswers * 15})</div><div>❌ {wrongAnswers} (-{wrongAnswers * 5})</div><div>📊 {attacksCount > 0 ? ((correctAnswers / attacksCount) * 100).toFixed(0) : 0}%</div><div>⚔️ {attacksCount}</div></div>
     </div>
   );
 };
 
 const styles = {
-  container: {
-    maxWidth: '1200px',
-    width: '95%',
-    margin: '20px auto',
-    padding: 'clamp(12px, 3vw, 20px)',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: 'clamp(12px, 3vw, 20px)',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    color: '#fff',
-    boxSizing: 'border-box',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 'clamp(10px, 2vw, 15px) clamp(12px, 3vw, 20px)',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 'clamp(8px, 2vw, 12px)',
-    marginBottom: 'clamp(15px, 3vw, 20px)',
-    backdropFilter: 'blur(10px)',
-    flexWrap: 'wrap',
-    gap: '10px',
-  },
-  scoreDisplay: {
-    fontSize: 'clamp(18px, 5vw, 24px)',
-    fontWeight: 'bold',
-    color: '#ffd700',
-    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-  },
-  enemyCount: {
-    fontSize: 'clamp(12px, 3vw, 16px)',
-    color: '#fff',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  bossBadge: {
-    backgroundColor: '#f44336',
-    padding: '3px 8px',
-    borderRadius: '12px',
-    fontSize: 'clamp(10px, 2.5vw, 12px)',
-    fontWeight: 'bold',
-  },
-  battleArena: {
-    display: 'grid',
-    gridTemplateColumns: '1fr auto 1fr',
-    gap: 'clamp(10px, 3vw, 20px)',
-    marginBottom: 'clamp(20px, 4vw, 30px)',
-    alignItems: 'center',
-    '@media (max-width: 768px)': {
-      gridTemplateColumns: '1fr',
-      gap: '20px',
-    },
-  },
-  enemySection: {
-    textAlign: 'center',
-  },
-  enemyCard: {
-    padding: 'clamp(12px, 3vw, 20px)',
-    borderRadius: 'clamp(12px, 3vw, 16px)',
-    boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
-    transition: 'transform 0.3s ease',
-  },
-  enemyName: {
-    fontSize: 'clamp(20px, 6vw, 32px)',
-    fontWeight: 'bold',
-    marginBottom: '8px',
-    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-  },
-  enemyDifficulty: {
-    fontSize: 'clamp(10px, 2.5vw, 14px)',
-    marginBottom: '15px',
-    opacity: 0.9,
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-  },
-  playerSection: {
-    textAlign: 'center',
-  },
-  playerCard: {
-    background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
-    padding: 'clamp(12px, 3vw, 20px)',
-    borderRadius: 'clamp(12px, 3vw, 16px)',
-    boxShadow: '0 8px 16px rgba(0,0,0,0.2)',
-  },
-  playerName: {
-    fontSize: 'clamp(20px, 6vw, 32px)',
-    fontWeight: 'bold',
-    marginBottom: '15px',
-    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-  },
-  vsDivider: {
-    fontSize: 'clamp(28px, 8vw, 48px)',
-    fontWeight: 'bold',
-    color: '#ffd700',
-    textShadow: '0 0 10px rgba(255,215,0,0.5)',
-    animation: 'pulse 1.5s ease-in-out infinite',
-    textAlign: 'center',
-  },
-  healthBarContainer: {
-    width: '100%',
-  },
-  healthBarLabel: {
-    fontSize: 'clamp(11px, 3vw, 14px)',
-    marginBottom: '5px',
-    fontWeight: 'bold',
-  },
-  healthBar: {
-    width: '100%',
-    height: 'clamp(20px, 5vw, 25px)',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)',
-  },
-  healthFill: {
-    height: '100%',
-    transition: 'width 0.3s ease',
-    borderRadius: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 'clamp(10px, 2.5vw, 12px)',
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  mathChallenge: {
-    marginBottom: 'clamp(20px, 4vw, 30px)',
-  },
-  equationBox: {
-    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)',
-    backdropFilter: 'blur(10px)',
-    padding: 'clamp(20px, 5vw, 30px)',
-    borderRadius: 'clamp(12px, 3vw, 16px)',
-    textAlign: 'center',
-    border: '1px solid rgba(255,255,255,0.2)',
-  },
-  equationText: {
-    fontSize: 'clamp(20px, 5vw, 28px)',
-    fontWeight: 'bold',
-    marginBottom: 'clamp(15px, 4vw, 25px)',
-    textShadow: '0 2px 4px rgba(0,0,0,0.3)',
-    wordBreak: 'break-word',
-    lineHeight: 1.4,
-  },
-  optionsGrid: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginTop: '10px',
-  },
-  optionButton: {
-    padding: 'clamp(10px, 2.5vw, 14px) clamp(15px, 4vw, 20px)',
-    fontSize: 'clamp(14px, 3.5vw, 16px)',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    color: 'white',
-    border: '1px solid rgba(255,255,255,0.3)',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-    textAlign: 'left',
-    '&:hover': {
-      backgroundColor: 'rgba(255,255,255,0.25)',
-      transform: 'scale(1.01)',
-    },
-  },
-  waitingMessage: {
-    marginTop: 'clamp(15px, 3vw, 20px)',
-    padding: 'clamp(8px, 2vw, 12px)',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: '8px',
-    fontSize: 'clamp(12px, 3vw, 14px)',
-    color: '#ffd700',
-    textAlign: 'center',
-  },
-  feedback: {
-    marginTop: 'clamp(15px, 3vw, 20px)',
-    padding: 'clamp(8px, 2vw, 12px)',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: '8px',
-    fontSize: 'clamp(12px, 3vw, 14px)',
-    color: '#ffd700',
-    whiteSpace: 'pre-line',
-    fontWeight: 'bold',
-    wordBreak: 'break-word',
-  },
-  powerUpsSection: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 'clamp(15px, 3vw, 20px)',
-    borderRadius: '12px',
-    marginBottom: '15px',
-    backdropFilter: 'blur(10px)',
-  },
-  powerUpsTitle: {
-    fontSize: 'clamp(14px, 4vw, 18px)',
-    marginBottom: '15px',
-    color: '#ffd700',
-    textAlign: 'center',
-  },
-  powerUpsContainer: {
-    display: 'flex',
-    gap: 'clamp(8px, 2vw, 15px)',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  powerUpButton: {
-    padding: 'clamp(8px, 2vw, 10px) clamp(12px, 3vw, 20px)',
-    fontSize: 'clamp(11px, 3vw, 14px)',
-    fontWeight: 'bold',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-    '@media (max-width: 480px)': {
-      whiteSpace: 'normal',
-    },
-    '&:disabled': {
-      opacity: 0.5,
-      cursor: 'not-allowed',
-    },
-  },
-  statsDisplay: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: 'clamp(10px, 2vw, 12px) clamp(12px, 3vw, 20px)',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: '12px',
-    color: '#fff',
-    fontSize: 'clamp(10px, 2.5vw, 14px)',
-    backdropFilter: 'blur(10px)',
-    flexWrap: 'wrap',
-    gap: '10px',
-  },
-  completionContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: '500px',
-    padding: '20px',
-  },
-  completionCard: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: 'clamp(16px, 4vw, 20px)',
-    padding: 'clamp(20px, 5vw, 40px)',
-    textAlign: 'center',
-    maxWidth: '450px',
-    width: '90%',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-    boxSizing: 'border-box',
-  },
-  trophyIcon: {
-    fontSize: 'clamp(60px, 15vw, 80px)',
-    marginBottom: '20px',
-    animation: 'bounce 0.5s ease',
-  },
-  sadIcon: {
-    fontSize: 'clamp(60px, 15vw, 80px)',
-    marginBottom: '20px',
-  },
-  completionTitle: {
-    fontSize: 'clamp(24px, 6vw, 36px)',
-    marginBottom: '15px',
-    color: '#ffd700',
-  },
-  completionText: {
-    fontSize: 'clamp(14px, 4vw, 16px)',
-    marginBottom: '20px',
-    color: '#fff',
-  },
-  finalScore: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 'clamp(12px, 3vw, 15px)',
-    borderRadius: '10px',
-    marginBottom: '20px',
-    fontSize: 'clamp(12px, 3vw, 14px)',
-    lineHeight: '1.8',
-    color: '#fff',
-  },
-  continueButton: {
-    padding: 'clamp(10px, 2.5vw, 12px) clamp(20px, 5vw, 30px)',
-    fontSize: 'clamp(14px, 4vw, 16px)',
-    backgroundColor: '#ffd700',
-    color: '#333',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    transition: 'all 0.3s',
-    '&:hover': {
-      transform: 'scale(1.02)',
-      backgroundColor: '#ffed4e',
-    },
-  },
+  container: { maxWidth: '100%', width: '100%', margin: 0, padding: '12px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: '#fff', boxSizing: 'border-box', '@media (min-width: 769px)': { maxWidth: '1200px', margin: '20px auto', padding: '20px', borderRadius: '20px' } },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '10px', marginBottom: '15px', flexWrap: 'wrap', gap: '8px', '@media (min-width: 769px)': { padding: '15px 20px', marginBottom: '20px' } },
+  scoreDisplay: { fontSize: '16px', fontWeight: 'bold', color: '#ffd700', '@media (min-width: 769px)': { fontSize: '24px' } },
+  enemyCount: { fontSize: '11px', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', '@media (min-width: 769px)': { fontSize: '16px', gap: '8px' } },
+  bossBadge: { backgroundColor: '#f44336', padding: '2px 6px', borderRadius: '10px', fontSize: '9px', fontWeight: 'bold', '@media (min-width: 769px)': { padding: '3px 8px', fontSize: '12px' } },
+  battleArena: { display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px', '@media (min-width: 768px)': { display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '15px', alignItems: 'center' } },
+  enemySection: { textAlign: 'center' },
+  enemyCard: { padding: '12px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)', '@media (min-width: 769px)': { padding: '20px', borderRadius: '16px' } },
+  enemyName: { fontSize: '18px', fontWeight: 'bold', marginBottom: '4px', '@media (min-width: 769px)': { fontSize: '32px', marginBottom: '8px' } },
+  enemyDifficulty: { fontSize: '9px', marginBottom: '10px', opacity: 0.9, '@media (min-width: 769px)': { fontSize: '14px', marginBottom: '15px' } },
+  playerSection: { textAlign: 'center' },
+  playerCard: { background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', padding: '12px', borderRadius: '12px', '@media (min-width: 769px)': { padding: '20px', borderRadius: '16px' } },
+  playerName: { fontSize: '18px', fontWeight: 'bold', marginBottom: '10px', '@media (min-width: 769px)': { fontSize: '32px', marginBottom: '15px' } },
+  vsDivider: { fontSize: '28px', fontWeight: 'bold', color: '#ffd700', textAlign: 'center', '@media (min-width: 769px)': { fontSize: '48px' } },
+  healthBarContainer: { width: '100%' },
+  healthBarLabel: { fontSize: '10px', marginBottom: '3px', fontWeight: 'bold', '@media (min-width: 769px)': { fontSize: '14px', marginBottom: '5px' } },
+  healthBar: { width: '100%', height: '18px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '10px', overflow: 'hidden', '@media (min-width: 769px)': { height: '25px', borderRadius: '12px' } },
+  healthFill: { height: '100%', transition: 'width 0.3s ease', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold', '@media (min-width: 769px)': { fontSize: '12px', borderRadius: '12px' } },
+  mathChallenge: { marginBottom: '15px' },
+  equationBox: { background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)', backdropFilter: 'blur(10px)', padding: '15px', borderRadius: '12px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.2)', '@media (min-width: 769px)': { padding: '30px', borderRadius: '16px' } },
+  equationText: { fontSize: '16px', fontWeight: 'bold', marginBottom: '15px', wordBreak: 'break-word', lineHeight: 1.4, '@media (min-width: 769px)': { fontSize: '28px', marginBottom: '25px' } },
+  optionsGrid: { display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' },
+  optionButton: { padding: '10px 12px', fontSize: '11px', backgroundColor: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', transition: 'all 0.2s', textAlign: 'left', minHeight: '44px', '@media (min-width: 769px)': { padding: '14px 20px', fontSize: '16px', borderRadius: '12px' } },
+  waitingMessage: { marginTop: '12px', padding: '8px', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: '8px', fontSize: '11px', color: '#ffd700', textAlign: 'center', '@media (min-width: 769px)': { marginTop: '20px', padding: '12px', fontSize: '14px' } },
+  feedback: { marginTop: '12px', padding: '8px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '8px', fontSize: '11px', color: '#ffd700', whiteSpace: 'pre-line', fontWeight: 'bold', wordBreak: 'break-word', '@media (min-width: 769px)': { marginTop: '20px', padding: '12px', fontSize: '14px' } },
+  powerUpsSection: { backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '12px', marginBottom: '12px', '@media (min-width: 769px)': { padding: '20px', marginBottom: '15px' } },
+  powerUpsTitle: { fontSize: '13px', marginBottom: '10px', color: '#ffd700', textAlign: 'center', '@media (min-width: 769px)': { fontSize: '18px', marginBottom: '15px' } },
+  powerUpsContainer: { display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' },
+  powerUpButton: { padding: '8px 12px', fontSize: '10px', fontWeight: 'bold', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', transition: 'all 0.2s', minHeight: '40px', '@media (min-width: 769px)': { padding: '10px 20px', fontSize: '14px' } },
+  statsDisplay: { display: 'flex', justifyContent: 'space-between', padding: '10px 12px', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '10px', fontSize: '9px', flexWrap: 'wrap', gap: '8px', '@media (min-width: 769px)': { padding: '12px 20px', fontSize: '14px' } },
+  completionContainer: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px', padding: '16px' },
+  completionCard: { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', borderRadius: '16px', padding: '20px', textAlign: 'center', maxWidth: '320px', width: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.3)', '@media (min-width: 769px)': { borderRadius: '20px', padding: '40px', maxWidth: '450px' } },
+  trophyIcon: { fontSize: '48px', marginBottom: '12px', '@media (min-width: 769px)': { fontSize: '80px', marginBottom: '20px' } },
+  sadIcon: { fontSize: '48px', marginBottom: '12px', '@media (min-width: 769px)': { fontSize: '80px', marginBottom: '20px' } },
+  completionTitle: { fontSize: '22px', marginBottom: '10px', color: '#ffd700', '@media (min-width: 769px)': { fontSize: '36px', marginBottom: '15px' } },
+  completionText: { fontSize: '12px', marginBottom: '15px', color: '#fff', '@media (min-width: 769px)': { fontSize: '16px', marginBottom: '20px' } },
+  finalScore: { backgroundColor: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '10px', marginBottom: '15px', fontSize: '11px', lineHeight: '1.6', color: '#fff', '@media (min-width: 769px)': { padding: '15px', marginBottom: '20px', fontSize: '14px', lineHeight: '1.8' } },
+  continueButton: { padding: '10px 20px', fontSize: '13px', backgroundColor: '#ffd700', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', minHeight: '44px', '@media (min-width: 769px)': { padding: '12px 30px', fontSize: '16px' } }
 };
 
-// Add responsive CSS with media queries
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes pulse {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1.1);
-      opacity: 0.9;
-    }
-  }
-  
-  @keyframes bounce {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-20px);
-    }
-  }
-  
-  button {
-    transition: all 0.2s ease;
-  }
-  
-  button:hover:not(:disabled) {
-    transform: scale(1.02);
-  }
-  
-  button:active:not(:disabled) {
-    transform: scale(0.98);
-  }
-  
-  /* Responsive design for tablets */
-  @media (max-width: 768px) {
-    .battle-arena {
-      grid-template-columns: 1fr;
-    }
-  }
-  
-  /* Responsive design for mobile devices */
-  @media (max-width: 480px) {
-    .stats-display {
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-    }
-    
-    .power-ups-container {
-      flex-direction: column;
-      align-items: stretch;
-    }
-    
-    .power-up-button {
-      width: 100%;
-    }
-  }
-  
-  /* Touch-friendly improvements */
-  @media (hover: none) and (pointer: coarse) {
-    button {
-      min-height: 44px;
-      min-width: 44px;
-    }
-  }
-`;
+styleSheet.textContent = `@keyframes pulse { 0%,100%{transform:scale(1)}50%{transform:scale(1.05)}} @keyframes bounce { 0%,100%{transform:translateY(0)}50%{transform:translateY(-15px)}} button:hover:not(:disabled){opacity:0.9} button:active:not(:disabled){transform:scale(0.97)} @media (max-width:480px){button{min-height:44px}} @media (max-width:360px){.scoreDisplay{font-size:14px!important}.enemyName{font-size:14px!important}.equationText{font-size:13px!important}.optionButton{font-size:9px!important;padding:8px!important}}`;
 document.head.appendChild(styleSheet);
 
 export default BattleArena;

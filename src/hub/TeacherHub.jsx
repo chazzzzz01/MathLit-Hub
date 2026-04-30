@@ -46,9 +46,8 @@ function TeacherHub() {
         setOpenDropdown(null);
         setIsEditingUsername(false);
       }
-      // Close mobile menu when clicking outside (but not on the hamburger button)
+      // Close mobile menu when clicking outside
       if (mobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        // Check if click is on hamburger button
         const hamburgerButton = document.querySelector('.hamburger-button');
         if (hamburgerButton && !hamburgerButton.contains(event.target)) {
           setMobileMenuOpen(false);
@@ -112,6 +111,7 @@ function TeacherHub() {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
+      // On desktop, ensure mobile menu is closed when resizing up
       if (!mobile) {
         setMobileMenuOpen(false);
       }
@@ -143,7 +143,14 @@ function TeacherHub() {
       // Toggle mobile menu - if open, close it; if closed, open it
       setMobileMenuOpen(!mobileMenuOpen);
     } else {
+      // On desktop, toggle sidebar collapse state
       setSidebarCollapsed(!sidebarCollapsed);
+    }
+  };
+
+  const closeSidebar = () => {
+    if (isMobile) {
+      setMobileMenuOpen(false);
     }
   };
 
@@ -158,9 +165,7 @@ function TeacherHub() {
     console.log('Navigating to:', path);
     navigate(path);
     setOpenDropdown(null);
-    if (isMobile) {
-      setMobileMenuOpen(false);
-    }
+    closeSidebar();
   };
 
   const handleProfileClick = () => {
@@ -173,6 +178,11 @@ function TeacherHub() {
     if (user?.name) return user.name;
     if (user?.email) return user.email.split('@')[0];
     return 'Teacher';
+  };
+
+  // Get user XP points (for consistency with StudentHub, though teachers might not have XP)
+  const getUserXP = () => {
+    return userData?.xp || 0;
   };
 
   const handleEditUsername = () => {
@@ -221,6 +231,13 @@ function TeacherHub() {
     { path: "/teacherhub/collaboration", icon: MdPeople, label: "Collaboration" }
   ];
 
+  // Mobile navigation items
+  const mobileNavItems = [
+    { path: "/teacherhub/home", icon: FiHome, label: "Home" },
+    { path: "/teacherhub/dashboard", icon: FiBarChart2, label: "Dashboard" },
+    { path: "/teacherhub/collaboration", icon: MdPeople, label: "Collaboration" }
+  ];
+
   // If no user, show loading
   if (!user) {
     return (
@@ -252,6 +269,16 @@ function TeacherHub() {
                     backgroundColor: isActive ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
                   }}
                   onClick={() => handleNavigation(item.path)}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
                 >
                   <item.icon size={24} color="white" />
                   {!sidebarCollapsed && <span style={styles.iconText}>{item.label}</span>}
@@ -266,31 +293,43 @@ function TeacherHub() {
       <main
         style={{
           ...styles.main,
-          ...(!isMobile && {
-            marginLeft: sidebarCollapsed ? '70px' : '260px',
-          })
+          marginLeft: !isMobile ? (sidebarCollapsed ? '70px' : '260px') : '0',
+          transition: 'margin-left 0.3s ease',
         }}
       >
-        {/* Header */}
+        {/* Header - Matching StudentHub exactly */}
         <header style={styles.header}>
-          {/* Hamburger Menu Button - Only shows on mobile */}
-          {isMobile && (
+          {/* Left section - Hamburger button */}
+          <div style={styles.leftSection}>
             <button 
               className="hamburger-button"
-              style={styles.hamburgerButton} 
-              onClick={toggleSidebar}
+              onClick={toggleSidebar} 
+              style={styles.hamburgerButton}
+              title={!isMobile ? (sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar") : "Menu"}
             >
-              <FiMenu size={24} color="white" />
+              {!isMobile && sidebarCollapsed ? <FiMenu size={24} color="white" /> : 
+               !isMobile && !sidebarCollapsed ? <FiX size={24} color="white" /> :
+               <FiMenu size={24} color="white" />}
             </button>
-          )}
+          </div>
 
-          {/* Right section - Teacher name and profile icon */}
+          {/* Right section - Profile (matches StudentHub exactly) */}
           <div style={styles.rightSection}>
             <div style={styles.profileContainer} ref={dropdownRef}>
               <div style={styles.profileContent} onClick={handleProfileClick}>
-                <span style={styles.teacherName}>
-                  {getUserIdentifier()}
-                </span>
+                {/* Name and XP Section */}
+                <div style={styles.profileInfo}>
+                  <span style={styles.teacherName}>
+                    {getUserIdentifier()}
+                  </span>
+                  {getUserXP() > 0 && (
+                    <span style={styles.xpPoints}>
+                      ⭐ {getUserXP()} XP
+                    </span>
+                  )}
+                </div>
+                
+                {/* Chevron Icon */}
                 <FiChevronDown 
                   size={18} 
                   color="white" 
@@ -299,6 +338,8 @@ function TeacherHub() {
                     transform: openDropdown === 'profile' ? 'rotate(180deg)' : 'rotate(0deg)'
                   }}
                 />
+                
+                {/* Avatar */}
                 {user?.picture ? (
                   <img 
                     src={user.picture}
@@ -314,7 +355,7 @@ function TeacherHub() {
                 )}
               </div>
               
-              {/* Profile Dropdown */}
+              {/* Profile Dropdown - Matches StudentHub exactly */}
               {openDropdown === 'profile' && (
                 <div style={styles.dropdown}>
                   {/* User Header */}
@@ -334,11 +375,13 @@ function TeacherHub() {
                   
                   <div style={styles.dropdownDivider}></div>
                   
-                  {/* Account Information Section */}
+                  {/* Account Info Section */}
                   <div style={styles.dropdownSection}>
                     <div style={styles.dropdownSectionTitle}>Account Information</div>
-                    
-                    {/* Username with Edit */}
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>📧 Email:</span>
+                      <span style={styles.infoValue}>{user?.email || 'Not provided'}</span>
+                    </div>
                     <div style={styles.dropdownInfoItem}>
                       <span style={styles.infoLabel}>👤 Username:</span>
                       {isEditingUsername ? (
@@ -367,35 +410,34 @@ function TeacherHub() {
                         </div>
                       )}
                     </div>
-                    
-                    {/* Member Since */}
+                    {getUserXP() > 0 && (
+                      <div style={styles.dropdownInfoItem}>
+                        <span style={styles.infoLabel}>⭐ XP Points:</span>
+                        <span style={styles.infoValue}>{getUserXP()} XP</span>
+                      </div>
+                    )}
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>📚 Active Classes:</span>
+                      <span style={styles.infoValue}>{teacherStats.activeClasses}</span>
+                    </div>
+                    <div style={styles.dropdownInfoItem}>
+                      <span style={styles.infoLabel}>👥 Total Students:</span>
+                      <span style={styles.infoValue}>{teacherStats.totalStudents}</span>
+                    </div>
                     <div style={styles.dropdownInfoItem}>
                       <span style={styles.infoLabel}>🎓 Member since:</span>
                       <span style={styles.infoValue}>
                         {formatDate(teacherStats.memberSince || user?.createdAt || userData?.createdAt)}
                       </span>
                     </div>
-                    
-                    {/* Last Login */}
-                    <div style={styles.dropdownInfoItem}>
-                      <span style={styles.infoLabel}>🕒 Last login:</span>
-                      <span style={styles.infoValue}>
-                        {formatDate(teacherStats.lastLogin || user?.lastLogin || userData?.lastLogin)}
-                      </span>
-                    </div>
-                    
-                    {/* Teacher Statistics */}
-                    <div style={styles.dropdownStatsSection}>
-                      <div style={styles.dropdownSectionTitle}>Teaching Statistics</div>
+                    {(userData?.lastLogin || teacherStats.lastLogin) && (
                       <div style={styles.dropdownInfoItem}>
-                        <span style={styles.infoLabel}>📚 Active Classes:</span>
-                        <span style={styles.infoValue}>{teacherStats.activeClasses}</span>
+                        <span style={styles.infoLabel}>🕒 Last login:</span>
+                        <span style={styles.infoValue}>
+                          {formatDate(teacherStats.lastLogin || user?.lastLogin || userData?.lastLogin)}
+                        </span>
                       </div>
-                      <div style={styles.dropdownInfoItem}>
-                        <span style={styles.infoLabel}>👥 Total Students:</span>
-                        <span style={styles.infoValue}>{teacherStats.totalStudents}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                   
                   <div style={styles.dropdownDivider}></div>
@@ -410,10 +452,10 @@ function TeacherHub() {
           </div>
         </header>
 
-        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked */}
+        {/* Mobile Dropdown Menu - Shows below header when hamburger clicked on mobile */}
         {isMobile && mobileMenuOpen && (
           <div ref={mobileMenuRef} style={styles.mobileDropdownMenu}>
-            {navItems.map((item, index) => {
+            {mobileNavItems.map((item, index) => {
               const isActive = location.pathname === item.path;
               return (
                 <div 
@@ -421,7 +463,6 @@ function TeacherHub() {
                   style={{
                     ...styles.mobileMenuItem,
                     backgroundColor: isActive ? 'rgba(37, 99, 235, 0.1)' : 'transparent',
-                    borderLeft: isActive ? '4px solid #2563eb' : '4px solid transparent'
                   }}
                   onClick={() => handleNavigation(item.path)}
                 >
@@ -429,7 +470,7 @@ function TeacherHub() {
                   <span style={{
                     ...styles.mobileMenuText,
                     color: isActive ? '#2563eb' : '#333',
-                    fontWeight: isActive ? '600' : '400'
+                    fontWeight: isActive ? '600' : '500',
                   }}>
                     {item.label}
                   </span>
@@ -439,7 +480,7 @@ function TeacherHub() {
           </div>
         )}
 
-        {/* Content Area - Uses Outlet for nested routes */}
+        {/* Content Area */}
         <div style={styles.contentWrapper}>
           <div style={styles.content}>
             <Outlet context={{ 
@@ -461,8 +502,10 @@ const styles = {
   wrapper: {
     display: 'flex',
     minHeight: '100vh',
+    width: '100%',
     position: 'relative',
     backgroundColor: '#f5f5f5',
+    overflowX: 'hidden',
   },
   loadingContainer: {
     display: 'flex',
@@ -471,6 +514,7 @@ const styles = {
     justifyContent: 'center',
     minHeight: '100vh',
     gap: '20px',
+    backgroundColor: '#f5f5f5',
   },
   loadingSpinner: {
     width: '40px',
@@ -510,10 +554,6 @@ const styles = {
     marginBottom: '8px',
     borderRadius: '0 20px 20px 0',
     transition: 'all 0.2s',
-    ':hover': {
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-      transform: 'translateX(4px)',
-    },
   },
   iconText: {
     marginLeft: '12px',
@@ -524,8 +564,6 @@ const styles = {
   },
   main: {
     flex: 1,
-    transition: 'margin-left 0.3s ease',
-    paddingTop: '70px',
     minHeight: '100vh',
     backgroundColor: '#f5f5f5',
     display: 'flex',
@@ -546,6 +584,11 @@ const styles = {
     zIndex: 150,
     boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
   },
+  leftSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+  },
   hamburgerButton: {
     background: 'transparent',
     border: 'none',
@@ -564,6 +607,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '15px',
+    marginLeft: 'auto',
   },
   profileContainer: {
     position: 'relative',
@@ -580,10 +624,23 @@ const styles = {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
   },
+  profileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
   teacherName: {
     color: 'white',
     fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '500',
+  },
+  xpPoints: {
+    color: '#FFD700',
+    fontSize: 'clamp(12px, 3vw, 14px)',
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    padding: '4px 8px',
+    borderRadius: '12px',
   },
   chevronIcon: {
     transition: 'transform 0.2s ease',
@@ -662,7 +719,7 @@ const styles = {
     padding: '12px 16px',
   },
   dropdownSectionTitle: {
-    fontSize: '11px',
+    fontSize: '12px',
     fontWeight: '600',
     color: '#999',
     textTransform: 'uppercase',
@@ -727,9 +784,6 @@ const styles = {
       backgroundColor: '#1e4db9',
     },
   },
-  dropdownStatsSection: {
-    marginTop: '8px',
-  },
   dropdownDivider: {
     height: '1px',
     backgroundColor: '#e0e0e0',
@@ -751,6 +805,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     backgroundColor: '#f5f5f5',
+    marginTop: '70px',
   },
   content: {
     padding: 'clamp(16px, 4vw, 24px)',
@@ -761,10 +816,9 @@ const styles = {
     backgroundColor: '#f5f5f5',
     display: 'flex',
     flexDirection: 'column',
-    boxSizing: 'border-box',
   },
   
-  // Mobile Dropdown Menu Styles - Shows below header
+  // Mobile Dropdown Menu Styles
   mobileDropdownMenu: {
     position: 'fixed',
     top: '70px',
@@ -794,7 +848,7 @@ const styles = {
   },
 };
 
-// Add animations
+// Add CSS animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
@@ -805,7 +859,7 @@ styleSheet.textContent = `
   @keyframes slideDown {
     from {
       opacity: 0;
-      transform: translateY(-20px);
+      transform: translateY(-10px);
     }
     to {
       opacity: 1;
@@ -813,33 +867,29 @@ styleSheet.textContent = `
     }
   }
   
-  /* Responsive Design */
-  @media (max-width: 768px) {
-    .teacher-name {
-      font-size: 14px;
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
     }
   }
   
-  @media (max-width: 480px) {
-    .teacher-name {
-      display: none;
-    }
-    
-    .content {
-      padding: 12px;
-    }
+  button:hover {
+    opacity: 0.9;
   }
   
-  /* Better touch targets for mobile */
-  @media (max-width: 768px) {
-    button, [role="button"], .mobile-menu-item {
-      min-height: 44px;
-    }
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
   
-  /* Smooth scrolling */
-  html {
-    scroll-behavior: smooth;
+  body, html {
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
   }
 `;
 document.head.appendChild(styleSheet);

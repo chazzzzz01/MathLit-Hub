@@ -1,4 +1,4 @@
-// src/missions/mission3.jsx
+// src/missions/mission3.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -20,198 +20,91 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const MISSION_ID = 3;
   const MISSION_XP = 400;
 
-  // Questions with correct answers randomized in different positions (1st, 2nd, 3rd, or 4th)
   const questions = [
     {
-      title: "Question 1: Point-Slope Formula",
       question: "What is the formula of the point-slope form of a linear equation?",
-      options: [
-        "y = mx + b",
-        "y - y₁ = m(x - x₁)",
-        "y = x + b",
-        "y₁ - y = m(x₁ - x)"
-      ],
-      correct: 1,  // Correct answer is 2nd choice
+      options: ["y = mx + b", "y - y₁ = m(x - x₁)", "y = x + b", "y₁ - y = m(x₁ - x)"],
+      correct: 1,
       explanation: "Point-slope form uses a known slope m and a point (x₁, y₁): y - y₁ = m(x - x₁)."
     },
     {
-      title: "Question 2: What Slope Represents",
       question: "What does the slope represent?",
-      options: [
-        "The y-intercept of the line",
-        "The highest point of the line",
-        "The rate of change of the line",
-        "The x-intercept of the line"
-      ],
-      correct: 2,  // Correct answer is 3rd choice
+      options: ["The y-intercept", "The highest point", "The rate of change", "The x-intercept"],
+      correct: 2,
       explanation: "Slope tells how steep the line is or how y changes with respect to x."
     },
     {
-      title: "Question 3: Equation with Slope 3 through (2, -1)",
       question: "What is the equation of a line with slope 3 passing through (2, -1)?",
-      options: [
-        "y - 1 = 3(x + 2)",
-        "y + 1 = 3(x + 2)",
-        "y - 1 = 3(x - 2)",
-        "y + 1 = 3(x - 2)"
-      ],
-      correct: 3,  // Correct answer is 4th choice
+      options: ["y - 1 = 3(x + 2)", "y + 1 = 3(x + 2)", "y - 1 = 3(x - 2)", "y + 1 = 3(x - 2)"],
+      correct: 3,
       explanation: "Substitute m=3, x₁=2, y₁=-1: y - (-1) = 3(x - 2) → y + 1 = 3(x - 2)"
     },
     {
-      title: "Question 4: Equation with Slope -4 through (0, 5)",
       question: "Find the equation of the line with slope -4 passing through (0, 5).",
-      options: [
-        "y - 5 = -4(x - 0)",
-        "y + 5 = -4(x - 0)",
-        "y - 5 = 4(x - 0)",
-        "y + 5 = 4(x - 0)"
-      ],
-      correct: 0,  // Correct answer is 1st choice
+      options: ["y - 5 = -4(x - 0)", "y + 5 = -4(x - 0)", "y - 5 = 4(x - 0)", "y + 5 = 4(x - 0)"],
+      correct: 0,
       explanation: "Substitute m=-4, x₁=0, y₁=5: y - 5 = -4(x - 0)"
     },
     {
-      title: "Question 5: Identify Slope",
       question: "In the equation y - 2 = 5(x - 1), what is the slope?",
-      options: [
-        "2",
-        "1",
-        "-5",
-        "5"
-      ],
-      correct: 3,  // Correct answer is 4th choice
+      options: ["2", "1", "-5", "5"],
+      correct: 3,
       explanation: "The slope is the coefficient of (x - x₁), which is 5."
     },
     {
-      title: "Question 6: Comparing Graphs",
       question: "How do the graphs of y - 3 = 2(x - 4) and y - 3 = -2(x - 4) differ?",
-      options: [
-        "They are the same line",
-        "One increases while the other decreases",
-        "Both are horizontal lines",
-        "They overlap exactly"
-      ],
-      correct: 1,  // Correct answer is 2nd choice
+      options: ["Same line", "One increases, one decreases", "Both horizontal", "Overlap exactly"],
+      correct: 1,
       explanation: "Positive slope rises from left to right; negative slope falls from left to right."
     },
     {
-      title: "Question 7: Verify Correctness",
       question: "Is the equation y - 5 = 3(x + 2) correct for slope 3 and point (-2, 5)?",
-      options: [
-        "No, because the slope is wrong",
-        "Yes, because it follows the formula",
-        "No, because the point is incorrect",
-        "Yes, but only after simplifying"
-      ],
-      correct: 1,  // Correct answer is 2nd choice
+      options: ["No, slope wrong", "Yes, follows formula", "No, point incorrect", "Yes, but only after simplifying"],
+      correct: 1,
       explanation: "x + 2 is the same as x - (-2), so it is correct for point (-2, 5)."
     },
     {
-      title: "Question 8: Correct Equation",
       question: "Which is the correct equation for slope 1 and point (3, 2)?",
-      options: [
-        "y + 2 = 1(x - 3)",
-        "y - 3 = 1(x - 2)",
-        "y - 2 = 1(x - 3)",
-        "y + 3 = 1(x + 2)"
-      ],
-      correct: 2,  // Correct answer is 3rd choice
+      options: ["y + 2 = 1(x - 3)", "y - 3 = 1(x - 2)", "y - 2 = 1(x - 3)", "y + 3 = 1(x + 2)"],
+      correct: 2,
       explanation: "Substitute correctly: y - y₁ = m(x - x₁) → y - 2 = 1(x - 3)"
     },
     {
-      title: "Question 9: Point-Slope Example",
-      question: "Which is a correct example of a point-slope equation you can create?",
-      options: [
-        "y = 4x + 2",
-        "y - 4 = 2(x - 1)",
-        "y = x - 5",
-        "y = 3x"
-      ],
-      correct: 1,  // Correct answer is 2nd choice
+      question: "Which is a correct example of a point-slope equation?",
+      options: ["y = 4x + 2", "y - 4 = 2(x - 1)", "y = x - 5", "y = 3x"],
+      correct: 1,
       explanation: "y - 4 = 2(x - 1) is in point-slope form: y - y₁ = m(x - x₁)."
     },
     {
-      title: "Question 10: Real-world Application",
       question: "Which situation can be modeled using point-slope form?",
-      options: [
-        "A circle's radius changing unevenly",
-        "A constant value that does not change",
-        "A random pattern with no rule",
-        "A decreasing temperature at a constant rate"
-      ],
-      correct: 3,  // Correct answer is 4th choice
+      options: ["Circle's radius changing", "Constant value not changing", "Random pattern", "Decreasing temperature at constant rate"],
+      correct: 3,
       explanation: "Linear equations represent constant rate of change, which can be modeled using point-slope form."
     }
   ];
 
   const steps = [
-    {
-      title: "📐 SLOPE AND A POINT MISSION",
-      content: "Welcome to the Slope and a Point mission! Learn how to find the equation of a line using a given slope and a point.",
-      description: "The point-slope form is: y - y₁ = m(x - x₁). Let's master this concept!",
-      type: "info"
-    },
+    { title: "📐 SLOPE AND A POINT MISSION", content: "Welcome to the Slope and a Point mission! Learn how to find the equation of a line using a given slope and a point.", description: "The point-slope form is: y - y₁ = m(x - x₁). Let's master this concept!", type: "info" },
     {
       title: "Lesson: Slope and a Point",
       content: (
         <div>
-          <p style={{ marginBottom: '15px', fontSize: '14px', color: '#555' }}>
-            <strong>m</strong> and <strong>(x₁, y₁)</strong>
-          </p>
-          
-          {/* Image Display */}
-          <div style={styles.imageContainer}>
-            <img 
-              src="/image.png" 
-              alt="Slope and Point Graph"
-              style={styles.lessonImage}
-              onError={(e) => {
-                e.target.onerror = null;
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Ctext x='250' y='150' text-anchor='middle' fill='%23666' font-size='16'%3ESlope = -2, Point (1, 5)%3C/text%3E%3C/svg%3E";
-              }}
-            />
-            <p style={styles.imageCaption}>Figure 1: Line with slope -2 passing through point (1, 5)</p>
+          <p style={respStyles.paragraph}><strong>m</strong> and <strong>(x₁, y₁)</strong></p>
+          <div style={respStyles.imageContainer}>
+            <img src="/image.png" alt="Slope and Point Graph" style={respStyles.lessonImage}
+              onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Ctext x='250' y='150' text-anchor='middle' fill='%23666' font-size='16'%3ESlope = -2, Point (1, 5)%3C/text%3E%3C/svg%3E"; }} />
+            <p style={respStyles.imageCaption}>Figure 1: Line with slope -2 passing through point (1, 5)</p>
           </div>
-          
-          <div style={styles.exampleBox}>
-            <h4 style={styles.exampleTitle}>📐 Example:</h4>
-            <p>Write the equation of a line whose graph has a slope of <strong>-2</strong> and passes through the point <strong>(1, 5)</strong>.</p>
-            
-            <div style={styles.solutionBox}>
-              <p><strong>Solution:</strong> If given a slope and a particular point, then we will use the <strong>Point-slope Form</strong> defined as:</p>
-              <div style={styles.formulaBox}>
-                <strong>y - y₁ = m(x - x₁)</strong>
-              </div>
-              
-              <p><strong>Step 1.</strong> Identify the slope and a point (x₁, y₁).</p>
-              <p>✓ m = -2 ; and x₁ = 1 and y₁ = 5</p>
-              
-              <p><strong>Step 2.</strong> Substitute the given values into the formula: y - y₁ = m(x - x₁)</p>
-              <div style={styles.formulaBox}>
-                y - 5 = -2(x - 1)
-              </div>
-              
-              <p><strong>Step 3.</strong> Simplify:</p>
-              <div style={styles.formulaBox}>
-                y - 5 = -2(x - 1)
-              </div>
-              
-              <p><strong>Step 4.</strong> Apply Distributive property:</p>
-              <div style={styles.formulaBox}>
-                y - 5 = -2(x) - (-2)(1)<br/>
-                y - 5 = -2x + 2
-              </div>
-              
-              <p><strong>Step 5.</strong> Apply Addition Property of Equality:</p>
-              <div style={styles.formulaBox}>
-                y - 5 + 5 = -2x + 2 + 5<br/>
-                y = -2x + 7
-              </div>
-              
-              <p><strong>Thus, the equation of a line whose graph has a slope of -2 and a point (1, 5) is:</strong></p>
-              <div style={styles.resultBox}>
-                y = -2x + 7 &nbsp;&nbsp;or&nbsp;&nbsp; 2x + y = 7 (standard form)
-              </div>
+          <div style={respStyles.exampleBox}>
+            <h4 style={respStyles.exampleTitle}>📐 Example:</h4>
+            <p>Write the equation of a line with slope <strong>-2</strong> through point <strong>(1, 5)</strong>.</p>
+            <div style={respStyles.solutionBox}>
+              <p><strong>Solution:</strong> Use <strong>Point-slope Form</strong>: y - y₁ = m(x - x₁)</p>
+              <p><strong>Step 1.</strong> m = -2, x₁ = 1, y₁ = 5</p>
+              <p><strong>Step 2.</strong> Substitute: y - 5 = -2(x - 1)</p>
+              <p><strong>Step 3.</strong> Distribute: y - 5 = -2x + 2</p>
+              <p><strong>Step 4.</strong> Add 5: y = -2x + 7</p>
+              <div style={respStyles.resultBoxSmall}>y = -2x + 7 &nbsp;or&nbsp; 2x + y = 7</div>
             </div>
           </div>
         </div>
@@ -220,130 +113,53 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     }
   ];
 
-  // Add quiz steps dynamically from questions array
   for (let i = 0; i < questions.length; i++) {
-    steps.push({
-      ...questions[i],
-      type: "quiz"
-    });
+    steps.push({ ...questions[i], title: `Question ${i + 1}`, type: "quiz" });
   }
-
-  // Add complete step
-  steps.push({
-    title: "Mission Complete! 🎉",
-    content: "Congratulations! You've mastered the Slope and a Point mission!",
-    result: "You now know how to find equations using slope and a point!",
-    note: "The point-slope form is a powerful tool for writing linear equations!",
-    type: "complete"
-  });
+  steps.push({ title: "Mission Complete! 🎉", content: "Congratulations! You've mastered the Slope and a Point mission!", result: "You now know how to find equations using slope and a point!", note: "The point-slope form is a powerful tool!", type: "complete" });
 
   const avatarMessages = {
-    happy: [
-      "📐 Excellent! You're mastering slope!",
-      "✨ Perfect! Point-slope form is clear to you!",
-      "🌟 Great job! Keep going!",
-      "💫 You're becoming a linear equations expert!",
-      "📏 The slope is rising with your skills!",
-      "📚 Excellent work! One step closer!",
-      "🏆 Amazing! You've got this!"
-    ],
-    wrong: [
-      "🤔 Oops! Let's review the point-slope form!",
-      "💡 Almost there! Remember: y - y₁ = m(x - x₁)",
-      "📚 Not quite right. Check your substitution!",
-      "✨ Don't give up! Practice makes perfect!",
-      "🎯 Keep trying! You'll master point-slope form!",
-      "💪 Every mistake teaches us something! Try again!",
-      "🌟 Focus on identifying m, x₁, and y₁ correctly!"
-    ],
-    info: [
-      "💡 Remember: Point-slope form is y - y₁ = m(x - x₁)!",
-      "📐 A positive slope rises, negative slope falls!",
-      "🔢 The slope m tells you the steepness of the line!",
-      "✨ Practice substituting values into the formula!",
-      "📚 Keep practicing your point-slope skills!"
-    ]
+    happy: ["📐 Excellent!", "✨ Perfect!", "🌟 Great job!", "💫 You're an expert!", "📏 Slope is rising!", "🏆 Amazing!"],
+    wrong: ["🤔 Oops! Review point-slope form!", "💡 Almost there! y - y₁ = m(x - x₁)", "📚 Not quite right.", "✨ Don't give up!", "🎯 Keep trying!", "💪 Every mistake teaches us!"],
+    info: ["💡 Remember: y - y₁ = m(x - x₁)!", "📐 Positive slope rises, negative falls!", "🔢 Slope m tells steepness!", "✨ Practice substituting values!"]
   };
 
-  const getRandomMessage = (type) => {
-    const messages = avatarMessages[type];
-    return messages[Math.floor(Math.random() * messages.length)];
-  };
+  const getRandomMessage = (type) => avatarMessages[type][Math.floor(Math.random() * avatarMessages[type].length)];
 
-  // Check if mission is already completed on load
   useEffect(() => {
     const checkCompletion = async () => {
       if (user?.dbId) {
-        const { data } = await supabase
-          .from('mission_progress')
-          .select('status')
-          .eq('mission_id', MISSION_ID)
-          .eq('student_id', user.dbId)
-          .maybeSingle();
-        
-        if (data?.status === 'completed') {
-          setIsAlreadyCompleted(true);
-          setShowRewardClaimed(true);
-          setCurrentStep(steps.length - 1);
-        }
+        const { data } = await supabase.from('mission_progress').select('status').eq('mission_id', MISSION_ID).eq('student_id', user.dbId).maybeSingle();
+        if (data?.status === 'completed') { setIsAlreadyCompleted(true); setShowRewardClaimed(true); setCurrentStep(steps.length - 1); }
       }
     };
     checkCompletion();
   }, [user?.dbId]);
 
-  const handleResetMission = () => {
-    setShowResetConfirm(true);
-  };
-
+  const handleResetMission = () => setShowResetConfirm(true);
   const confirmReset = () => {
-    setCurrentStep(0);
-    setAnswers({});
-    setShowConfetti(false);
-    setFeedbackAvatar(null);
-    setCanProceed(true);
-    setShowAvatarMessage(true);
-    setShowResetConfirm(false);
-    setShowRewardClaimed(false);
-    setIsAlreadyCompleted(false);
-    setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! You can do this! 💪");
-    
-    setTimeout(() => {
-      setShowAvatarMessage(false);
-    }, 3000);
+    setCurrentStep(0); setAnswers({}); setShowConfetti(false); setFeedbackAvatar(null);
+    setCanProceed(true); setShowAvatarMessage(true); setShowResetConfirm(false);
+    setShowRewardClaimed(false); setIsAlreadyCompleted(false);
+    setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! 💪");
+    setTimeout(() => setShowAvatarMessage(false), 3000);
   };
-
   const cancelReset = () => {
     setShowResetConfirm(false);
-    setCurrentAvatarMessage("👍 Great choice! Let's continue with your progress!");
+    setCurrentAvatarMessage("👍 Great choice! Let's continue!");
     setShowAvatarMessage(true);
-    setTimeout(() => {
-      setShowAvatarMessage(false);
-    }, 2000);
+    setTimeout(() => setShowAvatarMessage(false), 2000);
   };
 
   const handleAnswer = (stepIndex, answerIndex) => {
     const step = steps[stepIndex];
     const isCorrect = answerIndex === step.correct;
-    
-    const messageType = isCorrect ? 'happy' : 'wrong';
-    const randomMessage = getRandomMessage(messageType);
-    setCurrentAvatarMessage(randomMessage);
-    
+    setCurrentAvatarMessage(getRandomMessage(isCorrect ? 'happy' : 'wrong'));
     setFeedbackAvatar(isCorrect ? 'happy' : 'wrong');
     setCanProceed(isCorrect);
     setShowAvatarMessage(true);
-    
-    setAnswers({
-      ...answers,
-      [stepIndex]: {
-        selected: answerIndex,
-        isCorrect: isCorrect
-      }
-    });
-    
-    setTimeout(() => {
-      setFeedbackAvatar(null);
-    }, 3000);
+    setAnswers({ ...answers, [stepIndex]: { selected: answerIndex, isCorrect } });
+    setTimeout(() => setFeedbackAvatar(null), 3000);
   };
 
   const handleNext = () => {
@@ -351,36 +167,29 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       if (steps[currentStep].type === 'quiz') {
         if (!answers[currentStep]) {
           setCurrentAvatarMessage("🤔 Please select an answer first!");
-          setFeedbackAvatar('wrong');
-          setShowAvatarMessage(true);
+          setFeedbackAvatar('wrong'); setShowAvatarMessage(true);
           setTimeout(() => setFeedbackAvatar(null), 2000);
           return;
         }
-        
         if (!canProceed) {
-          setCurrentAvatarMessage("📚 You need to answer correctly to continue! Try again!");
-          setFeedbackAvatar('wrong');
-          setShowAvatarMessage(true);
+          setCurrentAvatarMessage("📚 You need to answer correctly to continue!");
+          setFeedbackAvatar('wrong'); setShowAvatarMessage(true);
           setTimeout(() => setFeedbackAvatar(null), 2000);
           return;
         }
       }
-      
       setCurrentStep(currentStep + 1);
       setCanProceed(true);
       setFeedbackAvatar(null);
-      
       if (steps[currentStep + 1]?.type === 'quiz') {
         setCurrentAvatarMessage(getRandomMessage('info'));
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
       } else if (steps[currentStep + 1]?.type === 'complete') {
-        setCurrentAvatarMessage("🎉 You're almost there! Complete the mission to claim your reward!");
+        setCurrentAvatarMessage("🎉 Complete the mission to claim your reward!");
         setShowAvatarMessage(true);
         setTimeout(() => setShowAvatarMessage(false), 3000);
-      } else {
-        setShowAvatarMessage(false);
-      }
+      } else setShowAvatarMessage(false);
     }
   };
 
@@ -391,212 +200,96 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
       if (prevStep.type === 'quiz') {
         const prevAnswer = answers[currentStep - 1];
         setCanProceed(prevAnswer ? prevAnswer.isCorrect : true);
-      } else {
-        setCanProceed(true);
-      }
+      } else setCanProceed(true);
       setFeedbackAvatar(null);
       setShowAvatarMessage(false);
     }
   };
 
-  // Save mission completion to database
   const saveMissionCompletion = async () => {
-    try {
-      if (!user?.dbId) return false;
-      
-      const { error } = await supabase
-        .from('mission_progress')
-        .upsert({
-          mission_id: MISSION_ID,
-          student_id: user.dbId,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          xp_earned: MISSION_XP,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'mission_id,student_id'
-        });
-      
-      if (error) {
-        console.error('Error saving mission progress:', error);
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error in saveMissionCompletion:', error);
-      return false;
-    }
+    if (!user?.dbId) return false;
+    const { error } = await supabase.from('mission_progress').upsert({
+      mission_id: MISSION_ID, student_id: user.dbId, status: 'completed',
+      completed_at: new Date().toISOString(), xp_earned: MISSION_XP
+    }, { onConflict: 'mission_id,student_id' });
+    return !error;
   };
 
-  // Function to go to mission list
-  const goToMissionsList = () => {
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate('/studenthub/missions');
-    }
-  };
+  const goToMissionsList = () => { if (onComplete) onComplete(); else navigate('/studenthub/missions'); };
 
   const handleComplete = async () => {
     if (isCompleting || isAlreadyCompleted) return;
     setIsCompleting(true);
-    
     setShowConfetti(true);
-    setCurrentAvatarMessage(`🏆 CONGRATULATIONS! You've mastered the Slope and a Point mission! +${MISSION_XP} XP! 🎉`);
+    setCurrentAvatarMessage(`🏆 CONGRATULATIONS! +${MISSION_XP} XP! 🎉`);
     setFeedbackAvatar('happy');
     setShowAvatarMessage(true);
-    
     await saveMissionCompletion();
-    
     const currentProgress = userData?.progress || {};
     const completedMissions = currentProgress.completedMissions || [];
-    const currentMissionsCompleted = currentProgress.missionsCompleted || 0;
-    const currentTotalXP = userData?.xp || 0;
-    
     if (!completedMissions.includes(MISSION_ID) && updateUserData) {
-      const newTotalXP = currentTotalXP + MISSION_XP;
-      const newMissionsCompleted = currentMissionsCompleted + 1;
-      
+      const newTotalXP = (userData?.xp || 0) + MISSION_XP;
       updateUserData({
         xp: newTotalXP,
-        progress: {
-          ...currentProgress,
-          missionsCompleted: newMissionsCompleted,
-          completedMissions: [...completedMissions, MISSION_ID],
-          lastMissionCompleted: new Date().toISOString(),
-          totalXP: newTotalXP
-        }
+        progress: { ...currentProgress, missionsCompleted: (currentProgress.missionsCompleted || 0) + 1, completedMissions: [...completedMissions, MISSION_ID], lastMissionCompleted: new Date().toISOString() }
       });
-      
-      window.dispatchEvent(new CustomEvent('xpUpdated', { 
-        detail: { newXP: newTotalXP, missionId: MISSION_ID }
-      }));
-      
-      window.dispatchEvent(new CustomEvent('missionCompleted', {
-        detail: { missionId: MISSION_ID }
-      }));
+      window.dispatchEvent(new CustomEvent('xpUpdated', { detail: { newXP: newTotalXP, missionId: MISSION_ID } }));
     }
-    
     setShowRewardClaimed(true);
     setIsAlreadyCompleted(true);
-    
-    setTimeout(() => {
-      setShowConfetti(false);
-    }, 2000);
+    setTimeout(() => setShowConfetti(false), 2000);
   };
 
   const renderStepContent = () => {
     const step = steps[currentStep];
     const currentAnswer = answers[currentStep];
-
-    switch (step.type) {
-      case "info":
-        return (
-          <div style={styles.infoContent}>
-            <p style={styles.contentText}>{step.content}</p>
-            <p style={styles.descriptionText}>{step.description}</p>
-            <div style={styles.formulaBox}>
-              <p style={styles.formulaText}>Point-Slope Form: y - y₁ = m(x - x₁)</p>
-            </div>
+    if (step.type === "info") return (
+      <div style={respStyles.infoContent}>
+        <p style={respStyles.contentText}>{step.content}</p>
+        <p style={respStyles.descriptionText}>{step.description}</p>
+        <div style={respStyles.formulaBoxSmall}><p style={respStyles.formulaText}>Point-Slope Form: y - y₁ = m(x - x₁)</p></div>
+      </div>
+    );
+    if (step.type === "lesson") return <div style={respStyles.lessonContent}>{step.content}</div>;
+    if (step.type === "quiz") return (
+      <div style={respStyles.quizContent}>
+        <div style={respStyles.questionNumber}>Question {currentStep - 1} of {questions.length}</div>
+        <p style={respStyles.questionText}>{step.question}</p>
+        <div style={respStyles.optionsContainer}>
+          {step.options.map((option, idx) => (
+            <label key={idx} style={{ ...respStyles.optionLabel, ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? respStyles.correctOption : {}), ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? respStyles.wrongOption : {}) }}>
+              <input type="radio" name={`q-${currentStep}`} value={idx} checked={currentAnswer && currentAnswer.selected === idx} onChange={() => handleAnswer(currentStep, idx)} style={respStyles.radio} />
+              <span style={respStyles.optionText}>{option}</span>
+            </label>
+          ))}
+        </div>
+        {currentAnswer && (
+          <div style={currentAnswer.isCorrect ? respStyles.correctFeedback : respStyles.incorrectFeedback}>
+            {currentAnswer.isCorrect ? `✅ Correct! ${step.explanation}` : `❌ Incorrect. ${step.explanation}`}
           </div>
-        );
-
-      case "lesson":
-        return (
-          <div style={styles.lessonContent}>
-            {step.content}
-          </div>
-        );
-
-      case "quiz":
-        return (
-          <div style={styles.quizContent}>
-            <div style={styles.questionNumber}>
-              Question {currentStep - 1} of {questions.length}
-            </div>
-            <p style={styles.questionText}>{step.question}</p>
-            <div style={styles.optionsContainer}>
-              {step.options.map((option, idx) => (
-                <label 
-                  key={idx} 
-                  style={{
-                    ...styles.optionLabel,
-                    ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? styles.correctOption : {}),
-                    ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? styles.wrongOption : {})
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name={`question-${currentStep}`}
-                    value={idx}
-                    checked={currentAnswer && currentAnswer.selected === idx}
-                    onChange={() => handleAnswer(currentStep, idx)}
-                    style={styles.radio}
-                  />
-                  <span style={styles.optionText}>{option}</span>
-                </label>
-              ))}
-            </div>
-            {currentAnswer && (
-              <div style={currentAnswer.isCorrect ? styles.correctFeedback : styles.incorrectFeedback}>
-                {currentAnswer.isCorrect ? 
-                  `✅ Correct! ${step.explanation}` : 
-                  `❌ Incorrect. ${step.explanation}`}
-              </div>
-            )}
-          </div>
-        );
-
-      case "complete":
-        return (
-          <div style={styles.completeContent}>
-            {!showRewardClaimed ? (
-              <>
-                <p style={styles.completeText}>{step.content}</p>
-                <div style={styles.resultBox}>
-                  <span style={styles.resultIcon}>📐</span>
-                  <span style={styles.resultText}>{step.result}</span>
-                </div>
-                <p style={styles.noteText}>{step.note}</p>
-                <div style={styles.rewardBox}>
-                  <span style={styles.rewardIcon}>🏆</span>
-                  <span style={styles.rewardText}>+{MISSION_XP} XP Reward!</span>
-                </div>
-                <button 
-                  style={styles.claimButton} 
-                  onClick={handleComplete}
-                  disabled={isCompleting}
-                >
-                  {isCompleting ? "Claiming..." : "🎁 Claim Your Reward"}
-                </button>
-              </>
-            ) : (
-              <>
-                <div style={styles.claimedBox}>
-                  <span style={styles.claimedIcon}>✅</span>
-                  <p style={styles.claimedText}>Mission Completed! +{MISSION_XP} XP Earned!</p>
-                </div>
-                <div style={styles.resultBox}>
-                  <span style={styles.resultIcon}>📐</span>
-                  <span style={styles.resultText}>{step.result}</span>
-                </div>
-                <div style={styles.actionButtons}>
-                  <button 
-                    style={styles.missionsListButton} 
-                    onClick={goToMissionsList}
-                  >
-                    📋 Back to All Missions
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        );
-
-      default:
-        return null;
-    }
+        )}
+      </div>
+    );
+    if (step.type === "complete") return (
+      <div style={respStyles.completeContent}>
+        {!showRewardClaimed ? (
+          <>
+            <p style={respStyles.completeText}>{step.content}</p>
+            <div style={respStyles.resultBoxSmall}><span>📐</span><span>{step.result}</span></div>
+            <p style={respStyles.noteText}>{step.note}</p>
+            <div style={respStyles.rewardBoxSmall}><span>🏆</span><span>+{MISSION_XP} XP Reward!</span></div>
+            <button style={respStyles.claimButton} onClick={handleComplete} disabled={isCompleting}>{isCompleting ? "Claiming..." : "🎁 Claim Your Reward"}</button>
+          </>
+        ) : (
+          <>
+            <div style={respStyles.claimedBox}><span>✅</span><p style={respStyles.claimedText}>Mission Completed! +{MISSION_XP} XP!</p></div>
+            <div style={respStyles.resultBoxSmall}><span>📐</span><span>{step.result}</span></div>
+            <button style={respStyles.missionsListButton} onClick={goToMissionsList}>📋 Back to All Missions</button>
+          </>
+        )}
+      </div>
+    );
+    return null;
   };
 
   const getAvatarImage = () => {
@@ -607,817 +300,128 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
 
   const progressPercentage = ((currentStep + 1) / steps.length) * 100;
   const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
-  const totalQuestions = questions.length;
 
-  // If already completed, show the completed screen directly
   if (isAlreadyCompleted && currentStep !== steps.length - 1 && !showRewardClaimed) {
-    setTimeout(() => {
-      setCurrentStep(steps.length - 1);
-      setShowRewardClaimed(true);
-    }, 100);
+    setTimeout(() => { setCurrentStep(steps.length - 1); setShowRewardClaimed(true); }, 100);
     return null;
   }
 
   return (
-    <div style={styles.container}>
-      {showConfetti && (
-        <div style={styles.confettiOverlay}>
-          <div style={styles.confettiMessage}>
-            🎉 +{MISSION_XP} XP Earned! 🎉
-            <br />
-            You've mastered Slope and a Point! 📐
-          </div>
-        </div>
-      )}
-
+    <div style={respStyles.container}>
+      {showConfetti && <div style={respStyles.confettiOverlay}><div style={respStyles.confettiMessage}>🎉 +{MISSION_XP} XP! 🎉<br />Slope and a Point Mastered! 📐</div></div>}
       {showResetConfirm && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={styles.modalTitle}>🔄 Reset Mission?</h3>
-            <p style={styles.modalText}>Are you sure you want to reset this mission? All your progress will be lost.</p>
-            <div style={styles.modalButtons}>
-              <button style={styles.confirmResetBtn} onClick={confirmReset}>
-                Yes, Reset
-              </button>
-              <button style={styles.cancelResetBtn} onClick={cancelReset}>
-                Cancel
-              </button>
+        <div style={respStyles.modalOverlay}>
+          <div style={respStyles.modalContent}>
+            <h3 style={respStyles.modalTitle}>🔄 Reset Mission?</h3>
+            <p style={respStyles.modalText}>Reset this mission? All progress will be lost.</p>
+            <div style={respStyles.modalButtons}>
+              <button style={respStyles.confirmResetBtn} onClick={confirmReset}>Yes, Reset</button>
+              <button style={respStyles.cancelResetBtn} onClick={cancelReset}>Cancel</button>
             </div>
           </div>
         </div>
       )}
-      
-      <div style={styles.headerRow}>
-        {!showRewardClaimed && (
-          <button style={styles.resetButton} onClick={handleResetMission} title="Reset Mission">
-            🔄 Reset Mission
-          </button>
-        )}
-      </div>
-
-      <div style={styles.progressBar}>
-        <div 
-          style={{
-            ...styles.progressFill,
-            width: `${progressPercentage}%`
-          }}
-        />
-      </div>
-
-      {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
-        <div style={styles.questionProgress}>
-          <span>📐 Questions Mastered: {questionsCompleted}/{totalQuestions}</span>
-        </div>
-      )}
-
-      <div style={styles.card}>
-        <h2 style={styles.title}>{steps[currentStep].title}</h2>
-        
-        <div style={styles.scrollableContent}>
-          {renderStepContent()}
-        </div>
-        
+      <div style={respStyles.headerRow}>{!showRewardClaimed && <button style={respStyles.resetButton} onClick={handleResetMission}>🔄 Reset</button>}</div>
+      <div style={respStyles.progressBar}><div style={{ ...respStyles.progressFill, width: `${progressPercentage}%` }} /></div>
+      {steps[currentStep].type === 'quiz' && !showRewardClaimed && <div style={respStyles.questionProgress}>📐 Mastered: {questionsCompleted}/{questions.length}</div>}
+      <div style={respStyles.card}>
+        <h2 style={respStyles.title}>{steps[currentStep].title}</h2>
+        <div style={respStyles.scrollableContent}>{renderStepContent()}</div>
         {currentStep < steps.length - 1 && steps[currentStep].type !== 'complete' && !showRewardClaimed && (
-          <div style={styles.buttonContainer}>
-            {currentStep > 0 && (
-              <button style={styles.prevButton} onClick={handlePrevious}>
-                ← Previous
-              </button>
-            )}
-            
-            <button 
-              style={{
-                ...styles.nextButton,
-                ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? styles.disabledButton : {})
-              }}
-              onClick={handleNext}
-              disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}
-            >
-              Next →
-            </button>
+          <div style={respStyles.buttonContainer}>
+            {currentStep > 0 && <button style={respStyles.prevButton} onClick={handlePrevious}>← Prev</button>}
+            <button style={{ ...respStyles.nextButton, ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? respStyles.disabledButton : {}) }} onClick={handleNext} disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}>Next →</button>
           </div>
         )}
-        
-        <div style={styles.stepIndicator}>
-          {steps[currentStep].type === 'quiz' && !showRewardClaimed
-            ? `Question ${currentStep - 1} of ${totalQuestions}` 
-            : `Step ${currentStep + 1} of ${steps.length}`}
-        </div>
+        <div style={respStyles.stepIndicator}>{steps[currentStep].type === 'quiz' && !showRewardClaimed ? `Q${currentStep - 1}/${questions.length}` : `Step ${currentStep + 1}/${steps.length}`}</div>
       </div>
-
-      {/* Avatar Assistant at Bottom */}
-      <div style={styles.avatarContainer}>
-        <div style={styles.bubbleContainer}>
+      <div style={respStyles.avatarContainer}>
+        <div style={respStyles.bubbleContainer}>
           {showAvatarMessage && currentAvatarMessage && (
-            <div style={styles.speechBubble}>
-              <span style={styles.bubbleText}>{currentAvatarMessage}</span>
-              <button 
-                onClick={() => setShowAvatarMessage(false)} 
-                style={styles.closeBubble}
-              >
-                ✕
-              </button>
-            </div>
+            <div style={respStyles.speechBubble}><span style={respStyles.bubbleText}>{currentAvatarMessage}</span><button onClick={() => setShowAvatarMessage(false)} style={respStyles.closeBubble}>✕</button></div>
           )}
-          {!showAvatarMessage && (
-            <button 
-              onClick={() => {
-                setShowAvatarMessage(true);
-                setCurrentAvatarMessage(getRandomMessage('info'));
-              }} 
-              style={styles.reopenBubble}
-            >
-              💬
-            </button>
-          )}
+          {!showAvatarMessage && <button onClick={() => { setShowAvatarMessage(true); setCurrentAvatarMessage(getRandomMessage('info')); }} style={respStyles.reopenBubble}>💬</button>}
         </div>
-
-        <div style={styles.avatarWrapper}>
-          <img
-            src={getAvatarImage()}
-            alt="Learning Assistant"
-            style={styles.avatarImage}
-            onError={(e) => {
-              e.target.onerror = null;
-              if (feedbackAvatar === 'happy') {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
-              } else if (feedbackAvatar === 'wrong') {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23ef4444'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 70 L65 70' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
-              } else {
-                e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
-              }
-            }}
-          />
-        </div>
+        <div style={respStyles.avatarWrapper}><img src={getAvatarImage()} alt="Assistant" style={respStyles.avatarImage} onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"; }} /></div>
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: {
-    maxWidth: '900px',
-    margin: '0 auto',
-    padding: '20px',
-    position: 'relative',
-    minHeight: '100vh',
-    backgroundColor: '#f3f4f6',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  
-  headerRow: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    marginBottom: '10px',
-  },
-  
-  resetButton: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
-  },
-  
-  progressBar: {
-    width: '100%',
-    height: '8px',
-    backgroundColor: '#e5e7eb',
-    borderRadius: '4px',
-    marginBottom: '10px',
-    overflow: 'hidden',
-  },
-  
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#10b981',
-    transition: 'width 0.3s ease',
-    borderRadius: '4px',
-  },
-  
-  questionProgress: {
-    textAlign: 'center',
-    marginBottom: '15px',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#10b981',
-  },
-  
-  card: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    padding: '25px',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-    display: 'flex',
-    flexDirection: 'column',
-    maxHeight: 'calc(100vh - 180px)',
-    overflow: 'hidden',
-  },
-  
-  scrollableContent: {
-    flex: 1,
-    overflowY: 'auto',
-    paddingRight: '10px',
-    marginBottom: '15px',
-  },
-  
-  title: {
-    fontSize: '24px',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: '15px',
-    flexShrink: 0,
-  },
-  
-  infoContent: {
-    textAlign: 'center',
-    padding: '15px',
-  },
-  
-  contentText: {
-    fontSize: '16px',
-    color: '#666',
-    lineHeight: '1.6',
-    marginBottom: '12px',
-  },
-  
-  descriptionText: {
-    fontSize: '15px',
-    color: '#555',
-    lineHeight: '1.5',
-    marginBottom: '12px',
-  },
-  
-  formulaBox: {
-    backgroundColor: '#f3f4f6',
-    padding: '15px',
-    borderRadius: '8px',
-    textAlign: 'center',
-    marginTop: '15px',
-    border: '1px solid #e5e7eb',
-  },
-  
-  formulaText: {
-    fontSize: '16px',
-    fontFamily: 'monospace',
-    color: '#10b981',
-    fontWeight: 'bold',
-  },
-  
-  lessonContent: {
-    padding: '15px',
-    lineHeight: '1.6',
-  },
-  
-  exampleBox: {
-    backgroundColor: '#f0f9ff',
-    padding: '20px',
-    borderRadius: '12px',
-    marginTop: '15px',
-    border: '1px solid #bae6fd',
-  },
-  
-  exampleTitle: {
-    color: '#0369a1',
-    marginBottom: '15px',
-    fontSize: '18px',
-  },
-  
-  solutionBox: {
-    backgroundColor: '#fefce8',
-    padding: '15px',
-    borderRadius: '8px',
-    marginTop: '10px',
-    fontSize: '14px',
-    border: '1px solid #fde047',
-  },
-  
-  resultBox: {
-    backgroundColor: '#dcfce7',
-    padding: '12px',
-    borderRadius: '6px',
-    marginTop: '10px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    border: '1px solid #86efac',
-  },
-  
-  imageContainer: {
-    textAlign: 'center',
-    marginBottom: '20px',
-    padding: '10px',
-    backgroundColor: '#f9fafb',
-    borderRadius: '12px',
-    border: '1px solid #e5e7eb',
-  },
-  
-  lessonImage: {
-    maxWidth: '100%',
-    height: 'auto',
-    borderRadius: '8px',
-  },
-  
-  imageCaption: {
-    fontSize: '12px',
-    color: '#6b7280',
-    marginTop: '8px',
-    fontStyle: 'italic',
-  },
-  
-  quizContent: {
-    padding: '5px',
-  },
-  
-  questionNumber: {
-    fontSize: '14px',
-    color: '#10b981',
-    fontWeight: 'bold',
-    marginBottom: '15px',
-    textAlign: 'center',
-  },
-  
-  questionText: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: '20px',
-    textAlign: 'center',
-  },
-  
-  optionsContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginBottom: '20px',
-  },
-  
-  optionLabel: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  },
-  
-  correctOption: {
-    backgroundColor: '#d1fae5',
-    borderColor: '#10b981',
-  },
-  
-  wrongOption: {
-    backgroundColor: '#fee2e2',
-    borderColor: '#ef4444',
-  },
-  
-  radio: {
-    marginRight: '10px',
-    cursor: 'pointer',
-  },
-  
-  optionText: {
-    fontSize: '14px',
-    color: '#333',
-  },
-  
-  correctFeedback: {
-    padding: '10px',
-    backgroundColor: '#d1fae5',
-    color: '#065f46',
-    borderRadius: '8px',
-    marginTop: '10px',
-    fontSize: '13px',
-  },
-  
-  incorrectFeedback: {
-    padding: '10px',
-    backgroundColor: '#fee2e2',
-    color: '#991b1b',
-    borderRadius: '8px',
-    marginTop: '10px',
-    fontSize: '13px',
-  },
-  
-  completeContent: {
-    textAlign: 'center',
-    padding: '15px',
-  },
-  
-  completeText: {
-    fontSize: '18px',
-    color: '#333',
-    marginBottom: '20px',
-  },
-  
-  finalResultBox: {
-    backgroundColor: '#ede9fe',
-    padding: '15px',
-    borderRadius: '12px',
-    marginBottom: '15px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-  },
-  
-  resultIcon: {
-    fontSize: '32px',
-  },
-  
-  resultText: {
-    fontSize: '20px',
-    fontWeight: 'bold',
-    color: '#065f46',
-  },
-  
-  noteText: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '20px',
-    fontStyle: 'italic',
-  },
-  
-  rewardBox: {
-    backgroundColor: '#fef3c7',
-    padding: '15px',
-    borderRadius: '12px',
-    marginBottom: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '10px',
-  },
-  
-  rewardIcon: {
-    fontSize: '28px',
-  },
-  
-  rewardText: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    color: '#d97706',
-  },
-  
-  claimButton: {
-    backgroundColor: '#10b981',
-    color: 'white',
-    padding: '14px 24px',
-    border: 'none',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    fontWeight: 'bold',
-    width: '100%',
-    transition: 'all 0.2s',
-  },
-  
-  claimedBox: {
-    backgroundColor: '#d1fae5',
-    padding: '15px',
-    borderRadius: '12px',
-    marginBottom: '15px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-  },
-  
-  claimedIcon: {
-    fontSize: '24px',
-  },
-  
-  claimedText: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#065f46',
-    margin: 0,
-  },
-  
-  actionButtons: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    marginTop: '15px',
-  },
-  
-  missionsListButton: {
-    backgroundColor: '#6b7280',
-    color: 'white',
-    padding: '12px 24px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    width: '100%',
-    transition: 'all 0.2s',
-  },
-  
-  buttonContainer: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    marginTop: '15px',
-    gap: '10px',
-    flexShrink: 0,
-  },
-  
-  prevButton: {
-    backgroundColor: '#6b7280',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    transition: 'all 0.2s',
-  },
-  
-  nextButton: {
-    backgroundColor: '#10b981',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    transition: 'all 0.2s',
-  },
-  
-  disabledButton: {
-    backgroundColor: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: 0.6,
-  },
-  
-  stepIndicator: {
-    textAlign: 'center',
-    marginTop: '12px',
-    fontSize: '12px',
-    color: '#999',
-    flexShrink: 0,
-  },
-  
-  avatarContainer: {
-    position: 'fixed',
-    bottom: '15px',
-    right: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-end',
-    zIndex: 100,
-  },
-  
-  bubbleContainer: {
-    marginBottom: '8px',
-    marginRight: '5px',
-  },
-  
-  speechBubble: {
-    backgroundColor: 'white',
-    padding: '8px 12px',
-    borderRadius: '16px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxWidth: '220px',
-    position: 'relative',
-    border: '2px solid #10b981',
-  },
-  
-  bubbleText: {
-    fontSize: '12px',
-    color: '#333',
-    lineHeight: '1.4',
-  },
-  
-  closeBubble: {
-    marginLeft: '8px',
-    cursor: 'pointer',
-    background: 'none',
-    border: 'none',
-    fontSize: '11px',
-    color: '#999',
-    padding: '2px 4px',
-  },
-  
-  reopenBubble: {
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    cursor: 'pointer',
-    backgroundColor: '#10b981',
-    color: 'white',
-    border: 'none',
-    fontSize: '18px',
-    marginRight: '5px',
-    marginBottom: '5px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-    transition: 'all 0.2s',
-  },
-  
-  avatarWrapper: {
-    width: '70px',
-    height: '70px',
-    borderRadius: '50%',
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
-    border: '3px solid white',
-    cursor: 'pointer',
-    transition: 'transform 0.2s',
-  },
-  
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
-    display: 'block',
-  },
-  
-  confettiOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  
-  confettiMessage: {
-    backgroundColor: 'white',
-    padding: '25px',
-    borderRadius: '16px',
-    fontSize: '20px',
-    textAlign: 'center',
-    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-  },
-  
-  modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2000,
-  },
-  
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    padding: '20px',
-    maxWidth: '350px',
-    width: '90%',
-    textAlign: 'center',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-  },
-  
-  modalTitle: {
-    fontSize: '20px',
-    marginBottom: '12px',
-    color: '#ef4444',
-  },
-  
-  modalText: {
-    fontSize: '14px',
-    color: '#555',
-    marginBottom: '20px',
-    lineHeight: '1.5',
-  },
-  
-  modalButtons: {
-    display: 'flex',
-    gap: '12px',
-    justifyContent: 'center',
-  },
-  
-  confirmResetBtn: {
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-  },
-  
-  cancelResetBtn: {
-    backgroundColor: '#6b7280',
-    color: 'white',
-    padding: '8px 18px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.2s',
-  },
+const respStyles = {
+  container: { padding: '10px', minHeight: '100vh', backgroundColor: '#f3f4f6', position: 'relative', boxSizing: 'border-box', width: '100%', '@media (min-width: 769px)': { padding: '20px' } },
+  headerRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' },
+  resetButton: { backgroundColor: '#ef4444', color: 'white', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', minHeight: '36px' },
+  progressBar: { width: '100%', height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', marginBottom: '8px', overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#10b981', transition: 'width 0.3s ease' },
+  questionProgress: { textAlign: 'center', marginBottom: '10px', fontSize: '10px', fontWeight: 'bold', color: '#10b981' },
+  card: { backgroundColor: 'white', borderRadius: '12px', padding: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 160px)', overflow: 'hidden', '@media (min-width: 769px)': { padding: '25px', maxHeight: 'calc(100vh - 200px)' } },
+  scrollableContent: { flex: 1, overflowY: 'auto', paddingRight: '6px', marginBottom: '10px' },
+  title: { fontSize: '16px', color: '#333', textAlign: 'center', marginBottom: '10px', flexShrink: 0 },
+  infoContent: { textAlign: 'center', padding: '8px' },
+  contentText: { fontSize: '13px', color: '#666', lineHeight: '1.4', marginBottom: '8px' },
+  descriptionText: { fontSize: '12px', color: '#555', lineHeight: '1.4', marginBottom: '8px' },
+  formulaBoxSmall: { backgroundColor: '#f3f4f6', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '10px' },
+  formulaText: { fontSize: '12px', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' },
+  lessonContent: { padding: '8px', lineHeight: '1.5', fontSize: '12px' },
+  quizContent: { padding: '4px' },
+  questionNumber: { fontSize: '11px', color: '#10b981', fontWeight: 'bold', marginBottom: '10px', textAlign: 'center' },
+  questionText: { fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '12px', textAlign: 'center' },
+  optionsContainer: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' },
+  optionLabel: { display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer' },
+  correctOption: { backgroundColor: '#d1fae5', borderColor: '#10b981' },
+  wrongOption: { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
+  radio: { marginRight: '8px', cursor: 'pointer', width: '16px', height: '16px' },
+  optionText: { fontSize: '11px', color: '#333' },
+  correctFeedback: { padding: '8px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
+  incorrectFeedback: { padding: '8px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
+  completeContent: { textAlign: 'center', padding: '8px' },
+  completeText: { fontSize: '14px', color: '#333', marginBottom: '12px' },
+  resultBoxSmall: { backgroundColor: '#ede9fe', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
+  noteText: { fontSize: '11px', color: '#666', marginBottom: '12px', fontStyle: 'italic' },
+  rewardBoxSmall: { backgroundColor: '#fef3c7', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
+  claimButton: { backgroundColor: '#10b981', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%', minHeight: '44px' },
+  claimedBox: { backgroundColor: '#d1fae5', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' },
+  claimedText: { fontSize: '12px', fontWeight: 'bold', color: '#065f46', margin: 0 },
+  missionsListButton: { backgroundColor: '#6b7280', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%', minHeight: '44px' },
+  buttonContainer: { display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', flexShrink: 0 },
+  prevButton: { backgroundColor: '#6b7280', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
+  nextButton: { backgroundColor: '#10b981', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
+  disabledButton: { backgroundColor: '#9ca3af', cursor: 'not-allowed', opacity: 0.6 },
+  stepIndicator: { textAlign: 'center', marginTop: '10px', fontSize: '10px', color: '#999', flexShrink: 0 },
+  avatarContainer: { position: 'fixed', bottom: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 100 },
+  bubbleContainer: { marginBottom: '6px', marginRight: '4px' },
+  speechBubble: { backgroundColor: 'white', padding: '6px 10px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.15)', maxWidth: '160px', border: '2px solid #10b981' },
+  bubbleText: { fontSize: '9px', color: '#333', lineHeight: '1.3' },
+  closeBubble: { marginLeft: '6px', cursor: 'pointer', background: 'none', border: 'none', fontSize: '9px', color: '#999' },
+  reopenBubble: { borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', fontSize: '16px', marginRight: '4px', marginBottom: '4px' },
+  avatarWrapper: { width: '50px', height: '50px', borderRadius: '50%', overflow: 'hidden', backgroundColor: '#f0f0f0', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', border: '2px solid white', '@media (min-width: 769px)': { width: '70px', height: '70px' } },
+  avatarImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  confettiOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  confettiMessage: { backgroundColor: 'white', padding: '20px', borderRadius: '16px', fontSize: '16px', textAlign: 'center', maxWidth: '80%' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' },
+  modalContent: { backgroundColor: 'white', borderRadius: '16px', padding: '16px', maxWidth: '300px', width: '90%', textAlign: 'center' },
+  modalTitle: { fontSize: '16px', marginBottom: '10px', color: '#ef4444' },
+  modalText: { fontSize: '12px', color: '#555', marginBottom: '16px', lineHeight: '1.4' },
+  modalButtons: { display: 'flex', gap: '10px', justifyContent: 'center', flexDirection: 'column', '@media (min-width: 481px)': { flexDirection: 'row' } },
+  confirmResetBtn: { backgroundColor: '#ef4444', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' },
+  cancelResetBtn: { backgroundColor: '#6b7280', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' },
+  paragraph: { marginBottom: '10px', fontSize: '12px', color: '#555' },
+  imageContainer: { textAlign: 'center', margin: '10px 0', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '10px' },
+  lessonImage: { maxWidth: '100%', height: 'auto', borderRadius: '8px' },
+  imageCaption: { fontSize: '10px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' },
+  exampleBox: { backgroundColor: '#f0f9ff', padding: '12px', borderRadius: '10px', marginTop: '12px' },
+  exampleTitle: { color: '#0369a1', marginBottom: '10px', fontSize: '14px' },
+  solutionBox: { backgroundColor: '#fefce8', padding: '10px', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
+  resultBoxSmall: { backgroundColor: '#dcfce7', padding: '8px', borderRadius: '6px', marginTop: '8px', textAlign: 'center', fontWeight: 'bold', fontSize: '12px' }
 };
 
-// Add animations to document
 const styleSheet = document.createElement("style");
-styleSheet.innerHTML = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes bounce {
-    0% { transform: scale(0.8); opacity: 0; }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  
-  @keyframes float {
-    0% { transform: translateY(0px); }
-    50% { transform: translateY(-5px); }
-    100% { transform: translateY(0px); }
-  }
-  
-  @keyframes bubblePop {
-    0% { transform: scale(0); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  
-  button:hover:not(:disabled) {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
-  
-  button:active:not(:disabled) {
-    transform: translateY(0);
-  }
-  
-  .optionLabel:hover {
-    background-color: #f3f4f6;
-    border-color: #10b981;
-  }
-  
-  .avatarWrapper:hover {
-    transform: scale(1.05);
-  }
-  
-  .resetButton:hover {
-    background-color: #dc2626;
-  }
-  
-  .confirmResetBtn:hover {
-    background-color: #dc2626;
-  }
-  
-  .cancelResetBtn:hover {
-    background-color: #5a6268;
-  }
-  
-  .claimButton:hover {
-    background-color: #059669;
-    transform: translateY(-2px);
-  }
-  
-  .missionsListButton:hover {
-    background-color: #5a6268;
-    transform: translateY(-2px);
-  }
-  
-  .scrollableContent::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  .scrollableContent::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 4px;
-  }
-  
-  .scrollableContent::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 4px;
-  }
-  
-  .scrollableContent::-webkit-scrollbar-thumb:hover {
-    background: #555;
-  }
-`;
-
-if (!document.querySelector('#mission3-styles')) {
-  styleSheet.id = 'mission3-styles';
-  document.head.appendChild(styleSheet);
-}
+styleSheet.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
+button:active { transform: scale(0.98); }
+@media (max-width: 480px) { button, .optionLabel { min-height: 40px; } }
+@media (max-width: 360px) { .title { font-size: 14px !important; } .questionText { font-size: 12px !important; } .optionText { font-size: 10px !important; } .avatarWrapper { width: 45px !important; height: 45px !important; } }`;
+if (!document.querySelector('#mission3-responsive-styles')) { styleSheet.id = 'mission3-responsive-styles'; document.head.appendChild(styleSheet); }
 
 export default Mission3;

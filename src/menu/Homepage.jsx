@@ -1,4 +1,4 @@
-// src/menu/Homepage.jsx - COMPLETE FIXED VERSION with proper deletion handling
+// src/menu/Homepage.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { 
@@ -325,7 +325,7 @@ function Homepage() {
       <div style={styles.welcomeCard}>
         <div style={styles.welcomeHeader}>
           <div style={styles.welcomeIcon}>🎮</div>
-          <div>
+          <div style={styles.welcomeTextContainer}>
             <h1 style={styles.welcomeTitle}>Welcome back, {userName}!</h1>
             <p style={styles.welcomeDate}>{currentDate}</p>
           </div>
@@ -370,7 +370,7 @@ function Homepage() {
               <input
                 type="text"
                 style={styles.joinClassInput}
-                placeholder="Enter class code (e.g., MATH2024ABC)"
+                placeholder="Enter class code"
                 value={classCode}
                 onChange={handleClassCodeChange}
                 maxLength="20"
@@ -393,7 +393,7 @@ function Homepage() {
                   onClick={handlePreviewClass}
                   disabled={isJoining || !classCode.trim()}
                 >
-                  {isJoining ? 'Checking...' : 'Preview Class'}
+                  {isJoining ? 'Checking...' : 'Preview'}
                 </button>
               </div>
             </div>
@@ -412,7 +412,7 @@ function Homepage() {
             
             <div style={styles.exampleCodes}>
               <p style={styles.exampleTitle}>💡 Tip:</p>
-              <p style={styles.exampleText}>Ask your teacher for the class code (4-20 characters, letters and numbers only)</p>
+              <p style={styles.exampleText}>Ask your teacher for the class code</p>
             </div>
           </div>
         )}
@@ -439,16 +439,16 @@ function Homepage() {
                         onClick={(e) => handleRemoveClick(e, enrollment)}
                         title="Remove from class"
                       >
-                        <FiTrash2 size={16} color="#ef4444" />
+                        <FiTrash2 size={14} color="#ef4444" />
                       </button>
                     </div>
                     <p style={styles.classTeacher}>
-                      <FiUser size={12} style={styles.inlineIcon} />
+                      <FiUser size={10} style={styles.inlineIcon} />
                       <span style={styles.label}>Teacher:</span> 
                       <strong style={styles.teacherName}>{teacherName}</strong>
                     </p>
                     <div style={styles.classCodeContainer}>
-                      <span style={styles.classCodeLabel}>Class Code:</span>
+                      <span style={styles.classCodeLabel}>Code:</span>
                       <code style={styles.classCode}>{enrollment.class.code}</code>
                     </div>
                     <p style={styles.joinedDate}>
@@ -459,7 +459,7 @@ function Homepage() {
                     </div>
                     <p style={styles.progressText}>Progress: {enrollment.progress || 0}%</p>
                     <div style={styles.openClassButton}>
-                      Click to open class <FiArrowLeft style={{transform: 'rotate(180deg)'}} size={14} />
+                      Tap to open <FiArrowLeft style={{transform: 'rotate(180deg)'}} size={12} />
                     </div>
                   </div>
                 </div>
@@ -480,7 +480,7 @@ function Homepage() {
         <div style={styles.noClassesCard}>
           <div style={styles.noClassesIcon}>📚</div>
           <h3 style={styles.noClassesTitle}>No Classes Yet</h3>
-          <p style={styles.noClassesText}>Click "Join a New Class" above to get started!</p>
+          <p style={styles.noClassesText}>Tap "Join a New Class" to get started!</p>
           <p style={styles.noClassesSubtext}>Enter the class code your teacher gave you</p>
         </div>
       )}
@@ -492,7 +492,7 @@ function Homepage() {
         }}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Confirm Join Class</h2>
+              <h2 style={styles.modalTitle}>Confirm Join</h2>
               <button style={styles.modalClose} onClick={() => {
                 setShowJoinModal(false);
                 setClassDetails(null);
@@ -504,15 +504,12 @@ function Homepage() {
                 <div style={styles.previewIcon}>{classDetails.icon}</div>
                 <h3 style={styles.previewName}>{classDetails.name}</h3>
                 <div style={styles.previewTeacherInfo}>
-                  <FiUser size={16} />
+                  <FiUser size={14} />
                   <span style={styles.previewTeacherLabel}>Teacher:</span>
                   <strong style={styles.previewTeacherName}>{classDetails.teacherName}</strong>
                 </div>
-                <p style={styles.previewCode}>Class Code: <strong>{classDetails.code}</strong></p>
-                <p style={styles.previewStudents}>{classDetails.studentsCount} students enrolled</p>
-                {classDetails.createdAt && (
-                  <p style={styles.previewDate}>Created: {formatDate(classDetails.createdAt)}</p>
-                )}
+                <p style={styles.previewCode}>Code: <strong>{classDetails.code}</strong></p>
+                <p style={styles.previewStudents}>{classDetails.studentsCount} students</p>
                 <p style={styles.previewDescription}>{classDetails.description}</p>
               </div>
             </div>
@@ -529,7 +526,7 @@ function Homepage() {
                 onClick={handleJoinClass}
                 disabled={isJoining}
               >
-                {isJoining ? 'Joining...' : 'Confirm Join'}
+                {isJoining ? 'Joining...' : 'Join'}
               </button>
             </div>
           </div>
@@ -540,7 +537,7 @@ function Homepage() {
         <div style={styles.modalOverlay} onClick={handleCancelRemove}>
           <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Remove from Class</h2>
+              <h2 style={styles.modalTitle}>Leave Class</h2>
               <button style={styles.modalClose} onClick={handleCancelRemove}>×</button>
             </div>
             
@@ -548,18 +545,13 @@ function Homepage() {
               <div style={styles.classPreview}>
                 <div style={styles.previewIcon}>{getClassIcon(classToRemove.class.name)}</div>
                 <h3 style={styles.previewName}>{classToRemove.class.name}</h3>
-                <div style={styles.previewTeacherInfo}>
-                  <FiUser size={16} />
-                  <span>Teacher: {classToRemove.class.teacher?.name || classToRemove.class.teacher_name || 'Teacher'}</span>
-                </div>
                 <p style={styles.previewCode}>Code: {classToRemove.class.code}</p>
               </div>
               
               <div style={styles.warningBox}>
                 <span style={styles.warningIcon}>⚠️</span>
                 <p style={styles.warningText}>
-                  Are you sure you want to remove yourself from this class? 
-                  You will lose access to class materials and your progress will be reset.
+                  Are you sure? You will lose access to this class and your progress will be reset.
                 </p>
               </div>
             </div>
@@ -577,7 +569,7 @@ function Homepage() {
                 onClick={handleConfirmRemove}
                 disabled={isRemoving}
               >
-                {isRemoving ? 'Removing...' : 'Yes, Remove Me'}
+                {isRemoving ? 'Removing...' : 'Leave'}
               </button>
             </div>
           </div>
@@ -589,337 +581,478 @@ function Homepage() {
 
 const styles = {
   container: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    padding: '24px',
+    width: '100%',
+    maxWidth: '100%',
+    margin: '0',
+    padding: '12px',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-    '@media (max-width: 768px)': { padding: '16px' },
-    '@media (max-width: 480px)': { padding: '12px' },
+    boxSizing: 'border-box',
+    '@media (min-width: 769px)': { 
+      maxWidth: '1200px',
+      margin: '0 auto',
+      padding: '24px'
+    },
   },
-  inlineIcon: { marginRight: '4px', verticalAlign: 'middle' },
-  teacherName: { color: '#2563eb', fontWeight: '600', marginLeft: '4px' },
+  inlineIcon: { 
+    marginRight: '2px', 
+    verticalAlign: 'middle' 
+  },
+  teacherName: { 
+    color: '#2563eb', 
+    fontWeight: '600', 
+    marginLeft: '2px',
+    fontSize: 'inherit'
+  },
   welcomeCard: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '20px',
-    padding: '32px',
-    marginBottom: '32px',
+    borderRadius: '16px',
+    padding: '16px',
+    marginBottom: '16px',
     color: 'white',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-    '@media (max-width: 768px)': { padding: '24px', marginBottom: '24px' },
-    '@media (max-width: 480px)': { padding: '20px', marginBottom: '20px' },
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+    '@media (min-width: 769px)': { 
+      borderRadius: '20px',
+      padding: '32px',
+      marginBottom: '32px'
+    },
   },
   welcomeHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    marginBottom: '16px',
-    '@media (max-width: 480px)': { flexDirection: 'column', textAlign: 'center', gap: '8px' },
+    gap: '12px',
+    marginBottom: '12px',
+    flexWrap: 'wrap',
+    '@media (min-width: 769px)': { 
+      gap: '16px',
+      marginBottom: '16px'
+    },
   },
   welcomeIcon: {
-    fontSize: '48px',
-    '@media (max-width: 480px)': { fontSize: '40px' },
+    fontSize: '32px',
+    flexShrink: 0,
+    '@media (min-width: 769px)': { fontSize: '48px' },
+  },
+  welcomeTextContainer: {
+    flex: 1,
+    '@media (max-width: 480px)': { textAlign: 'center' },
   },
   welcomeTitle: {
-    fontSize: '28px',
+    fontSize: '18px',
     fontWeight: 'bold',
     margin: 0,
-    '@media (max-width: 768px)': { fontSize: '24px' },
-    '@media (max-width: 480px)': { fontSize: '20px' },
+    '@media (min-width: 769px)': { fontSize: '28px' },
   },
   welcomeDate: {
-    fontSize: '14px',
+    fontSize: '10px',
     opacity: 0.9,
-    margin: '8px 0 0 0',
-    '@media (max-width: 480px)': { fontSize: '12px' },
+    margin: '4px 0 0 0',
+    '@media (min-width: 769px)': { fontSize: '14px', marginTop: '8px' },
   },
   welcomeMessage: {
-    fontSize: '16px',
+    fontSize: '12px',
     opacity: 0.95,
     margin: 0,
-    lineHeight: 1.5,
-    '@media (max-width: 480px)': { fontSize: '14px' },
+    lineHeight: 1.4,
+    '@media (min-width: 769px)': { fontSize: '16px', lineHeight: 1.5 },
   },
   joinClassContainer: {
-    marginBottom: '40px',
+    marginBottom: '20px',
     display: 'flex',
     justifyContent: 'center',
-    '@media (max-width: 768px)': { marginBottom: '30px' },
+    alignItems: 'center',
+    width: '100%',
+    '@media (min-width: 769px)': { marginBottom: '40px' },
   },
   joinClassButton: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
-    padding: '16px 32px',
-    borderRadius: '16px',
-    fontSize: '18px',
+    padding: '12px 20px',
+    borderRadius: '12px',
+    fontSize: '14px',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '8px',
     transition: 'transform 0.2s, box-shadow 0.2s',
-    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-    '@media (max-width: 768px)': { padding: '14px 24px', fontSize: '16px' },
-    '@media (max-width: 480px)': { padding: '12px 20px', fontSize: '14px', width: '100%', justifyContent: 'center' },
+    boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
+    width: '100%',
+    justifyContent: 'center',
+    '@media (min-width: 769px)': { 
+      padding: '16px 32px',
+      fontSize: '18px',
+      gap: '12px',
+      width: 'auto',
+      minWidth: '200px'
+    },
   },
   joinIcon: {
-    fontSize: '24px',
-    '@media (max-width: 480px)': { fontSize: '20px' },
+    fontSize: '18px',
+    '@media (min-width: 769px)': { fontSize: '24px' },
   },
   joinClassCard: {
     background: 'white',
-    borderRadius: '20px',
-    padding: '32px',
+    borderRadius: '16px',
+    padding: '16px',
     width: '100%',
-    maxWidth: '500px',
-    boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
     border: '1px solid #e5e7eb',
     position: 'relative',
-    '@media (max-width: 768px)': { padding: '24px' },
-    '@media (max-width: 480px)': { padding: '20px' },
+    boxSizing: 'border-box',
+    '@media (min-width: 769px)': { 
+      padding: '32px',
+      maxWidth: '500px',
+      borderRadius: '20px'
+    },
   },
   joinClassHeader: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    marginBottom: '20px',
+    gap: '8px',
+    marginBottom: '12px',
     position: 'relative',
-    '@media (max-width: 480px)': { flexWrap: 'wrap' },
+    flexWrap: 'wrap',
+    '@media (min-width: 769px)': { 
+      gap: '12px',
+      marginBottom: '20px'
+    },
   },
   joinClassIcon: {
-    fontSize: '28px',
-    '@media (max-width: 480px)': { fontSize: '24px' },
+    fontSize: '20px',
+    '@media (min-width: 769px)': { fontSize: '28px' },
   },
   joinClassTitle: {
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 'bold',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
     margin: 0,
     flex: 1,
-    '@media (max-width: 768px)': { fontSize: '20px' },
+    '@media (min-width: 769px)': { fontSize: '24px' },
   },
   closeButton: {
     background: 'none',
     border: 'none',
-    fontSize: '24px',
+    fontSize: '20px',
     cursor: 'pointer',
     color: '#9ca3af',
-    padding: '4px 8px',
+    padding: '4px',
     borderRadius: '8px',
     transition: 'all 0.2s',
-    minHeight: '44px',
-    minWidth: '44px',
+    minHeight: '36px',
+    minWidth: '36px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '@media (min-width: 769px)': { 
+      fontSize: '24px',
+      minHeight: '44px',
+      minWidth: '44px'
+    },
   },
   joinClassDescription: {
-    fontSize: '14px',
+    fontSize: '11px',
     color: '#6b7280',
-    marginBottom: '24px',
-    lineHeight: 1.5,
-    '@media (max-width: 480px)': { fontSize: '13px', marginBottom: '20px' },
+    marginBottom: '16px',
+    lineHeight: 1.4,
+    '@media (min-width: 769px)': { 
+      fontSize: '14px', 
+      marginBottom: '24px',
+      lineHeight: 1.5
+    },
   },
   joinClassForm: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
-    marginBottom: '16px',
+    gap: '12px',
+    marginBottom: '12px',
+    width: '100%',
+    '@media (min-width: 769px)': { 
+      gap: '16px',
+      marginBottom: '16px'
+    },
   },
   joinClassInput: {
     width: '100%',
-    padding: '14px 18px',
-    fontSize: '16px',
+    padding: '10px 12px',
+    fontSize: '14px',
     border: '2px solid #e5e7eb',
-    borderRadius: '12px',
+    borderRadius: '10px',
     outline: 'none',
     transition: 'all 0.3s ease',
     fontFamily: 'monospace',
     textAlign: 'center',
-    letterSpacing: '1px',
+    letterSpacing: '0.5px',
     boxSizing: 'border-box',
-    '@media (max-width: 480px)': { padding: '12px 16px', fontSize: '16px' },
+    '@media (min-width: 769px)': { 
+      padding: '14px 18px',
+      fontSize: '16px',
+      letterSpacing: '1px'
+    },
   },
   joinClassButtons: {
     display: 'flex',
-    gap: '12px',
-    '@media (max-width: 480px)': { flexDirection: 'column' },
+    gap: '8px',
+    width: '100%',
+    flexDirection: 'column',
+    '@media (min-width: 481px)': { 
+      flexDirection: 'row',
+      gap: '12px'
+    },
   },
   cancelJoinButton: {
     flex: 1,
-    padding: '12px',
+    padding: '10px',
     backgroundColor: '#f3f4f6',
     color: '#374151',
     border: 'none',
-    borderRadius: '10px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'background-color 0.2s',
-    '@media (max-width: 480px)': { padding: '12px' },
-    minHeight: '44px',
+    minHeight: '40px',
+    '@media (min-width: 769px)': { 
+      padding: '12px',
+      fontSize: '14px',
+      minHeight: '44px'
+    },
   },
   previewButton: {
     flex: 1,
-    padding: '12px',
+    padding: '10px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
-    borderRadius: '10px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    fontSize: '12px',
     fontWeight: '500',
     cursor: 'pointer',
     transition: 'transform 0.2s',
-    '@media (max-width: 480px)': { padding: '12px' },
-    minHeight: '44px',
+    minHeight: '40px',
+    '@media (min-width: 769px)': { 
+      padding: '12px',
+      fontSize: '14px',
+      minHeight: '44px'
+    },
   },
   errorMessage: {
-    marginTop: '16px',
-    padding: '12px',
+    marginTop: '12px',
+    padding: '8px',
     backgroundColor: '#fee2e2',
     color: '#dc2626',
-    borderRadius: '10px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    fontSize: '11px',
     textAlign: 'center',
-    '@media (max-width: 480px)': { fontSize: '12px', padding: '10px' },
+    wordBreak: 'break-word',
+    '@media (min-width: 769px)': { 
+      marginTop: '16px',
+      padding: '12px',
+      fontSize: '14px'
+    },
   },
   successMessage: {
-    marginTop: '16px',
-    padding: '12px',
+    marginTop: '12px',
+    padding: '8px',
     backgroundColor: '#d1fae5',
     color: '#059669',
-    borderRadius: '10px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    fontSize: '11px',
     textAlign: 'center',
-    '@media (max-width: 480px)': { fontSize: '12px', padding: '10px' },
+    wordBreak: 'break-word',
+    '@media (min-width: 769px)': { 
+      marginTop: '16px',
+      padding: '12px',
+      fontSize: '14px'
+    },
   },
   exampleCodes: {
-    marginTop: '20px',
-    padding: '12px',
+    marginTop: '12px',
+    padding: '8px',
     backgroundColor: '#f0fdf4',
-    borderRadius: '10px',
+    borderRadius: '8px',
     textAlign: 'center',
+    '@media (min-width: 769px)': { 
+      marginTop: '20px',
+      padding: '12px'
+    },
   },
   exampleTitle: {
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold',
     color: '#166534',
-    margin: '0 0 4px 0',
+    margin: '0 0 2px 0',
+    '@media (min-width: 769px)': { fontSize: '12px', marginBottom: '4px' },
   },
   exampleText: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#166534',
     margin: 0,
+    '@media (min-width: 769px)': { fontSize: '12px' },
   },
   myClassesSection: {
-    marginBottom: '40px',
-    '@media (max-width: 768px)': { marginBottom: '30px' },
+    marginBottom: '20px',
+    width: '100%',
+    '@media (min-width: 769px)': { marginBottom: '40px' },
   },
   sectionTitle: {
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: '20px',
-    '@media (max-width: 768px)': { fontSize: '20px', marginBottom: '16px' },
+    marginBottom: '12px',
+    textAlign: 'center',
+    '@media (min-width: 769px)': { 
+      fontSize: '24px', 
+      marginBottom: '20px',
+      textAlign: 'left'
+    },
   },
   classesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
-    gap: '20px',
-    '@media (max-width: 768px)': { gridTemplateColumns: '1fr', gap: '16px' },
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    width: '100%',
+    '@media (min-width: 769px)': { 
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+      gap: '20px'
+    },
   },
   classCard: {
     background: 'white',
-    borderRadius: '16px',
-    padding: '20px',
+    borderRadius: '12px',
+    padding: '12px',
     display: 'flex',
-    gap: '16px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+    gap: '12px',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
     transition: 'transform 0.2s, box-shadow 0.2s',
     cursor: 'pointer',
-    '@media (max-width: 480px)': { flexDirection: 'column', textAlign: 'center', padding: '16px' },
+    width: '100%',
+    boxSizing: 'border-box',
+    '@media (min-width: 769px)': { 
+      padding: '20px',
+      gap: '16px',
+      borderRadius: '16px'
+    },
   },
   classIcon: {
-    fontSize: '48px',
-    '@media (max-width: 480px)': { fontSize: '40px' },
+    fontSize: '36px',
+    flexShrink: 0,
+    '@media (min-width: 769px)': { fontSize: '48px' },
   },
   classInfo: {
     flex: 1,
+    minWidth: 0,
+    width: '100%',
   },
   classHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '8px',
-    '@media (max-width: 480px)': { justifyContent: 'center', gap: '8px' },
+    marginBottom: '6px',
+    flexWrap: 'wrap',
+    '@media (min-width: 769px)': { marginBottom: '8px' },
   },
   className: {
-    fontSize: '18px',
+    fontSize: '14px',
     fontWeight: '600',
     color: '#1f2937',
     margin: 0,
-    '@media (max-width: 768px)': { fontSize: '16px' },
+    wordBreak: 'break-word',
+    '@media (min-width: 769px)': { fontSize: '18px' },
   },
   deleteButton: {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '8px',
+    padding: '6px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '8px',
+    borderRadius: '6px',
     transition: 'background-color 0.2s',
-    minWidth: '40px',
-    minHeight: '40px',
+    minWidth: '32px',
+    minHeight: '32px',
+    flexShrink: 0,
+    '@media (min-width: 769px)': { 
+      padding: '8px',
+      minWidth: '40px',
+      minHeight: '40px'
+    },
   },
   label: {
     fontWeight: '500',
     color: '#6b7280',
+    fontSize: '10px',
+    '@media (min-width: 769px)': { fontSize: '13px' },
   },
   classTeacher: {
-    fontSize: '13px',
+    fontSize: '10px',
     color: '#374151',
-    marginBottom: '8px',
+    marginBottom: '6px',
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
+    gap: '2px',
     flexWrap: 'wrap',
-    '@media (max-width: 480px)': { fontSize: '12px', justifyContent: 'center' },
+    '@media (min-width: 769px)': { 
+      fontSize: '13px',
+      marginBottom: '8px',
+      gap: '4px'
+    },
   },
   classCodeContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    marginBottom: '8px',
-    padding: '6px 10px',
+    gap: '4px',
+    marginBottom: '6px',
+    padding: '4px 6px',
     backgroundColor: '#f9fafb',
-    borderRadius: '6px',
+    borderRadius: '4px',
     flexWrap: 'wrap',
-    '@media (max-width: 480px)': { justifyContent: 'center' },
+    '@media (min-width: 769px)': { 
+      gap: '8px',
+      marginBottom: '8px',
+      padding: '6px 10px',
+      borderRadius: '6px'
+    },
   },
   classCodeLabel: {
-    fontSize: '12px',
+    fontSize: '9px',
     color: '#6b7280',
     fontWeight: '500',
+    '@media (min-width: 769px)': { fontSize: '12px' },
   },
   classCode: {
-    fontSize: '14px',
+    fontSize: '10px',
     fontWeight: '700',
     color: '#3b82f6',
     fontFamily: 'monospace',
-    letterSpacing: '1px',
+    letterSpacing: '0.5px',
+    wordBreak: 'break-all',
+    '@media (min-width: 769px)': { fontSize: '14px', letterSpacing: '1px' },
   },
   joinedDate: {
-    fontSize: '12px',
+    fontSize: '9px',
     color: '#6b7280',
-    marginBottom: '8px',
+    marginBottom: '6px',
+    '@media (min-width: 769px)': { 
+      fontSize: '12px',
+      marginBottom: '8px'
+    },
   },
   progressBar: {
-    height: '6px',
+    height: '4px',
     backgroundColor: '#e5e7eb',
-    borderRadius: '3px',
+    borderRadius: '2px',
     overflow: 'hidden',
-    marginTop: '8px',
+    marginTop: '6px',
+    '@media (min-width: 769px)': { 
+      height: '6px',
+      marginTop: '8px'
+    },
   },
   progressFill: {
     height: '100%',
@@ -927,67 +1060,96 @@ const styles = {
     transition: 'width 0.3s ease',
   },
   progressText: {
-    fontSize: '11px',
+    fontSize: '9px',
     color: '#6b7280',
-    marginTop: '4px',
+    marginTop: '2px',
+    '@media (min-width: 769px)': { 
+      fontSize: '11px',
+      marginTop: '4px'
+    },
   },
   openClassButton: {
-    marginTop: '12px',
-    fontSize: '12px',
+    marginTop: '8px',
+    fontSize: '10px',
     color: '#667eea',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
+    gap: '4px',
     fontWeight: '500',
-    '@media (max-width: 480px)': { justifyContent: 'center' },
+    '@media (min-width: 769px)': { 
+      marginTop: '12px',
+      fontSize: '12px',
+      gap: '6px'
+    },
   },
   loadingClassesContainer: {
     textAlign: 'center',
-    padding: '40px',
+    padding: '24px',
     backgroundColor: '#f9fafb',
-    borderRadius: '16px',
-    marginBottom: '40px',
-    '@media (max-width: 768px)': { padding: '30px' },
+    borderRadius: '12px',
+    marginBottom: '20px',
+    '@media (min-width: 769px)': { 
+      padding: '40px',
+      marginBottom: '40px'
+    },
   },
   loadingSpinnerSmall: {
-    width: '30px',
-    height: '30px',
-    border: '3px solid #f3f4f6',
-    borderTop: '3px solid #2563eb',
+    width: '24px',
+    height: '24px',
+    border: '2px solid #f3f4f6',
+    borderTop: '2px solid #2563eb',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
-    margin: '0 auto 12px',
+    margin: '0 auto 8px',
+    '@media (min-width: 769px)': { 
+      width: '30px',
+      height: '30px',
+      borderWidth: '3px',
+      marginBottom: '12px'
+    },
   },
   noClassesCard: {
     textAlign: 'center',
-    padding: '60px 20px',
+    padding: '32px 16px',
     backgroundColor: '#f9fafb',
-    borderRadius: '16px',
-    marginBottom: '40px',
-    '@media (max-width: 768px)': { padding: '40px 20px' },
+    borderRadius: '12px',
+    marginBottom: '20px',
+    '@media (min-width: 769px)': { 
+      padding: '60px 20px',
+      marginBottom: '40px'
+    },
   },
   noClassesIcon: {
-    fontSize: '64px',
-    marginBottom: '16px',
-    '@media (max-width: 768px)': { fontSize: '48px' },
+    fontSize: '48px',
+    marginBottom: '12px',
+    '@media (min-width: 769px)': { 
+      fontSize: '64px',
+      marginBottom: '16px'
+    },
   },
   noClassesTitle: {
-    fontSize: '20px',
+    fontSize: '16px',
     fontWeight: '600',
     color: '#1f2937',
-    marginBottom: '8px',
-    '@media (max-width: 768px)': { fontSize: '18px' },
+    marginBottom: '6px',
+    '@media (min-width: 769px)': { 
+      fontSize: '20px',
+      marginBottom: '8px'
+    },
   },
   noClassesText: {
-    fontSize: '16px',
+    fontSize: '12px',
     color: '#6b7280',
-    marginBottom: '8px',
-    '@media (max-width: 768px)': { fontSize: '14px' },
+    marginBottom: '4px',
+    '@media (min-width: 769px)': { 
+      fontSize: '16px',
+      marginBottom: '8px'
+    },
   },
   noClassesSubtext: {
-    fontSize: '14px',
+    fontSize: '10px',
     color: '#9ca3af',
-    '@media (max-width: 768px)': { fontSize: '12px' },
+    '@media (min-width: 769px)': { fontSize: '14px' },
   },
   modalOverlay: {
     position: 'fixed',
@@ -996,84 +1158,105 @@ const styles = {
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    backdropFilter: 'blur(5px)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px',
+    padding: '12px',
+    '@media (min-width: 769px)': { padding: '20px' },
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: '20px',
-    maxWidth: '450px',
+    borderRadius: '16px',
+    maxWidth: 'calc(100% - 24px)',
     width: '100%',
-    maxHeight: '90vh',
+    maxHeight: '85vh',
     overflow: 'auto',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
-    '@media (max-width: 480px)': { borderRadius: '16px', maxHeight: '85vh' },
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+    '@media (min-width: 769px)': { 
+      borderRadius: '20px',
+      maxWidth: '450px',
+      maxHeight: '90vh'
+    },
   },
   modalHeader: {
-    padding: '20px 24px',
+    padding: '12px 16px',
     borderBottom: '1px solid #e5e7eb',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    '@media (max-width: 480px)': { padding: '16px 20px' },
+    '@media (min-width: 769px)': { padding: '20px 24px' },
   },
   modalTitle: {
-    fontSize: '20px',
+    fontSize: '16px',
     fontWeight: 'bold',
     color: '#1f2937',
     margin: 0,
-    '@media (max-width: 480px)': { fontSize: '18px' },
+    '@media (min-width: 769px)': { fontSize: '20px' },
   },
   modalClose: {
     background: 'none',
     border: 'none',
-    fontSize: '28px',
+    fontSize: '22px',
     cursor: 'pointer',
     color: '#9ca3af',
     transition: 'color 0.2s',
-    minWidth: '44px',
-    minHeight: '44px',
+    minWidth: '36px',
+    minHeight: '36px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    '@media (max-width: 480px)': { fontSize: '24px' },
+    '@media (min-width: 769px)': { 
+      fontSize: '28px',
+      minWidth: '44px',
+      minHeight: '44px'
+    },
   },
   modalBody: {
-    padding: '24px',
-    '@media (max-width: 480px)': { padding: '20px' },
+    padding: '16px',
+    '@media (min-width: 769px)': { padding: '24px' },
   },
   classPreview: {
     textAlign: 'center',
   },
   previewIcon: {
-    fontSize: '64px',
-    marginBottom: '16px',
-    '@media (max-width: 480px)': { fontSize: '48px', marginBottom: '12px' },
+    fontSize: '48px',
+    marginBottom: '12px',
+    '@media (min-width: 769px)': { 
+      fontSize: '64px', 
+      marginBottom: '16px' 
+    },
   },
   previewName: {
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 'bold',
     color: '#1f2937',
-    marginBottom: '12px',
-    '@media (max-width: 480px)': { fontSize: '20px', marginBottom: '8px' },
+    marginBottom: '8px',
+    wordBreak: 'break-word',
+    '@media (min-width: 769px)': { 
+      fontSize: '24px', 
+      marginBottom: '12px' 
+    },
   },
   previewTeacherInfo: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px',
-    marginBottom: '12px',
-    padding: '8px',
+    gap: '4px',
+    marginBottom: '8px',
+    padding: '6px',
     backgroundColor: '#f3f4f6',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '11px',
     color: '#374151',
     flexWrap: 'wrap',
-    '@media (max-width: 480px)': { fontSize: '12px', marginBottom: '8px' },
+    '@media (min-width: 769px)': { 
+      gap: '8px',
+      marginBottom: '12px',
+      padding: '8px',
+      fontSize: '14px'
+    },
   },
   previewTeacherLabel: {
     fontWeight: '500',
@@ -1084,96 +1267,137 @@ const styles = {
     fontWeight: '600',
   },
   previewCode: {
-    fontSize: '16px',
-    marginBottom: '8px',
-    '@media (max-width: 480px)': { fontSize: '14px' },
+    fontSize: '12px',
+    marginBottom: '6px',
+    wordBreak: 'break-word',
+    '@media (min-width: 769px)': { 
+      fontSize: '16px',
+      marginBottom: '8px'
+    },
   },
   previewStudents: {
-    fontSize: '13px',
+    fontSize: '10px',
     color: '#6b7280',
-    marginBottom: '8px',
-    '@media (max-width: 480px)': { fontSize: '12px', marginBottom: '12px' },
-  },
-  previewDate: {
-    fontSize: '12px',
-    color: '#9ca3af',
-    marginBottom: '16px',
-    '@media (max-width: 480px)': { fontSize: '11px', marginBottom: '12px' },
+    marginBottom: '6px',
+    '@media (min-width: 769px)': { 
+      fontSize: '13px', 
+      marginBottom: '12px' 
+    },
   },
   previewDescription: {
-    fontSize: '14px',
+    fontSize: '11px',
     color: '#374151',
-    lineHeight: 1.5,
-    marginTop: '12px',
-    '@media (max-width: 480px)': { fontSize: '13px' },
+    lineHeight: 1.4,
+    marginTop: '8px',
+    '@media (min-width: 769px)': { 
+      fontSize: '14px',
+      lineHeight: 1.5,
+      marginTop: '12px'
+    },
   },
   modalFooter: {
-    padding: '16px 24px',
+    padding: '12px 16px',
     borderTop: '1px solid #e5e7eb',
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '12px',
-    '@media (max-width: 480px)': { padding: '16px 20px', flexDirection: 'column' },
+    gap: '8px',
+    flexDirection: 'column',
+    '@media (min-width: 481px)': { 
+      flexDirection: 'row',
+      gap: '12px'
+    },
+    '@media (min-width: 769px)': { 
+      padding: '16px 24px'
+    },
   },
   cancelButton: {
-    padding: '10px 20px',
+    padding: '10px',
     backgroundColor: '#f3f4f6',
     color: '#374151',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '500',
     transition: 'background-color 0.2s',
-    '@media (max-width: 480px)': { padding: '12px', width: '100%' },
-    minHeight: '44px',
+    minHeight: '40px',
+    '@media (min-width: 481px)': { 
+      padding: '10px 20px',
+      minWidth: '100px'
+    },
+    '@media (min-width: 769px)': { 
+      fontSize: '14px',
+      minHeight: '44px'
+    },
   },
   confirmButton: {
-    padding: '10px 24px',
+    padding: '10px',
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '500',
     transition: 'transform 0.2s',
-    '@media (max-width: 480px)': { padding: '12px', width: '100%' },
-    minHeight: '44px',
+    minHeight: '40px',
+    '@media (min-width: 481px)': { 
+      padding: '10px 20px',
+      minWidth: '100px'
+    },
+    '@media (min-width: 769px)': { 
+      fontSize: '14px',
+      minHeight: '44px'
+    },
   },
   dangerButton: {
-    padding: '10px 24px',
+    padding: '10px',
     background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: '500',
     transition: 'transform 0.2s',
-    '@media (max-width: 480px)': { padding: '12px', width: '100%' },
-    minHeight: '44px',
+    minHeight: '40px',
+    '@media (min-width: 481px)': { 
+      padding: '10px 20px',
+      minWidth: '100px'
+    },
+    '@media (min-width: 769px)': { 
+      fontSize: '14px',
+      minHeight: '44px'
+    },
   },
   warningBox: {
-    marginTop: '20px',
-    padding: '16px',
+    marginTop: '16px',
+    padding: '12px',
     backgroundColor: '#fef3c7',
-    borderRadius: '12px',
+    borderRadius: '10px',
     display: 'flex',
-    gap: '12px',
+    gap: '8px',
     alignItems: 'flex-start',
-    '@media (max-width: 480px)': { padding: '12px', gap: '8px' },
+    '@media (min-width: 769px)': { 
+      marginTop: '20px',
+      padding: '16px',
+      gap: '12px'
+    },
   },
   warningIcon: {
-    fontSize: '24px',
-    '@media (max-width: 480px)': { fontSize: '20px' },
+    fontSize: '18px',
+    flexShrink: 0,
+    '@media (min-width: 769px)': { fontSize: '24px' },
   },
   warningText: {
     margin: 0,
-    fontSize: '14px',
+    fontSize: '10px',
     color: '#92400e',
-    lineHeight: 1.5,
-    '@media (max-width: 480px)': { fontSize: '12px' },
+    lineHeight: 1.4,
+    '@media (min-width: 769px)': { 
+      fontSize: '14px',
+      lineHeight: 1.5
+    },
   },
 };
 
@@ -1201,8 +1425,8 @@ styleSheet.textContent = `
     75% { transform: translateX(5px); }
   }
   
-  .classCard:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,0.12); }
-  .joinClassButton:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+  .classCard:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .joinClassButton:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
   .previewButton:hover:not(:disabled) { transform: translateY(-1px); }
   .cancelJoinButton:hover { background-color: #e5e7eb; }
   .closeButton:hover { background-color: #f3f4f6; }
@@ -1211,28 +1435,66 @@ styleSheet.textContent = `
   .cancelButton:hover { background-color: #e5e7eb; }
   .confirmButton:hover:not(:disabled) { transform: translateY(-1px); }
   .dangerButton:hover:not(:disabled) { transform: translateY(-1px); }
-  .joinClassInput:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); outline: none; }
+  .joinClassInput:focus { border-color: #667eea; box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1); outline: none; }
   .modalContent { animation: modalFadeIn 0.2s ease-out; }
   .successMessage { animation: slideIn 0.3s ease-out; }
   .errorMessage { animation: shake 0.3s ease-in-out; }
   
-  /* Mobile touch optimizations */
+  /* Touch optimizations for all mobile devices */
   @media (max-width: 768px) {
     button, .classCard, .tab {
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
     button:active, .classCard:active {
-      transform: scale(0.98);
+      transform: scale(0.97);
       transition: transform 0.05s ease;
     }
     input, textarea, select {
       font-size: 16px !important;
     }
-    button, .classCard, .deleteButton, .closeButton, .modalClose, 
+    button, .classCard .deleteButton, .closeButton, .modalClose, 
     .joinClassButton, .previewButton, .cancelJoinButton, 
     .cancelButton, .confirmButton, .dangerButton {
-      min-height: 44px;
+      min-height: 40px;
+    }
+  }
+  
+  /* Specific optimizations for very small screens (308px width) */
+  @media (max-width: 360px) {
+    .welcomeTitle {
+      font-size: 14px !important;
+    }
+    .welcomeIcon {
+      font-size: 28px !important;
+    }
+    .classIcon {
+      font-size: 28px !important;
+    }
+    .className {
+      font-size: 12px !important;
+    }
+    .joinClassTitle {
+      font-size: 14px !important;
+    }
+    .sectionTitle {
+      font-size: 14px !important;
+    }
+    .joinClassButton {
+      font-size: 12px !important;
+      padding: 10px 16px !important;
+    }
+    .classCard {
+      padding: 10px !important;
+    }
+    .classTeacher, .joinedDate, .progressText {
+      font-size: 9px !important;
+    }
+    .previewName {
+      font-size: 14px !important;
+    }
+    .previewIcon {
+      font-size: 40px !important;
     }
   }
 `;

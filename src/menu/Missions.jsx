@@ -1,4 +1,4 @@
-// src/menu/Missions.jsx
+// src/menu/Missions.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import Mission2 from '../missions/mission2';
@@ -424,14 +424,14 @@ function Missions() {
       )}
 
       <div style={styles.headerRow}>
-        <div>
+        <div style={styles.headerText}>
           <h1 style={styles.title}>🎯 Your Missions</h1>
           <p style={styles.subtitle}>
-            Complete missions to earn XP and track your progress, {user?.name?.split(' ')[0] || 'Student'}!
+            Complete missions to earn XP, {user?.name?.split(' ')[0] || 'Student'}!
           </p>
         </div>
         <button style={styles.resetProgressButton} onClick={handleResetProgress}>
-          🔄 Reset Progress
+          🔄 Reset
         </button>
       </div>
 
@@ -451,7 +451,7 @@ function Missions() {
                 {mission.locked && !localCompletedMissions.includes(mission.id) && '🔒 '}
                 {mission.title}
               </h3>
-              <span style={styles.xpBadge}>+{mission.xp} XP</span>
+              <span style={styles.xpBadge}>+{mission.xp}</span>
             </div>
 
             <p style={styles.missionDescription}>{mission.description}</p>
@@ -467,7 +467,7 @@ function Missions() {
                 onClick={() => handleMissionClick(mission.id)}
                 disabled={mission.locked}
               >
-                {mission.locked ? '🔒 Locked' : 'Start Mission'}
+                {mission.locked ? '🔒 Locked' : 'Start'}
               </button>
             )}
           </div>
@@ -524,7 +524,7 @@ function Missions() {
               </div>
               <div style={styles.xpBreakdownRight}>
                 <span style={styles.xpBreakdownValue}>
-                  {localCompletedMissions.includes(mission.id) ? `+${mission.xp} XP` : 'Not completed'}
+                  {localCompletedMissions.includes(mission.id) ? `+${mission.xp}` : 'Not done'}
                 </span>
               </div>
             </div>
@@ -538,7 +538,7 @@ function Missions() {
         </div>
       </div>
 
-      {/* Floating Assistant */}
+      {/* Floating Assistant - Responsive positioning */}
       <div style={styles.avatarContainer}>
         <div style={styles.bubbleContainer}>
           {showMessage ? (
@@ -573,10 +573,15 @@ function Missions() {
 
 const styles = {
   container: {
-    padding: '20px',
+    padding: '12px',
     minHeight: '100vh',
     backgroundColor: '#f3f4f6',
     position: 'relative',
+    boxSizing: 'border-box',
+    width: '100%',
+    '@media (min-width: 769px)': { 
+      padding: '20px'
+    },
   },
   loadingContainer: {
     display: 'flex',
@@ -584,59 +589,95 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    gap: '20px',
+    gap: '16px',
+    padding: '20px',
   },
   loadingSpinner: {
-    width: '50px',
-    height: '50px',
-    border: '4px solid #e5e7eb',
+    width: '40px',
+    height: '40px',
+    border: '3px solid #e5e7eb',
     borderTopColor: '#2563eb',
     borderRadius: '50%',
     animation: 'spin 0.8s linear infinite',
+    '@media (min-width: 769px)': {
+      width: '50px',
+      height: '50px',
+      borderWidth: '4px',
+    },
   },
   headerRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: '15px',
-    marginBottom: '20px',
+    gap: '10px',
+    marginBottom: '16px',
+    '@media (min-width: 769px)': {
+      marginBottom: '20px',
+      gap: '15px',
+    },
+  },
+  headerText: {
+    flex: 1,
   },
   title: {
-    fontSize: '32px',
+    fontSize: '20px',
     color: '#333',
-    marginBottom: '10px',
+    marginBottom: '4px',
+    '@media (min-width: 769px)': {
+      fontSize: '32px',
+      marginBottom: '10px',
+    },
   },
   subtitle: {
-    fontSize: '16px',
+    fontSize: '11px',
     color: '#666',
+    '@media (min-width: 769px)': {
+      fontSize: '16px',
+    },
   },
   resetProgressButton: {
     backgroundColor: '#ef4444',
     color: 'white',
-    padding: '10px 20px',
+    padding: '8px 14px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
     transition: 'all 0.2s',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '6px',
+    whiteSpace: 'nowrap',
+    minHeight: '40px',
+    '@media (min-width: 769px)': {
+      padding: '10px 20px',
+      fontSize: '14px',
+      gap: '8px',
+    },
   },
   missionsGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-    gap: '20px',
-    marginBottom: '30px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginBottom: '20px',
+    '@media (min-width: 769px)': {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+      gap: '20px',
+      marginBottom: '30px',
+    },
   },
   missionCard: {
     backgroundColor: 'white',
-    padding: '20px',
+    padding: '14px',
     borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
     transition: 'transform 0.2s, box-shadow 0.2s',
+    '@media (min-width: 769px)': {
+      padding: '20px',
+    },
   },
   completedMission: {
     backgroundColor: '#f0fdf4',
@@ -651,38 +692,60 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px',
+    marginBottom: '8px',
+    flexWrap: 'wrap',
+    gap: '6px',
+    '@media (min-width: 769px)': {
+      marginBottom: '10px',
+    },
   },
   missionTitle: {
-    fontSize: '20px',
+    fontSize: '15px',
     color: '#333',
     margin: 0,
+    '@media (min-width: 769px)': {
+      fontSize: '20px',
+    },
   },
   xpBadge: {
     backgroundColor: '#f59e0b',
     color: 'white',
-    padding: '4px 12px',
+    padding: '3px 8px',
     borderRadius: '20px',
-    fontSize: '12px',
+    fontSize: '10px',
     fontWeight: 'bold',
+    '@media (min-width: 769px)': {
+      padding: '4px 12px',
+      fontSize: '12px',
+    },
   },
   missionDescription: {
     color: '#666',
-    fontSize: '14px',
-    marginBottom: '15px',
-    lineHeight: '1.5',
+    fontSize: '11px',
+    marginBottom: '12px',
+    lineHeight: '1.4',
+    '@media (min-width: 769px)': {
+      fontSize: '14px',
+      marginBottom: '15px',
+      lineHeight: '1.5',
+    },
   },
   completeButton: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '10px 20px',
+    padding: '8px',
     border: 'none',
     borderRadius: '8px',
     width: '100%',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
     transition: 'all 0.2s',
+    minHeight: '40px',
+    '@media (min-width: 769px)': {
+      padding: '10px 20px',
+      fontSize: '14px',
+    },
   },
   lockedButton: {
     backgroundColor: '#9ca3af',
@@ -692,181 +755,285 @@ const styles = {
   completedBadge: {
     backgroundColor: '#22c55e',
     color: 'white',
-    padding: '10px 20px',
+    padding: '8px',
     textAlign: 'center',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
+    minHeight: '40px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '@media (min-width: 769px)': {
+      padding: '10px 20px',
+      fontSize: '14px',
+    },
   },
   statsCard: {
     backgroundColor: 'white',
-    padding: '20px',
+    padding: '14px',
     borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '20px',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    marginBottom: '12px',
+    '@media (min-width: 769px)': {
+      padding: '20px',
+      marginBottom: '20px',
+    },
   },
   statsTitle: {
-    fontSize: '18px',
+    fontSize: '15px',
     color: '#333',
-    marginBottom: '15px',
+    marginBottom: '12px',
+    '@media (min-width: 769px)': {
+      fontSize: '18px',
+      marginBottom: '15px',
+    },
   },
   progressStats: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    marginBottom: '20px',
+    gap: '10px',
+    marginBottom: '16px',
+    '@media (min-width: 769px)': {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      gap: '12px',
+      marginBottom: '20px',
+    },
   },
   statItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: '10px',
+    '@media (min-width: 769px)': {
+      gap: '12px',
+    },
   },
   statEmoji: {
-    fontSize: '24px',
+    fontSize: '20px',
+    '@media (min-width: 769px)': {
+      fontSize: '24px',
+    },
   },
   statLabel: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#999',
     marginBottom: '2px',
+    '@media (min-width: 769px)': {
+      fontSize: '12px',
+    },
   },
   statValue: {
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 'bold',
     color: '#333',
+    '@media (min-width: 769px)': {
+      fontSize: '16px',
+    },
   },
   progressBarContainer: {
-    marginTop: '15px',
+    marginTop: '12px',
   },
   progressBarLabel: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#666',
-    marginBottom: '5px',
+    marginBottom: '4px',
+    '@media (min-width: 769px)': {
+      fontSize: '12px',
+      marginBottom: '5px',
+    },
   },
   progressBarTrack: {
-    height: '8px',
+    height: '6px',
     backgroundColor: '#e5e7eb',
-    borderRadius: '4px',
+    borderRadius: '3px',
     overflow: 'hidden',
+    '@media (min-width: 769px)': {
+      height: '8px',
+    },
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: '#2563eb',
-    borderRadius: '4px',
+    borderRadius: '3px',
     transition: 'width 0.3s ease',
   },
   xpBreakdownCard: {
     backgroundColor: 'white',
-    padding: '20px',
+    padding: '14px',
     borderRadius: '12px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    marginBottom: '60px',
+    '@media (min-width: 769px)': {
+      padding: '20px',
+      marginBottom: '20px',
+    },
   },
   xpBreakdownList: {
-    marginBottom: '16px',
+    marginBottom: '12px',
   },
   xpBreakdownItem: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 0',
+    padding: '8px 0',
     borderBottom: '1px solid #e5e7eb',
+    '@media (min-width: 769px)': {
+      padding: '10px 0',
+    },
   },
   xpBreakdownLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '8px',
+    '@media (min-width: 769px)': {
+      gap: '10px',
+    },
   },
   xpBreakdownIcon: {
-    fontSize: '16px',
+    fontSize: '13px',
+    '@media (min-width: 769px)': {
+      fontSize: '16px',
+    },
   },
   xpBreakdownName: {
-    fontSize: '14px',
+    fontSize: '11px',
     color: '#374151',
+    '@media (min-width: 769px)': {
+      fontSize: '14px',
+    },
   },
   xpBreakdownRight: {
     textAlign: 'right',
   },
   xpBreakdownValue: {
-    fontSize: '13px',
+    fontSize: '10px',
     fontWeight: '500',
     color: '#f59e0b',
+    '@media (min-width: 769px)': {
+      fontSize: '13px',
+    },
   },
   xpBreakdownTotal: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: '12px',
-    marginTop: '8px',
+    paddingTop: '10px',
+    marginTop: '6px',
     borderTop: '2px solid #e5e7eb',
     fontWeight: 'bold',
+    '@media (min-width: 769px)': {
+      paddingTop: '12px',
+      marginTop: '8px',
+    },
   },
   xpBreakdownTotalValue: {
-    fontSize: '18px',
+    fontSize: '14px',
     fontWeight: '800',
     color: '#f59e0b',
+    '@media (min-width: 769px)': {
+      fontSize: '18px',
+    },
   },
   avatarContainer: {
     position: 'fixed',
-    bottom: '20px',
-    right: '20px',
+    bottom: '12px',
+    right: '12px',
     display: 'flex',
     alignItems: 'flex-end',
     zIndex: 1000,
+    '@media (min-width: 769px)': {
+      bottom: '20px',
+      right: '20px',
+    },
   },
   bubbleContainer: {
-    marginRight: '10px',
-    marginBottom: '10px',
+    marginRight: '8px',
+    marginBottom: '8px',
+    '@media (min-width: 769px)': {
+      marginRight: '10px',
+      marginBottom: '10px',
+    },
   },
   speechBubble: {
     backgroundColor: 'white',
-    padding: '12px 15px',
-    borderRadius: '18px',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
+    padding: '8px 10px',
+    borderRadius: '14px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
     animation: 'bubblePop 0.3s ease-out',
-    maxWidth: '220px',
+    maxWidth: '160px',
     position: 'relative',
     border: '2px solid #2563eb',
+    '@media (min-width: 769px)': {
+      padding: '12px 15px',
+      borderRadius: '18px',
+      maxWidth: '220px',
+    },
   },
   bubbleText: {
-    fontSize: '14px',
+    fontSize: '10px',
     color: '#333',
-    lineHeight: '1.4',
+    lineHeight: '1.3',
+    '@media (min-width: 769px)': {
+      fontSize: '14px',
+      lineHeight: '1.4',
+    },
   },
   closeBubble: {
-    marginLeft: '10px',
+    marginLeft: '6px',
     cursor: 'pointer',
     background: 'none',
     border: 'none',
-    fontSize: '12px',
+    fontSize: '9px',
     color: '#999',
-    padding: '2px 5px',
+    padding: '2px 4px',
+    '@media (min-width: 769px)': {
+      marginLeft: '10px',
+      fontSize: '12px',
+    },
   },
   reopenBubble: {
     borderRadius: '50%',
-    width: '40px',
-    height: '40px',
+    width: '32px',
+    height: '32px',
     cursor: 'pointer',
     backgroundColor: '#2563eb',
     color: 'white',
     border: 'none',
-    fontSize: '20px',
-    marginRight: '10px',
-    marginBottom: '10px',
+    fontSize: '16px',
+    marginRight: '8px',
+    marginBottom: '8px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
     transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    '@media (min-width: 769px)': {
+      width: '40px',
+      height: '40px',
+      fontSize: '20px',
+      marginRight: '10px',
+      marginBottom: '10px',
+    },
   },
   avatarWrapper: {
-    width: '90px',
-    height: '90px',
+    width: '60px',
+    height: '60px',
     borderRadius: '50%',
     overflow: 'hidden',
     animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
-    border: '3px solid white',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+    border: '2px solid white',
     cursor: 'pointer',
     transition: 'transform 0.2s',
+    '@media (min-width: 769px)': {
+      width: '90px',
+      height: '90px',
+      borderWidth: '3px',
+    },
   },
   avatarImage: {
     width: '100%',
@@ -886,85 +1053,132 @@ const styles = {
     justifyContent: 'center',
     zIndex: 2000,
     animation: 'fadeIn 0.2s',
+    padding: '16px',
   },
   modalContent: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    padding: '25px',
-    maxWidth: '400px',
-    width: '90%',
+    padding: '18px',
+    maxWidth: '90%',
+    width: '320px',
     textAlign: 'center',
     boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
     animation: 'bounce 0.3s',
+    '@media (min-width: 769px)': {
+      padding: '25px',
+      maxWidth: '400px',
+    },
   },
   modalIcon: {
-    fontSize: '48px',
-    marginBottom: '10px',
+    fontSize: '36px',
+    marginBottom: '8px',
+    '@media (min-width: 769px)': {
+      fontSize: '48px',
+      marginBottom: '10px',
+    },
   },
   modalTitle: {
-    fontSize: '22px',
-    marginBottom: '15px',
+    fontSize: '16px',
+    marginBottom: '10px',
     color: '#ef4444',
+    '@media (min-width: 769px)': {
+      fontSize: '22px',
+      marginBottom: '15px',
+    },
   },
   modalText: {
-    fontSize: '14px',
+    fontSize: '12px',
     color: '#555',
-    marginBottom: '15px',
-    lineHeight: '1.5',
+    marginBottom: '12px',
+    lineHeight: '1.4',
+    '@media (min-width: 769px)': {
+      fontSize: '14px',
+      marginBottom: '15px',
+      lineHeight: '1.5',
+    },
   },
   modalList: {
     textAlign: 'left',
-    marginBottom: '15px',
-    paddingLeft: '20px',
+    marginBottom: '12px',
+    paddingLeft: '18px',
     color: '#666',
-    fontSize: '13px',
+    fontSize: '11px',
+    '@media (min-width: 769px)': {
+      marginBottom: '15px',
+      fontSize: '13px',
+    },
   },
   modalWarning: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#ef4444',
     fontWeight: 'bold',
-    marginBottom: '20px',
-    padding: '8px',
+    marginBottom: '16px',
+    padding: '6px',
     backgroundColor: '#fee2e2',
     borderRadius: '8px',
+    '@media (min-width: 769px)': {
+      fontSize: '12px',
+      marginBottom: '20px',
+      padding: '8px',
+    },
   },
   modalButtons: {
     display: 'flex',
-    gap: '15px',
+    gap: '10px',
     justifyContent: 'center',
+    flexDirection: 'column',
+    '@media (min-width: 481px)': {
+      flexDirection: 'row',
+      gap: '15px',
+    },
   },
   modalCloseBtn: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '10px 24px',
+    padding: '8px 20px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
     transition: 'all 0.2s',
+    minHeight: '40px',
+    '@media (min-width: 769px)': {
+      padding: '10px 24px',
+      fontSize: '14px',
+    },
   },
   confirmResetBtn: {
     backgroundColor: '#ef4444',
     color: 'white',
-    padding: '10px 20px',
+    padding: '8px 16px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
     transition: 'all 0.2s',
+    minHeight: '40px',
+    '@media (min-width: 769px)': {
+      padding: '10px 20px',
+      fontSize: '14px',
+    },
   },
   cancelResetBtn: {
     backgroundColor: '#6b7280',
     color: 'white',
-    padding: '10px 20px',
+    padding: '8px 16px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontSize: '14px',
+    fontSize: '12px',
     fontWeight: 'bold',
     transition: 'all 0.2s',
+    minHeight: '40px',
+    '@media (min-width: 769px)': {
+      padding: '10px 20px',
+      fontSize: '14px',
+    },
   },
 };
 
@@ -977,7 +1191,7 @@ styleSheet.innerHTML = `
   }
   @keyframes float {
     0% { transform: translateY(0px); }
-    50% { transform: translateY(-8px); }
+    50% { transform: translateY(-6px); }
     100% { transform: translateY(0px); }
   }
   @keyframes bubblePop {
@@ -990,7 +1204,7 @@ styleSheet.innerHTML = `
   }
   @keyframes bounce {
     0% { transform: scale(0.8); opacity: 0; }
-    50% { transform: scale(1.05); }
+    50% { transform: scale(1.03); }
     100% { transform: scale(1); opacity: 1; }
   }
   .resetProgressButton:hover {
@@ -1008,6 +1222,51 @@ styleSheet.innerHTML = `
   .completeButton:hover:not(:disabled) {
     opacity: 0.9;
     transform: translateY(-1px);
+  }
+  
+  /* Touch optimizations for small screens */
+  @media (max-width: 480px) {
+    button, .missionCard {
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button:active, .missionCard:active {
+      transform: scale(0.98);
+      transition: transform 0.05s ease;
+    }
+  }
+  
+  /* Specific optimizations for 308px width */
+  @media (max-width: 340px) {
+    .title {
+      font-size: 16px !important;
+    }
+    .subtitle {
+      font-size: 9px !important;
+    }
+    .missionTitle {
+      font-size: 12px !important;
+    }
+    .xpBadge {
+      font-size: 8px !important;
+      padding: 2px 6px !important;
+    }
+    .missionDescription {
+      font-size: 9px !important;
+    }
+    .statsTitle {
+      font-size: 13px !important;
+    }
+    .avatarWrapper {
+      width: 50px !important;
+      height: 50px !important;
+    }
+    .speechBubble {
+      max-width: 130px !important;
+    }
+    .bubbleText {
+      font-size: 8px !important;
+    }
   }
 `;
 
