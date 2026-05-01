@@ -1,4 +1,4 @@
-// src/games/SpaceShooter.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
+// src/games/SpaceShooter.jsx - FULLY RESPONSIVE with dynamic enemy sizing
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaArrowRight, FaCrosshairs } from 'react-icons/fa';
@@ -17,7 +17,7 @@ const SpaceShooter = () => {
   const [wrongShots, setWrongShots] = useState(0);
   const [correctShots, setCorrectShots] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 800 });
   
   const [gameStartTime, setGameStartTime] = useState(null);
   const [gameResultSent, setGameResultSent] = useState(false);
@@ -30,7 +30,7 @@ const SpaceShooter = () => {
   const [wrongAnswers, setWrongAnswers] = useState(0);
 
   const gameRef = useRef({
-    player: { x: 380, y: 550, width: 40, height: 40 },
+    player: { x: 380, y: 750, width: 40, height: 40 },
     bullets: [],
     enemies: [],
     particles: [],
@@ -73,7 +73,6 @@ const SpaceShooter = () => {
     setGameResultSent(true);
   }, [gameResultSent, correctAnswers, wrongAnswers, totalShots]);
 
-  // Handle messages from parent
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data?.type === 'REQUEST_SCORE') {
@@ -100,9 +99,25 @@ const SpaceShooter = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
-  // Detect mobile
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+    const checkMobile = () => {
+      const isMobileDevice = window.innerWidth <= 768;
+      setIsMobile(isMobileDevice);
+      
+      const container = canvasRef.current?.parentElement;
+      if (container) {
+        const maxWidth = Math.min(800, window.innerWidth - 40);
+        const scale = maxWidth / 800;
+        setCanvasDimensions({
+          width: maxWidth,
+          height: 800 * scale
+        });
+        if (canvasRef.current) {
+          canvasRef.current.style.width = `${maxWidth}px`;
+          canvasRef.current.style.height = `${800 * scale}px`;
+        }
+      }
+    };
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -123,6 +138,27 @@ const SpaceShooter = () => {
 
   const getRandomQuestion = useCallback(() => questions[Math.floor(Math.random() * questions.length)], []);
 
+  // Function to calculate enemy dimensions based on text
+  const calculateEnemyDimensions = useCallback((text) => {
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `bold 11px "Courier New", monospace`;
+    
+    let displayText = text;
+    if (displayText && displayText.includes('. ')) {
+      displayText = displayText.substring(displayText.indexOf('. ') + 2);
+    }
+    
+    const textWidth = ctx.measureText(displayText).width;
+    // Width: text width + padding (min 95, max 200)
+    const width = Math.min(200, Math.max(95, textWidth + 20));
+    // Height: based on text length (taller for longer text)
+    let height = 60;
+    if (textWidth > 140) height = 75;
+    if (textWidth > 170) height = 85;
+    
+    return { width, height };
+  }, []);
+
   const createEnemy = useCallback(() => {
     if (!currentQuestion) return null;
     const allOptions = [...currentQuestion.options];
@@ -131,8 +167,27 @@ const SpaceShooter = () => {
     const isCorrect = Math.random() < 0.4;
     const displayAnswer = isCorrect ? correctOptionText : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
     const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
-    return { id: Math.random(), x: Math.random() * 730, y: -60, width: 70, height: 55, speed: levelBaseSpeed * gameRef.current.currentSpeedMultiplier, horizontalSpeed: (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * gameRef.current.currentSpeedMultiplier), direction: Math.random() < 0.5 ? -1 : 1, questionText: currentQuestion.text, displayAnswer, isCorrect, correctAnswerLetter: currentQuestion.correctAnswer, allOptions: currentQuestion.options, explanation: currentQuestion.explanation };
-  }, [currentQuestion, level]);
+    
+    // Calculate dynamic dimensions based on text
+    const dimensions = calculateEnemyDimensions(displayAnswer);
+    
+    return { 
+      id: Math.random(), 
+      x: Math.random() * (800 - dimensions.width - 10), 
+      y: -60, 
+      width: dimensions.width, 
+      height: dimensions.height, 
+      speed: levelBaseSpeed * gameRef.current.currentSpeedMultiplier, 
+      horizontalSpeed: (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1) * gameRef.current.currentSpeedMultiplier), 
+      direction: Math.random() < 0.5 ? -1 : 1, 
+      questionText: currentQuestion.text, 
+      displayAnswer, 
+      isCorrect, 
+      correctAnswerLetter: currentQuestion.correctAnswer, 
+      allOptions: currentQuestion.options, 
+      explanation: currentQuestion.explanation 
+    };
+  }, [currentQuestion, level, calculateEnemyDimensions]);
 
   const showLevelStart = (levelNum) => {
     setLevelAnnouncement(`LEVEL ${levelNum}`);
@@ -157,14 +212,31 @@ const SpaceShooter = () => {
     gameRef.current.enemies = []; gameRef.current.bullets = []; gameRef.current.particles = []; gameRef.current.spawnTimer = 0; gameRef.current.baseEnemySpeed = 0.8; gameRef.current.currentSpeedMultiplier = 1.0; gameRef.current.spawnDelay = 120;
     setWrongShots(0); setCorrectShots(0); setLevel(1); setHighestLevel(1); setTotalCorrect(0); setTotalWrong(0); setTotalShots(0); setScore(0); setCorrectAnswers(0); setWrongAnswers(0);
     setCurrentQuestion(getRandomQuestion());
-    for (let i = 0; i < 3; i++) { const e = createEnemy(); if (e) { e.y = -60 - (i * 40); gameRef.current.enemies.push(e); } }
+    for (let i = 0; i < 3; i++) { const e = createEnemy(); if (e) { e.y = -60 - (i * 50); gameRef.current.enemies.push(e); } }
     showLevelStart(1);
   }, [getRandomQuestion, createEnemy]);
 
   const startGame = () => {
-    gameRef.current.gameActive = false; gameRef.current.waitingForSpace = false;
-    setScore(0); setLevel(1); setWrongShots(0); setCorrectShots(0); setTotalCorrect(0); setTotalWrong(0); setTotalShots(0); setHighestLevel(1); setCorrectAnswers(0); setWrongAnswers(0);
-    setGameState('playing'); setShowLevelAnnouncement(false); setGameStartTime(Date.now()); setGameResultSent(false); setTimeSpent(0);
+    gameRef.current.gameActive = false;
+    gameRef.current.waitingForSpace = false;
+    setScore(0);
+    setLevel(1);
+    setWrongShots(0);
+    setCorrectShots(0);
+    setTotalCorrect(0);
+    setTotalWrong(0);
+    setTotalShots(0);
+    setHighestLevel(1);
+    setCorrectAnswers(0);
+    setWrongAnswers(0);
+    setGameState('playing');
+    setShowLevelAnnouncement(false);
+    setGameStartTime(Date.now());
+    setGameResultSent(false);
+    setTimeSpent(0);
+    gameRef.current.enemies = [];
+    gameRef.current.bullets = [];
+    gameRef.current.particles = [];
     setTimeout(() => initLevel(), 100);
   };
 
@@ -196,10 +268,14 @@ const SpaceShooter = () => {
     if (game.keys['Space']) shoot();
     game.bullets = game.bullets.filter(b => { b.y -= b.speed; return b.y > -20; });
     game.spawnTimer++;
-    const maxEnemies = Math.min(12, 8 + Math.floor(level / 2));
-    if (game.spawnTimer > (game.spawnDelay || 120) && game.enemies.length < maxEnemies) { const newEnemy = createEnemy(); if (newEnemy) { newEnemy.y = -60; newEnemy.x = Math.random() * 730; game.enemies.push(newEnemy); game.spawnTimer = 0; } }
-    game.enemies.forEach(e => { e.x += e.horizontalSpeed * e.direction; if (e.x <= 0 || e.x >= 730) e.direction *= -1; e.y += e.speed; });
-    game.enemies = game.enemies.filter(e => e.y < 650);
+    const maxEnemies = Math.min(8, 5 + Math.floor(level / 2));
+    if (game.spawnTimer > (game.spawnDelay || 120) && game.enemies.length < maxEnemies) { const newEnemy = createEnemy(); if (newEnemy) { newEnemy.y = -60; newEnemy.x = Math.random() * (800 - newEnemy.width - 10); game.enemies.push(newEnemy); game.spawnTimer = 0; } }
+    game.enemies.forEach(e => { 
+      e.x += e.horizontalSpeed * e.direction; 
+      if (e.x <= 0 || e.x >= 800 - e.width) e.direction *= -1; 
+      e.y += e.speed; 
+    });
+    game.enemies = game.enemies.filter(e => e.y < 850);
     for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
       const b = game.bullets[bi];
       for (let ei = game.enemies.length - 1; ei >= 0; ei--) {
@@ -212,10 +288,32 @@ const SpaceShooter = () => {
             for (let i = 0; i < 20; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 30 });
             increaseSpeed();
             setCurrentQuestion(getRandomQuestion());
-            game.enemies.forEach(enemy => { enemy.questionText = currentQuestion?.text || ""; enemy.allOptions = currentQuestion?.options || []; enemy.correctAnswerLetter = currentQuestion?.correctAnswer || "A"; const wrongOps = (currentQuestion?.options || []).filter(opt => !opt.startsWith(currentQuestion?.correctAnswer || "")); const isEnemyCorrect = Math.random() < 0.4; enemy.isCorrect = isEnemyCorrect; enemy.displayAnswer = isEnemyCorrect ? (currentQuestion?.options || []).find(opt => opt.startsWith(currentQuestion?.correctAnswer || "")) : wrongOps[Math.floor(Math.random() * wrongOps.length)]; });
+            game.enemies.forEach(enemy => { 
+              enemy.questionText = currentQuestion?.text || ""; 
+              enemy.allOptions = currentQuestion?.options || []; 
+              enemy.correctAnswerLetter = currentQuestion?.correctAnswer || "A"; 
+              const wrongOps = (currentQuestion?.options || []).filter(opt => !opt.startsWith(currentQuestion?.correctAnswer || "")); 
+              const isEnemyCorrect = Math.random() < 0.4; 
+              enemy.isCorrect = isEnemyCorrect; 
+              const newAnswer = isEnemyCorrect ? (currentQuestion?.options || []).find(opt => opt.startsWith(currentQuestion?.correctAnswer || "")) : wrongOps[Math.floor(Math.random() * wrongOps.length)];
+              enemy.displayAnswer = newAnswer;
+              // Update enemy dimensions based on new text
+              const newDimensions = calculateEnemyDimensions(newAnswer);
+              enemy.width = newDimensions.width;
+              enemy.height = newDimensions.height;
+            });
           } else {
             setWrongAnswers(prev => prev + 1); setTotalWrong(prev => prev + 1);
-            setWrongShots(prev => { const newWrong = prev + 1; setScore(s => Math.max(0, s - 10)); setFeedback({ message: `-10 Wrong! ❌ | Correct: ${e.allOptions.find(opt => opt.startsWith(e.correctAnswerLetter))} (-5 XP!) (${newWrong}/3 mistakes) | Speed reset!`, type: 'error' }); game.currentSpeedMultiplier = 1.0; game.spawnDelay = Math.max(60, 120 - (level - 1) * 8); const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15); game.enemies.forEach(enemy => { enemy.speed = levelBaseSpeed; enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1)); }); for (let i = 0; i < 15; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 20 }); if (newWrong >= 3) { game.gameActive = false; const finalTimeSpent = Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000); sendGameResult(false, score, finalTimeSpent, { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong + 1 }); setGameState('gameOver'); setFeedback({ message: 'Game Over! 3 wrong answers!', type: 'error' }); } return newWrong; });
+            setWrongShots(prev => { const newWrong = prev + 1; setScore(s => Math.max(0, s - 10)); setFeedback({ message: `-10 Wrong! ❌ | Correct: ${e.allOptions.find(opt => opt.startsWith(e.correctAnswerLetter))} (-5 XP!) (${newWrong}/3 mistakes) | Speed reset!`, type: 'error' }); game.currentSpeedMultiplier = 1.0; game.spawnDelay = Math.max(60, 120 - (level - 1) * 8); const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15); game.enemies.forEach(enemy => { enemy.speed = levelBaseSpeed; enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1)); }); for (let i = 0; i < 15; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 20 }); if (newWrong >= 3) { 
+                game.gameActive = false; 
+                const finalTimeSpent = Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000); 
+                sendGameResult(false, score, finalTimeSpent, { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong + 1 }); 
+                setGameState('gameOver'); 
+                setShowLevelAnnouncement(false);
+                setFeedback({ message: 'Game Over! 3 wrong answers!', type: 'error' }); 
+              } 
+              return newWrong; 
+            });
           }
           game.bullets.splice(bi, 1); game.enemies.splice(ei, 1); break;
         }
@@ -224,15 +322,15 @@ const SpaceShooter = () => {
     const requiredCorrectShots = 5 + Math.floor(level / 2);
     if (correctShots >= requiredCorrectShots && game.gameActive && !game.waitingForSpace) advanceToNextLevel();
     game.particles = game.particles.filter(p => { p.x += p.vx; p.y += p.vy; p.life--; return p.life > 0; });
-  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, shoot, createEnemy]);
+  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, shoot, createEnemy, calculateEnemyDimensions]);
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
-    const gradient = ctx.createLinearGradient(0, 0, 0, 600);
+    const gradient = ctx.createLinearGradient(0, 0, 0, 800);
     gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`); gradient.addColorStop(1, '#000000');
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 800, 600);
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 800, 800);
     ctx.fillStyle = 'white';
-    for (let i = 0; i < 150 + Math.floor(level * 5); i++) ctx.fillRect((i * 131) % 800, (i * 253) % 600, 1.5, 1.5);
+    for (let i = 0; i < 200 + Math.floor(level * 5); i++) ctx.fillRect((i * 131) % 800, (i * 253) % 800, 1.5, 1.5);
     ctx.fillStyle = '#ff6600';
     ctx.beginPath(); ctx.moveTo(game.player.x + 5, game.player.y + 15); ctx.lineTo(game.player.x + 15, game.player.y + 10); ctx.lineTo(game.player.x + 15, game.player.y + 20); ctx.fill();
     ctx.fillStyle = '#00ffff';
@@ -242,50 +340,150 @@ const SpaceShooter = () => {
     ctx.fillStyle = '#ffff00';
     game.bullets.forEach(b => ctx.fillRect(b.x, b.y, b.width, b.height));
     game.particles.forEach(p => { ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`; ctx.fillRect(p.x, p.y, 4, 4); });
+    
     game.enemies.forEach(e => {
-      const gradient = ctx.createLinearGradient(e.x, e.y, e.x + e.width, e.y + e.height);
-      gradient.addColorStop(0, `rgb(255, ${255 - Math.floor(100 * (game.currentSpeedMultiplier - 1))}, ${255 - Math.floor(100 * (game.currentSpeedMultiplier - 1))})`);
-      gradient.addColorStop(1, `rgb(170, ${Math.floor((255 - Math.floor(100 * (game.currentSpeedMultiplier - 1))) * 0.6)}, ${Math.floor((255 - Math.floor(100 * (game.currentSpeedMultiplier - 1))) * 0.6)})`);
-      ctx.fillStyle = gradient; ctx.fillRect(e.x, e.y, e.width, e.height);
-      ctx.fillStyle = '#882222'; ctx.fillRect(e.x + 10, e.y + 12, e.width - 20, 6); ctx.fillRect(e.x + 10, e.y + 30, e.width - 20, 6);
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(e.x + 12, e.y + 8, 10, 6); ctx.fillRect(e.x + e.width - 22, e.y + 8, 10, 6);
-      ctx.fillStyle = '#000000'; ctx.fillRect(e.x + 14, e.y + 9, 6, 4); ctx.fillRect(e.x + e.width - 20, e.y + 9, 6, 4);
-      ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.min(20, Math.max(14, 20 * (window.innerWidth / 1000)))}px "Courier New", monospace`;
-      let displayText = e.displayAnswer; if (displayText?.length > 30) displayText = displayText.substring(0, 27) + '...';
-      ctx.fillText(displayText || "?", e.x + 5, e.y + 45);
-      ctx.strokeStyle = level > 3 ? '#ffaa44' : '#ffffff'; ctx.lineWidth = 2; ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
+      // Black background with dynamic size
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(e.x, e.y, e.width, e.height);
+      ctx.fillStyle = '#2a0000';
+      ctx.fillRect(e.x + 3, e.y + 3, e.width - 6, e.height - 6);
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(e.x + 10, e.y + 12, 12, 6);
+      ctx.fillRect(e.x + e.width - 22, e.y + 12, 12, 6);
+      ctx.fillStyle = '#ffffff';
+      
+      let displayText = e.displayAnswer;
+      if (displayText && displayText.includes('. ')) {
+        displayText = displayText.substring(displayText.indexOf('. ') + 2);
+      }
+      
+      // Dynamic font size based on box width
+      let fontSize = 11;
+      ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+      let textWidth = ctx.measureText(displayText || "?").width;
+      
+      while (textWidth > e.width - 12 && fontSize > 8) {
+        fontSize--;
+        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+        textWidth = ctx.measureText(displayText || "?").width;
+      }
+      
+      // Check if text needs two lines
+      let line1 = displayText;
+      let line2 = "";
+      if (textWidth > e.width - 12 && fontSize <= 8) {
+        const words = displayText.split(' ');
+        line1 = "";
+        line2 = "";
+        let currentLine = "";
+        for (let i = 0; i < words.length; i++) {
+          const testLine = currentLine + (currentLine ? " " : "") + words[i];
+          const testWidth = ctx.measureText(testLine).width;
+          if (testWidth > e.width - 12 && currentLine !== "") {
+            line1 = currentLine;
+            line2 = words.slice(i).join(' ');
+            break;
+          }
+          currentLine = testLine;
+        }
+        if (line1 === "") {
+          const midPoint = Math.floor(displayText.length / 2);
+          line1 = displayText.substring(0, midPoint);
+          line2 = displayText.substring(midPoint);
+        }
+        fontSize = 9;
+        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
+      }
+      
+      // Center text in the dynamically sized box
+      if (line2) {
+        const line1Width = ctx.measureText(line1).width;
+        const line2Width = ctx.measureText(line2).width;
+        const line1X = e.x + (e.width / 2) - (line1Width / 2);
+        const line2X = e.x + (e.width / 2) - (line2Width / 2);
+        const line1Y = e.y + (e.height / 2) - 10;
+        const line2Y = e.y + (e.height / 2) + 10;
+        
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 3;
+        ctx.fillText(line1, line1X, line1Y);
+        ctx.fillText(line2, line2X, line2Y);
+        ctx.shadowBlur = 0;
+      } else {
+        const textX = e.x + (e.width / 2) - (textWidth / 2);
+        const textY = e.y + (e.height / 2) + 5;
+        
+        ctx.shadowColor = 'black';
+        ctx.shadowBlur = 3;
+        ctx.fillText(displayText || "?", textX, textY);
+        ctx.shadowBlur = 0;
+      }
+      
+      // Silver border
+      ctx.strokeStyle = '#888888';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
     });
-    if (feedback.message) { ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336'; ctx.font = `bold ${Math.min(20, Math.max(14, 20 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(feedback.message, 180, 100); setTimeout(() => setFeedback({ message: '', type: '' }), 1500); }
-    if (showLevelAnnouncement) {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, 800, 600);
-      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(40, Math.max(28, 40 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(levelAnnouncement, 280, 280);
-      ctx.fillStyle = '#ffffff'; ctx.font = `${Math.min(22, Math.max(16, 22 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText('Press SPACE to start!', 290, 360);
-      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(16, Math.max(12, 16 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText('Shoot the correct answer for each question!', 250, 420);
+    
+    if (feedback.message && gameState === 'playing') { 
+      ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336'; 
+      ctx.font = `bold ${Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)))}px Arial`; 
+      ctx.fillText(feedback.message, 180, 120); 
+      setTimeout(() => setFeedback({ message: '', type: '' }), 1500); 
     }
-    const titleFont = Math.min(18, Math.max(12, 18 * (window.innerWidth / 1000)));
+    if (showLevelAnnouncement && gameState === 'playing') {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, 800, 800);
+      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(40, Math.max(28, 40 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(levelAnnouncement, 280, 380);
+      ctx.fillStyle = '#ffffff'; ctx.font = `${Math.min(22, Math.max(16, 22 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Press SPACE to start!', 290, 460);
+      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Shoot the correct answer for each question!', 250, 520);
+    }
+    const titleFont = Math.min(18, Math.max(12, 18 * (canvasDimensions.width / 800)));
     ctx.fillStyle = '#ffffff'; ctx.font = `bold ${titleFont}px Arial`; ctx.fillText(`Score: ${score}`, 20, 40);
     ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 70);
-    ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(24, Math.max(18, 24 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(`LEVEL ${level}`, 20, 120);
-    ctx.fillStyle = '#aaffaa'; ctx.font = `bold ${Math.min(16, Math.max(12, 16 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
+    ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(24, Math.max(18, 24 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`LEVEL ${level}`, 20, 120);
+    ctx.fillStyle = '#aaffaa'; ctx.font = `bold ${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
     ctx.fillStyle = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
     ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 180);
     const requiredCorrect = 5 + Math.floor(level / 2); const progress = (correctShots / requiredCorrect) * 100;
     ctx.fillStyle = '#666666'; ctx.fillRect(20, 200, 150, 12);
     ctx.fillStyle = '#4caf50'; ctx.fillRect(20, 200, (progress / 100) * 150, 12);
-    ctx.fillStyle = '#cccccc'; ctx.font = `${Math.min(14, Math.max(10, 14 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(`${correctShots}/${requiredCorrect} to level up`, 20, 195);
+    ctx.fillStyle = '#cccccc'; ctx.font = `${Math.min(14, Math.max(10, 14 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`${correctShots}/${requiredCorrect} to level up`, 20, 195);
     if (totalShots > 0) { ctx.fillStyle = '#88ff88'; ctx.fillText(`Accuracy: ${Math.round((totalCorrect / totalShots) * 100)}% (${totalCorrect}/${totalShots})`, 20, 230); }
-    ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(12, Math.max(8, 12 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
+    ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(12, Math.max(8, 12 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
     ctx.fillText(`✅ ${correctAnswers} | ❌ ${wrongAnswers}`, 20, 265);
-    if (currentQuestion && !showLevelAnnouncement && game.gameActive) {
-      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(18, Math.max(13, 18 * (window.innerWidth / 1000)))}px Arial`;
-      let qText = currentQuestion.text; if (qText?.length > 40) qText = qText.substring(0, 37) + '...';
-      ctx.fillText(`Q: ${qText || ""}`, 200, 40);
-      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(14, Math.max(10, 14 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText('Shoot the correct answer!', 260, 70);
+    if (currentQuestion && !showLevelAnnouncement && game.gameActive && gameState === 'playing') {
+      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(14, Math.max(11, 14 * (canvasDimensions.width / 800)))}px Arial`;
+      let qText = currentQuestion.text;
+      const maxWidth = 580;
+      const words = qText.split(' ');
+      let lines = [];
+      let currentLine = '';
+      
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + (currentLine ? ' ' : '') + words[i];
+        const testWidth = ctx.measureText(testLine).width;
+        if (testWidth > maxWidth && currentLine !== '') {
+          lines.push(currentLine);
+          currentLine = words[i];
+        } else {
+          currentLine = testLine;
+        }
+      }
+      lines.push(currentLine);
+      
+      let yOffset = 35;
+      for (let i = 0; i < lines.length; i++) {
+        ctx.fillText(`Q: ${lines[i]}`, 200, yOffset);
+        yOffset += 18;
+      }
+      
+      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(12, Math.max(9, 12 * (canvasDimensions.width / 800)))}px Arial`; 
+      ctx.fillText('Shoot the correct answer!', 260, yOffset + 5);
     }
-    if (!showLevelAnnouncement && game.gameActive && !isMobile) { ctx.fillStyle = '#888888'; ctx.font = `${Math.min(12, Math.max(8, 12 * (window.innerWidth / 1000)))}px Arial`; ctx.fillText('← → Move', 20, 575); ctx.fillText('SPACE Shoot', 20, 595); }
-    if (!showLevelAnnouncement && game.gameActive) { ctx.fillStyle = '#ff8888'; ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40); }
+    if (!showLevelAnnouncement && game.gameActive && !isMobile && gameState === 'playing') { ctx.fillStyle = '#888888'; ctx.font = `${Math.min(12, Math.max(8, 12 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('← → Move', 20, 770); ctx.fillText('SPACE Shoot', 20, 790); }
+    if (!showLevelAnnouncement && game.gameActive && gameState === 'playing') { ctx.fillStyle = '#ff8888'; ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40); }
     if (gameState === 'playing' && !showLevelAnnouncement) { ctx.fillStyle = '#aaaaaa'; const mins = Math.floor(timeSpent / 60); const secs = timeSpent % 60; ctx.fillText(`Time: ${mins}:${secs.toString().padStart(2, '0')}`, 700, 70); }
-  }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers]);
+  }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasDimensions]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -297,10 +495,29 @@ const SpaceShooter = () => {
   }, [gameState, updateGame, drawGame]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => { if (e.code === 'Space') { e.preventDefault(); gameRef.current.keys['Space'] = true; } else if (e.key === 'ArrowLeft') { e.preventDefault(); gameRef.current.keys['ArrowLeft'] = true; } else if (e.key === 'ArrowRight') { e.preventDefault(); gameRef.current.keys['ArrowRight'] = true; } };
-    const handleKeyUp = (e) => { if (e.code === 'Space') gameRef.current.keys['Space'] = false; else if (e.key === 'ArrowLeft') gameRef.current.keys['ArrowLeft'] = false; else if (e.key === 'ArrowRight') gameRef.current.keys['ArrowRight'] = false; };
-    window.addEventListener('keydown', handleKeyDown); window.addEventListener('keyup', handleKeyUp);
-    return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
+    const handleKeyDown = (e) => { 
+      if (e.code === 'Space') { 
+        e.preventDefault(); 
+        gameRef.current.keys['Space'] = true; 
+      } else if (e.key === 'ArrowLeft') { 
+        e.preventDefault(); 
+        gameRef.current.keys['ArrowLeft'] = true; 
+      } else if (e.key === 'ArrowRight') { 
+        e.preventDefault(); 
+        gameRef.current.keys['ArrowRight'] = true; 
+      } 
+    };
+    const handleKeyUp = (e) => { 
+      if (e.code === 'Space') gameRef.current.keys['Space'] = false; 
+      else if (e.key === 'ArrowLeft') gameRef.current.keys['ArrowLeft'] = false; 
+      else if (e.key === 'ArrowRight') gameRef.current.keys['ArrowRight'] = false; 
+    };
+    window.addEventListener('keydown', handleKeyDown); 
+    window.addEventListener('keyup', handleKeyUp);
+    return () => { 
+      window.removeEventListener('keydown', handleKeyDown); 
+      window.removeEventListener('keyup', handleKeyUp); 
+    };
   }, []);
 
   const totalXPEarned = (correctAnswers * 10) - (wrongAnswers * 5);
@@ -309,47 +526,308 @@ const SpaceShooter = () => {
     <div style={styles.container}>
       <button onClick={handleBackToGames} style={styles.backButton}><FaArrowLeft style={styles.backIcon} /> Back</button>
       <div style={styles.gameWrapper}>
-        <canvas ref={canvasRef} width={800} height={600} style={styles.canvas} />
+        <canvas 
+          ref={canvasRef} 
+          width={800} 
+          height={800} 
+          style={{
+            ...styles.canvas,
+            width: '100%',
+            height: 'auto',
+            maxWidth: '100%'
+          }} 
+        />
         {gameState === 'menu' && (
-          <div style={styles.menuOverlay}><div style={styles.menuContent}><h1 style={styles.gameTitle}>🚀 Equation Shooter 🚀</h1><p style={styles.gameSubtitle}>Shoot the correct answer!</p><div style={styles.features}><p><strong>How to Play:</strong></p><p>🎯 Read the question at the top</p><p>💡 Each enemy has an answer choice</p><p>🔫 Shoot the CORRECT answer!</p><p>⚠️ Wrong answer = -10 points + mistake</p><p>⭐ +10 XP/correct, -5 XP/wrong</p><p>💀 3 mistakes = Game Over!</p><p>⚡ Each correct = speed increase!</p></div><button onClick={startGame} style={styles.startButton}>Start Game</button></div></div>
+          <div style={styles.menuOverlay}>
+            <div style={styles.menuContent}>
+              <h1 style={styles.gameTitle}>🚀 Equation Shooter 🚀</h1>
+              <p style={styles.gameSubtitle}>Shoot the correct answer!</p>
+              <div style={styles.features}>
+                <p><strong>How to Play:</strong></p>
+                <p>🎯 Read the question at the top</p>
+                <p>💡 Each enemy has an answer choice</p>
+                <p>🔫 Shoot the CORRECT answer!</p>
+                <p>⚠️ Wrong answer = -10 points + mistake</p>
+                <p>⭐ +10 XP/correct, -5 XP/wrong</p>
+                <p>💀 3 mistakes = Game Over!</p>
+                <p>⚡ Each correct = speed increase!</p>
+              </div>
+              <button onClick={startGame} style={styles.startButton}>Start Game</button>
+            </div>
+          </div>
         )}
         {gameState === 'gameOver' && (
-          <div style={styles.gameOverOverlay}><div style={styles.gameOverContent}><h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2><p style={styles.finalScore}>Score: {score}</p><p>Level {highestLevel}</p><p>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</p><p>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</p><p>⭐ XP: {totalXPEarned}</p><p>Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}%</p><p>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p><button onClick={startGame} style={styles.retryButton}>Play Again</button></div></div>
+          <div style={styles.gameOverOverlay}>
+            <div style={styles.gameOverContent}>
+              <h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2>
+              <p style={styles.finalScore}>Score: {score}</p>
+              <p>Level {highestLevel}</p>
+              <p>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</p>
+              <p>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</p>
+              <p>⭐ XP: {totalXPEarned}</p>
+              <p>Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}%</p>
+              <p>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
+              <button onClick={startGame} style={styles.retryButton}>Play Again</button>
+            </div>
+          </div>
         )}
       </div>
       {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
-        <div style={styles.mobileControls}><div style={styles.leftControls}><button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}><FaArrowLeft size={24} /></button><button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}><FaArrowRight size={24} /></button></div><div style={styles.rightControls}><button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}><FaCrosshairs size={24} /></button></div></div>
+        <div style={styles.mobileControls}>
+          <div style={styles.leftControls}>
+            <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}><FaArrowLeft size={24} /></button>
+            <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}><FaArrowRight size={24} /></button>
+          </div>
+          <div style={styles.rightControls}>
+            <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}><FaCrosshairs size={24} /></button>
+          </div>
+        </div>
       )}
     </div>
   );
 };
 
 const styles = {
-  container: { width: '100%', minHeight: '100vh', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', padding: '12px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', '@media (min-width: 769px)': { padding: '20px' } },
-  backButton: { position: 'fixed', top: '10px', left: '10px', backgroundColor: 'rgba(0,0,0,0.85)', color: 'white', border: '2px solid rgba(255,255,255,0.3)', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', zIndex: 1000, '@media (min-width: 769px)': { top: '20px', left: '20px', padding: '12px 20px', fontSize: '16px', gap: '8px' } },
-  backIcon: { fontSize: '12px', '@media (min-width: 769px)': { fontSize: '16px' } },
-  gameWrapper: { position: 'relative', display: 'inline-block', margin: '70px auto 0 auto', boxShadow: '0 10px 40px rgba(0,0,0,0.3)', borderRadius: '10px', overflow: 'hidden', width: '100%', maxWidth: '800px', '@media (min-width: 769px)': { marginTop: '80px' } },
-  canvas: { display: 'block', width: '100%', height: 'auto', border: '3px solid rgba(255,255,255,0.2)', borderRadius: '10px', touchAction: 'none' },
-  menuOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 10, overflow: 'auto' },
-  menuContent: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', padding: '20px', textAlign: 'center', width: '100%', maxWidth: '500px' },
-  gameTitle: { fontSize: '24px', textAlign: 'center', color: '#ffd700', '@media (min-width: 769px)': { fontSize: '36px' } },
-  gameSubtitle: { fontSize: '13px', textAlign: 'center', '@media (min-width: 769px)': { fontSize: '18px' } },
-  features: { backgroundColor: 'rgba(0,0,0,0.7)', padding: '15px', borderRadius: '10px', marginTop: '10px', textAlign: 'left', lineHeight: '1.6', width: '100%', fontSize: '11px', border: '1px solid rgba(255,255,255,0.2)', maxHeight: '300px', overflow: 'auto', '@media (min-width: 769px)': { padding: '20px', fontSize: '16px', maxHeight: '400px' } },
-  startButton: { padding: '12px 30px', fontSize: '16px', fontWeight: 'bold', background: 'linear-gradient(135deg, #4CAF50, #45a049)', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', minWidth: '160px', '@media (min-width: 769px)': { padding: '14px 40px', fontSize: '20px', minWidth: '200px' } },
-  gameOverOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', textAlign: 'center', padding: '15px', zIndex: 10 },
-  gameOverContent: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', padding: '20px' },
-  gameOverTitle: { fontSize: '24px', color: '#ff6b6b', '@media (min-width: 769px)': { fontSize: '42px' } },
-  finalScore: { fontSize: '14px', margin: '3px 0', '@media (min-width: 769px)': { fontSize: '24px', margin: '5px 0' } },
-  retryButton: { padding: '10px 25px', fontSize: '14px', fontWeight: 'bold', background: 'linear-gradient(135deg, #2196F3, #1976D2)', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', minWidth: '140px', '@media (min-width: 769px)': { padding: '12px 35px', fontSize: '18px', minWidth: '160px' } },
-  mobileControls: { position: 'fixed', bottom: '10px', left: 0, right: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 15px', backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 100, borderTop: '1px solid rgba(255,255,255,0.2)' },
-  leftControls: { display: 'flex', gap: '15px' },
-  rightControls: { display: 'flex' },
-  mobileButton: { backgroundColor: 'rgba(255,255,255,0.2)', border: '2px solid rgba(255,255,255,0.6)', borderRadius: '50px', width: '55px', height: '55px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', cursor: 'pointer', '@media (min-width: 769px)': { width: '70px', height: '70px' } },
-  shootButton: { backgroundColor: 'rgba(255,80,80,0.8)', borderColor: '#ffaa44' }
+  container: { 
+    width: '100%', 
+    height: '100%',
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+    padding: '12px', 
+    boxSizing: 'border-box', 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    justifyContent: 'flex-start',
+    position: 'relative',
+    overflow: 'auto'
+  },
+  backButton: { 
+    position: 'fixed', 
+    top: '10px', 
+    left: '10px', 
+    backgroundColor: 'rgba(0,0,0,0.85)', 
+    color: 'white', 
+    border: '2px solid rgba(255,255,255,0.3)', 
+    padding: '8px 14px', 
+    borderRadius: '8px', 
+    cursor: 'pointer', 
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: '6px', 
+    fontSize: '12px', 
+    fontWeight: 'bold', 
+    zIndex: 1000,
+    '@media (max-width: 768px)': { 
+      top: '5px', 
+      left: '5px', 
+      padding: '6px 10px', 
+      fontSize: '10px'
+    }
+  },
+  backIcon: { 
+    fontSize: '12px',
+    '@media (max-width: 768px)': { fontSize: '10px' }
+  },
+  gameWrapper: { 
+    position: 'relative', 
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    width: '100%',
+    maxWidth: '800px',
+    margin: '60px auto 0 auto',
+    boxShadow: '0 10px 40px rgba(0,0,0,0.3)', 
+    borderRadius: '10px', 
+    overflow: 'hidden',
+    '@media (max-width: 768px)': { 
+      marginTop: '45px',
+      marginBottom: '0',
+      width: 'calc(100% - 16px)',
+      borderRadius: '8px'
+    }
+  },
+  canvas: { 
+    display: 'block', 
+    border: '3px solid rgba(255,255,255,0.2)', 
+    borderRadius: '10px', 
+    touchAction: 'none',
+    backgroundColor: '#000',
+    '@media (max-width: 768px)': {
+      border: '2px solid rgba(255,255,255,0.2)',
+      borderRadius: '8px'
+    }
+  },
+  menuOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    background: 'rgba(0,0,0,0.95)', 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    color: 'white', 
+    zIndex: 10, 
+    overflow: 'auto'
+  },
+  menuContent: { 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    gap: '15px', 
+    padding: '20px', 
+    textAlign: 'center', 
+    width: '100%', 
+    maxWidth: '500px',
+    '@media (max-width: 768px)': {
+      gap: '10px',
+      padding: '15px',
+      maxWidth: '90%'
+    }
+  },
+  gameTitle: { 
+    fontSize: '24px', 
+    textAlign: 'center', 
+    color: '#ffd700', 
+    '@media (min-width: 769px)': { fontSize: '36px' },
+    '@media (max-width: 768px)': { fontSize: '20px' }
+  },
+  gameSubtitle: { 
+    fontSize: '13px', 
+    textAlign: 'center', 
+    '@media (min-width: 769px)': { fontSize: '18px' },
+    '@media (max-width: 768px)': { fontSize: '11px' }
+  },
+  features: { 
+    backgroundColor: 'rgba(0,0,0,0.7)', 
+    padding: '15px', 
+    borderRadius: '10px', 
+    marginTop: '10px', 
+    textAlign: 'left', 
+    lineHeight: '1.6', 
+    width: '100%', 
+    fontSize: '11px', 
+    border: '1px solid rgba(255,255,255,0.2)', 
+    maxHeight: '300px', 
+    overflow: 'auto', 
+    '@media (min-width: 769px)': { padding: '20px', fontSize: '16px', maxHeight: '400px' },
+    '@media (max-width: 768px)': { padding: '10px', fontSize: '9px', maxHeight: '200px' }
+  },
+  startButton: { 
+    padding: '12px 30px', 
+    fontSize: '16px', 
+    fontWeight: 'bold', 
+    background: 'linear-gradient(135deg, #4CAF50, #45a049)', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '50px', 
+    cursor: 'pointer', 
+    minWidth: '160px', 
+    '@media (min-width: 769px)': { padding: '14px 40px', fontSize: '20px', minWidth: '200px' },
+    '@media (max-width: 768px)': { padding: '10px 20px', fontSize: '14px', minWidth: '130px' }
+  },
+  gameOverOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    background: 'rgba(0,0,0,0.95)', 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    color: 'white', 
+    textAlign: 'center', 
+    padding: '15px', 
+    zIndex: 10
+  },
+  gameOverContent: { 
+    display: 'flex', 
+    flexDirection: 'column', 
+    alignItems: 'center', 
+    gap: '10px', 
+    padding: '20px',
+    '@media (max-width: 768px)': {
+      gap: '6px',
+      padding: '12px'
+    }
+  },
+  gameOverTitle: { 
+    fontSize: '24px', 
+    color: '#ff6b6b', 
+    '@media (min-width: 769px)': { fontSize: '42px' },
+    '@media (max-width: 768px)': { fontSize: '20px' }
+  },
+  finalScore: { 
+    fontSize: '14px', 
+    margin: '3px 0', 
+    '@media (min-width: 769px)': { fontSize: '24px', margin: '5px 0' },
+    '@media (max-width: 768px)': { fontSize: '12px' }
+  },
+  retryButton: { 
+    padding: '10px 25px', 
+    fontSize: '14px', 
+    fontWeight: 'bold', 
+    background: 'linear-gradient(135deg, #2196F3, #1976D2)', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '50px', 
+    cursor: 'pointer', 
+    minWidth: '140px', 
+    '@media (min-width: 769px)': { padding: '12px 35px', fontSize: '18px', minWidth: '160px' },
+    '@media (max-width: 768px)': { padding: '8px 18px', fontSize: '12px', minWidth: '110px' }
+  },
+  mobileControls: { 
+    position: 'fixed', 
+    bottom: '10px', 
+    left: 0, 
+    right: 0, 
+    display: 'flex', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: '10px 20px', 
+    backgroundColor: 'rgba(0,0,0,0.85)', 
+    zIndex: 100, 
+    borderTop: '1px solid rgba(255,255,255,0.2)',
+    '@media (max-width: 768px)': {
+      bottom: '5px',
+      padding: '8px 15px'
+    }
+  },
+  leftControls: { 
+    display: 'flex', 
+    gap: '20px',
+    '@media (max-width: 768px)': {
+      gap: '15px'
+    }
+  },
+  rightControls: { 
+    display: 'flex' 
+  },
+  mobileButton: { 
+    backgroundColor: 'rgba(255,255,255,0.2)', 
+    border: '2px solid rgba(255,255,255,0.6)', 
+    borderRadius: '50px', 
+    width: '60px', 
+    height: '60px', 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    color: 'white', 
+    cursor: 'pointer', 
+    '@media (min-width: 769px)': { width: '70px', height: '70px' },
+    '@media (max-width: 768px)': { width: '50px', height: '50px' }
+  },
+  shootButton: { 
+    backgroundColor: 'rgba(255,80,80,0.8)', 
+    borderColor: '#ffaa44' 
+  }
 };
 
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `button:hover:enabled { transform: scale(1.05); } button:active { transform: scale(0.95); } @media (max-width: 480px) { button { min-height: 44px; } .gameTitle { font-size: 20px !important; } .gameSubtitle { font-size: 11px !important; } .features { font-size: 9px !important; } .mobileButton { width: 48px !important; height: 48px !important; } .mobileControls { padding: 8px 12px !important; gap: 12px !important; } } @media (max-width: 360px) { .mobileButton { width: 44px !important; height: 44px !important; } .leftControls { gap: 10px !important; } }`;
+styleSheet.textContent = `button:hover:enabled { transform: scale(1.05); } button:active { transform: scale(0.95); } @media (max-width: 480px) { .mobileButton { width: 44px !important; height: 44px !important; } .leftControls { gap: 12px !important; } }`;
 document.head.appendChild(styleSheet);
 
 export default SpaceShooter;
