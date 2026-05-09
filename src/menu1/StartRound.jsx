@@ -25,6 +25,106 @@ const animationStyles = `
   .answer-updated {
     animation: pulse 0.5s ease-in-out;
   }
+
+  /* Mobile Responsive Styles */
+  @media (max-width: 768px) {
+    .modal {
+      padding: 16px !important;
+      width: 95% !important;
+    }
+    .teams-container {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+    }
+    .teams-ready-container {
+      grid-template-columns: 1fr !important;
+      gap: 16px !important;
+    }
+    .summary-grid {
+      grid-template-columns: 1fr !important;
+    }
+    .points-teams-container {
+      grid-template-columns: 1fr !important;
+    }
+    .header {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+    }
+    .team-header-a, .team-header-b {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+    }
+    .team-stats {
+      flex-wrap: wrap !important;
+    }
+    .student-answer-header {
+      flex-wrap: wrap !important;
+      gap: 8px !important;
+    }
+    .points-card-header {
+      flex-wrap: wrap !important;
+    }
+    .awarded-badge {
+      margin-left: 0 !important;
+    }
+    .points-input-wrapper {
+      flex-wrap: wrap !important;
+    }
+    .points-actions {
+      flex-direction: column !important;
+    }
+    .points-actions button {
+      width: 100% !important;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .timer-number {
+      font-size: 32px !important;
+    }
+    .question-text {
+      font-size: 16px !important;
+    }
+    .team-title {
+      font-size: 16px !important;
+    }
+    .points-team-title {
+      font-size: 18px !important;
+    }
+    .member-item {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 6px !important;
+    }
+    .student-answer-content {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+    }
+    .answer-content {
+      flex-direction: column !important;
+      text-align: center !important;
+    }
+  }
+
+  @media (max-width: 320px) {
+    .modal {
+      padding: 12px !important;
+    }
+    .timer-number {
+      font-size: 28px !important;
+    }
+    .points-input {
+      width: 60px !important;
+      font-size: 16px !important;
+    }
+    .points-adjust-btn {
+      width: 30px !important;
+      height: 30px !important;
+    }
+    .member-count, .submission-count {
+      font-size: 10px !important;
+    }
+  }
 `;
 
 function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded }) {
@@ -51,11 +151,21 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const [studentAnswers, setStudentAnswers] = useState({ A: [], B: [] });
   const [answerUpdateTrigger, setAnswerUpdateTrigger] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   
   const timerIntervalRef = useRef(null);
   const readinessSubscriptionRef = useRef(null);
   const answersSubscriptionRef = useRef(null);
   const answerPollIntervalRef = useRef(null);
+  
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   const question = {
     text: "Find the equation of the line passing through (1, 2) and (5, 10)",
@@ -176,18 +286,15 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const getMajorityAnswer = (answers) => {
     if (!answers || answers.length === 0) return null;
     
-    // Filter out empty answers
     const validAnswers = answers.filter(a => a.answer && a.answer.trim());
     if (validAnswers.length === 0) return null;
     
-    // Count frequency of each answer
     const frequency = {};
     validAnswers.forEach(item => {
       const normalizedAnswer = item.answer.trim().toLowerCase();
       frequency[normalizedAnswer] = (frequency[normalizedAnswer] || 0) + 1;
     });
     
-    // Find the answer with highest frequency
     let maxCount = 0;
     let majorityAnswer = null;
     
@@ -198,7 +305,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       }
     }
     
-    // Return the original answer text (not normalized)
     const originalAnswer = validAnswers.find(
       a => a.answer.trim().toLowerCase() === majorityAnswer
     );
@@ -218,33 +324,25 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     try {
       console.log(`📡 Fetching answers for session: ${sessionId}`);
       
-      // Step 1: Get all answers for this session
       const answers = await fetchStudentAnswers(sessionId);
-      
-      // Step 2: Get team assignments
       const teamAssignments = await getTeamAssignments();
-      
-      // Step 3: Process answers by team
       const { teamAAnswers, teamBAnswers, unassignedAnswers } = processAnswersByTeam(answers, teamAssignments);
       
       if (unassignedAnswers.length > 0) {
         console.warn(`⚠️ ${unassignedAnswers.length} answers from unassigned students`);
       }
       
-      // Step 4: Update individual student answers state
       setStudentAnswers({
         A: teamAAnswers,
         B: teamBAnswers
       });
       
-      // Step 5: Calculate team answers by majority vote
       const teamAMajorityAnswer = getMajorityAnswer(teamAAnswers);
       const teamBMajorityAnswer = getMajorityAnswer(teamBAnswers);
       
       console.log(`🏆 Team A majority answer: "${teamAMajorityAnswer}" (from ${teamAAnswers.length} students)`);
       console.log(`🏆 Team B majority answer: "${teamBMajorityAnswer}" (from ${teamBAnswers.length} students)`);
       
-      // Step 6: Update team answers with animation triggers
       const previousTeamA = teamAnswers.A;
       const previousTeamB = teamAnswers.B;
       
@@ -284,7 +382,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     try {
       console.log('🔄 Auto-assigning teams for class:', classId);
       
-      // Get all students in this class
       const { data: classStudents, error: classError } = await supabase
         .from('class_students')
         .select('student_id')
@@ -300,7 +397,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         return;
       }
       
-      // Get existing team assignments
       const { data: existingAssignments, error: existingError } = await supabase
         .from('team_assignments')
         .select('student_id')
@@ -321,7 +417,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       
       console.log(`Found ${unassignedStudents.length} unassigned students`);
       
-      // Assign unassigned students to teams alternately
       const newAssignments = unassignedStudents.map((student, index) => ({
         student_id: student.student_id,
         class_id: classId,
@@ -341,7 +436,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       
       console.log(`✅ Auto-assigned ${newAssignments.length} students to teams`);
       
-      // Refresh the component data
       if (onPointsAwarded) {
         await onPointsAwarded();
       }
@@ -373,7 +467,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         console.log(`Found ${existingSessions.length} old sessions to clean up`);
         
         for (const session of existingSessions) {
-          // Delete answers first (foreign key constraint)
           const { error: deleteAnswersError } = await supabase
             .from('student_answers')
             .delete()
@@ -384,7 +477,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           }
         }
         
-        // Delete game sessions
         const { error: deleteError } = await supabase
           .from('game_sessions')
           .delete()
@@ -484,7 +576,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     }
   };
 
-  // Clear old ready statuses when component mounts
   useEffect(() => {
     const clearOldReadyStatuses = async () => {
       console.log('Clearing old ready statuses for class:', classId);
@@ -502,7 +593,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     clearOldReadyStatuses();
   }, [classId]);
 
-  // Subscribe to ready status changes
   useEffect(() => {
     if (!classId) return;
     
@@ -567,15 +657,12 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const startGameRound = async () => {
     setError(null);
     try {
-      // Step 1: Auto-assign any unassigned students to teams
       console.log('Step 1: Auto-assigning teams...');
       await autoAssignTeams();
       
-      // Step 2: Clean up old game sessions
       console.log('Step 2: Cleaning up old sessions...');
       await cleanupOldGameSessions();
       
-      // Step 3: Create new game session
       console.log('Step 3: Creating new game session...');
       const { id: newSessionId } = await createGameSession();
       
@@ -586,13 +673,10 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       
       startTimer(20, newSessionId, new Date().toISOString());
       
-      // Step 4: Clear ready statuses
       await supabase.from('student_ready_status').delete().eq('class_id', classId);
       
-      // Step 5: Set up answer listeners and polling
       setupAnswerListeners(newSessionId);
       
-      // Step 6: Initial fetch for answers
       setTimeout(() => fetchAndProcessAnswers(), 500);
       
       console.log('✅ Round started successfully!');
@@ -607,10 +691,8 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const setupAnswerListeners = (sessionIdParam) => {
     console.log(`🔔 Setting up answer listeners for session ${sessionIdParam}`);
     
-    // Initial fetch
     fetchAndProcessAnswers();
     
-    // Poll every 2 seconds for new answers
     if (answerPollIntervalRef.current) clearInterval(answerPollIntervalRef.current);
     answerPollIntervalRef.current = setInterval(() => {
       if (isActive && sessionIdParam) {
@@ -619,7 +701,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       }
     }, 2000);
     
-    // Real-time subscription for instant updates
     if (answersSubscriptionRef.current) supabase.removeChannel(answersSubscriptionRef.current);
     
     const subscription = supabase
@@ -668,7 +749,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     if (!isActive && roundEnded) return;
     console.log('🏁 Ending round...');
     
-    // Final fetch to get all answers
     await fetchAndProcessAnswers();
     
     if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -787,13 +867,11 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       );
     }
     
-    // Create a map for quick answer lookup
     const answerMap = new Map();
     answers.forEach(answer => {
       answerMap.set(answer.studentId, answer);
     });
     
-    // Build list of all team members with their answers
     const allStudents = teamMembersList.map(member => {
       const answer = answerMap.get(member.id);
       return {
@@ -811,7 +889,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     return (
       <div style={styles.studentAnswersList}>
         <div style={styles.submissionStats}>
-          <FiUsers size={14} />
+          <FiUsers size={isMobile ? 12 : 14} />
           <span style={{ fontWeight: 'bold' }}>{submittedCount}/{totalCount} students have submitted answers</span>
         </div>
         {allStudents.map((student) => {
@@ -826,11 +904,11 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   {student.name}
                   {student.hasSubmitted && <span style={{ color: '#10b981', marginLeft: '4px' }}>✓</span>}
                 </span>
-                {student.hasSubmitted ? (
+                {!isMobile && (student.hasSubmitted ? (
                   <span style={styles.submittedBadge}>✅ Submitted</span>
                 ) : (
                   <span style={styles.notSubmittedBadge}>⏳ Not Submitted</span>
-                )}
+                ))}
               </div>
               {student.hasSubmitted ? (
                 <div style={styles.studentAnswerContent}>
@@ -847,7 +925,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   <span>No answer yet</span>
                 </div>
               )}
-              {student.submittedAt && (
+              {student.submittedAt && !isMobile && (
                 <div style={styles.submittedTime}>
                   Submitted: {new Date(student.submittedAt).toLocaleTimeString()}
                 </div>
@@ -873,14 +951,14 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     <>
       <style>{animationStyles}</style>
       <div style={styles.modalOverlay} onClick={(roundEnded && !pointsPhase) ? onClose : undefined}>
-        <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
-          <div style={styles.header}>
+        <div style={styles.modal} className="modal" onClick={(e) => e.stopPropagation()}>
+          <div style={styles.header} className="header">
             <h2 style={styles.title}>🎯 Live Math Challenge</h2>
             <h3 style={styles.className}>{className || 'Class'}</h3>
             {!roundEnded && isActive && (
               <>
                 <button style={styles.refreshButton} onClick={handleManualRefresh}>
-                  <FiRefreshCw size={16} /> Refresh Answers
+                  <FiRefreshCw size={isMobile ? 12 : 16} /> {!isMobile && "Refresh Answers"}
                 </button>
                 <button style={styles.endEarlyButton} onClick={endRound}>End Round Early</button>
               </>
@@ -900,18 +978,18 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
               <h3 style={styles.readyTitle}>🎮 Getting Teams Ready</h3>
               <p style={styles.readySubtitle}>Waiting for all team members to confirm they're ready...</p>
               
-              <div style={styles.teamsReadyContainer}>
+              <div style={styles.teamsReadyContainer} className="teams-ready-container">
                 <div style={styles.teamReadyCardA}>
                   <div style={styles.teamReadyHeaderA}>
-                    <FiUsers size={24} />
+                    <FiUsers size={isMobile ? 20 : 24} />
                     <h3>Team A</h3>
                     <span style={styles.memberCount}>{teamAReadyStudents.length}/{teamA.length} Ready</span>
                   </div>
                   <div style={styles.readyStatus}>
                     {allTeamAReady ? (
-                      <div style={styles.readyStatusReady}><FiCheckCircle size={24} color="#10b981" /><span>All Ready!</span></div>
+                      <div style={styles.readyStatusReady}><FiCheckCircle size={isMobile ? 20 : 24} color="#10b981" /><span>All Ready!</span></div>
                     ) : (
-                      <div style={styles.readyStatusWaiting}><FiAlertCircle size={24} color="#f59e0b" /><span>Waiting for {teamA.length - teamAReadyStudents.length} more...</span></div>
+                      <div style={styles.readyStatusWaiting}><FiAlertCircle size={isMobile ? 20 : 24} color="#f59e0b" /><span>Waiting for {teamA.length - teamAReadyStudents.length} more...</span></div>
                     )}
                   </div>
                   <div style={styles.teamMembersReadyList}>
@@ -932,15 +1010,15 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
                 <div style={styles.teamReadyCardB}>
                   <div style={styles.teamReadyHeaderB}>
-                    <FiUsers size={24} />
+                    <FiUsers size={isMobile ? 20 : 24} />
                     <h3>Team B</h3>
                     <span style={styles.memberCount}>{teamBReadyStudents.length}/{teamB.length} Ready</span>
                   </div>
                   <div style={styles.readyStatus}>
                     {allTeamBReady ? (
-                      <div style={styles.readyStatusReady}><FiCheckCircle size={24} color="#10b981" /><span>All Ready!</span></div>
+                      <div style={styles.readyStatusReady}><FiCheckCircle size={isMobile ? 20 : 24} color="#10b981" /><span>All Ready!</span></div>
                     ) : (
-                      <div style={styles.readyStatusWaiting}><FiAlertCircle size={24} color="#f59e0b" /><span>Waiting for {teamB.length - teamBReadyStudents.length} more...</span></div>
+                      <div style={styles.readyStatusWaiting}><FiAlertCircle size={isMobile ? 20 : 24} color="#f59e0b" /><span>Waiting for {teamB.length - teamBReadyStudents.length} more...</span></div>
                     )}
                   </div>
                   <div style={styles.teamMembersReadyList}>
@@ -990,7 +1068,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
             <>
               <div style={styles.timerSection}>
                 <div style={styles.timerCircle}>
-                  <FiClock size={40} color={timeLeft < 5 ? '#ef4444' : '#3b82f6'} />
+                  <FiClock size={isMobile ? 32 : 40} color={timeLeft < 5 ? '#ef4444' : '#3b82f6'} />
                   <div style={styles.timerText}>
                     <span style={styles.timerNumber}>{timeLeft}</span>
                     <span style={styles.timerLabel}>seconds left</span>
@@ -1017,13 +1095,13 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           )}
 
           {!isReadyPhase && (
-            <div style={styles.teamsContainer}>
+            <div style={styles.teamsContainer} className="teams-container">
               {/* Team A Column */}
               <div style={styles.teamCardA}>
-                <div style={styles.teamHeaderA}>
-                  <FiUsers size={24} />
+                <div style={styles.teamHeaderA} className="team-header-a">
+                  <FiUsers size={isMobile ? 20 : 24} />
                   <h3 style={styles.teamTitle}>Team A</h3>
-                  <div style={styles.teamStats}>
+                  <div style={styles.teamStats} className="team-stats">
                     <span style={styles.memberCount}>{teamA?.length || 0} members</span>
                     <span style={styles.submissionCount}>
                       {stats.teamA.submitted}/{stats.teamA.total} submitted
@@ -1044,7 +1122,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
                 <div style={styles.individualAnswersSection}>
                   <div style={styles.individualAnswersHeader}>
-                    <FiUsers size={16} />
+                    <FiUsers size={isMobile ? 12 : 16} />
                     <span>Individual Student Answers</span>
                     <span style={styles.answerCount}>
                       {studentAnswers.A.length}/{teamA?.length || 0} submitted
@@ -1056,9 +1134,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <div style={styles.membersList}>
                   <strong>👥 Team Members:</strong>
                   {teamA?.map(student => (
-                    <div key={student.id} style={styles.memberItem}>
+                    <div key={student.id} style={styles.memberItem} className="member-item">
                       <span>{student.name}</span>
-                      <span style={styles.roleBadge(student.role)}>{student.role || 'member'}</span>
+                      <span style={{...styles.roleBadge, backgroundColor: styles.roleBadge(student.role).backgroundColor}}>{student.role || 'member'}</span>
                     </div>
                   ))}
                 </div>
@@ -1066,10 +1144,10 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
               {/* Team B Column */}
               <div style={styles.teamCardB}>
-                <div style={styles.teamHeaderB}>
-                  <FiUsers size={24} />
+                <div style={styles.teamHeaderB} className="team-header-b">
+                  <FiUsers size={isMobile ? 20 : 24} />
                   <h3 style={styles.teamTitle}>Team B</h3>
-                  <div style={styles.teamStats}>
+                  <div style={styles.teamStats} className="team-stats">
                     <span style={styles.memberCount}>{teamB?.length || 0} members</span>
                     <span style={styles.submissionCount}>
                       {stats.teamB.submitted}/{stats.teamB.total} submitted
@@ -1090,7 +1168,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
 
                 <div style={styles.individualAnswersSection}>
                   <div style={styles.individualAnswersHeader}>
-                    <FiUsers size={16} />
+                    <FiUsers size={isMobile ? 12 : 16} />
                     <span>Individual Student Answers</span>
                     <span style={styles.answerCount}>
                       {studentAnswers.B.length}/{teamB?.length || 0} submitted
@@ -1102,9 +1180,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <div style={styles.membersList}>
                   <strong>👥 Team Members:</strong>
                   {teamB?.map(student => (
-                    <div key={student.id} style={styles.memberItem}>
+                    <div key={student.id} style={styles.memberItem} className="member-item">
                       <span>{student.name}</span>
-                      <span style={styles.roleBadge(student.role)}>{student.role || 'member'}</span>
+                      <span style={{...styles.roleBadge, backgroundColor: styles.roleBadge(student.role).backgroundColor}}>{student.role || 'member'}</span>
                     </div>
                   ))}
                 </div>
@@ -1115,7 +1193,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           {roundEnded && !pointsPhase && (
             <div style={styles.summaryCard}>
               <h3>🏆 Round Summary</h3>
-              <div style={styles.summaryGrid}>
+              <div style={styles.summaryGrid} className="summary-grid">
                 <div style={styles.summaryItem}>
                   <strong>Team A:</strong> 
                   <span style={checkAnswer(teamAnswers.A) ? styles.correctText : styles.incorrectText}>
@@ -1152,7 +1230,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 <p style={styles.explanationText}>{question.explanation}</p>
               </div>
               <button style={styles.awardPointsButton} onClick={goToPointsPhase}>
-                <FiAward size={20} /> Award Points to Teams
+                <FiAward size={isMobile ? 16 : 20} /> Award Points to Teams
               </button>
             </div>
           )}
@@ -1160,31 +1238,31 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           {pointsPhase && (
             <div style={styles.pointsPhaseContainer}>
               <div style={styles.pointsHeader}>
-                <FiAward size={32} color="#f59e0b" />
+                <FiAward size={isMobile ? 28 : 32} color="#f59e0b" />
                 <h2 style={styles.pointsTitle}>Award Points</h2>
                 <p style={styles.pointsSubtitle}>Give points to teams. Each team member will receive the same points!</p>
               </div>
 
-              <div style={styles.pointsTeamsContainer}>
+              <div style={styles.pointsTeamsContainer} className="points-teams-container">
                 <div style={teamPointsAwarded.A ? styles.pointsCardAAwarded : styles.pointsCardA}>
-                  <div style={styles.pointsCardHeader}>
-                    <div style={styles.teamIconWrapperA}><FiUsers size={28} /></div>
+                  <div style={styles.pointsCardHeader} className="points-card-header">
+                    <div style={styles.teamIconWrapperA}><FiUsers size={isMobile ? 22 : 28} /></div>
                     <div>
                       <h3 style={styles.pointsTeamTitle}>Team A</h3>
                       <span style={styles.pointsMemberCount}>{teamA?.length || 0} members</span>
                     </div>
-                    {teamPointsAwarded.A && <div style={styles.awardedBadge}><FiCheckCircle size={16} /> Points Awarded</div>}
+                    {teamPointsAwarded.A && <div style={styles.awardedBadge} className="awarded-badge"><FiCheckCircle size={16} /> Points Awarded</div>}
                   </div>
                   <div style={styles.pointsDisplay}>
                     <div style={styles.pointsInfo}>
                       <div style={styles.pointsLabel}>Points per member:</div>
                       {teamPointsAwarded.A ? (
-                        <div style={styles.pointsValueAwarded}><FiStar size={24} color="#f59e0b" /><span>{teamPoints.A} point{teamPoints.A !== 1 ? 's' : ''}</span></div>
+                        <div style={styles.pointsValueAwarded}><FiStar size={isMobile ? 20 : 24} color="#f59e0b" /><span>{teamPoints.A} point{teamPoints.A !== 1 ? 's' : ''}</span></div>
                       ) : (
-                        <div style={styles.pointsInputWrapper}>
-                          <button style={styles.pointsAdjustBtn} onClick={() => setTeamPoints(prev => ({ ...prev, A: Math.max(0, prev.A - 1) }))}><FiMinus size={16} /></button>
-                          <input type="number" min="0" value={teamPoints.A} onChange={(e) => setTeamPoints(prev => ({ ...prev, A: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} />
-                          <button style={styles.pointsAdjustBtn} onClick={() => setTeamPoints(prev => ({ ...prev, A: prev.A + 1 }))}><FiPlus size={16} /></button>
+                        <div style={styles.pointsInputWrapper} className="points-input-wrapper">
+                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, A: Math.max(0, prev.A - 1) }))}><FiMinus size={isMobile ? 12 : 16} /></button>
+                          <input type="number" min="0" value={teamPoints.A} onChange={(e) => setTeamPoints(prev => ({ ...prev, A: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} className="points-input" />
+                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, A: prev.A + 1 }))}><FiPlus size={isMobile ? 12 : 16} /></button>
                         </div>
                       )}
                     </div>
@@ -1196,7 +1274,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   </div>
                   {!teamPointsAwarded.A && (teamA?.length || 0) > 0 && (
                     <button style={styles.awardTeamButton} onClick={() => awardTeamPoints('A', teamPoints.A)}>
-                      <FiSend size={18} /> Award {teamPoints.A} Point{teamPoints.A !== 1 ? 's' : ''} to Team A
+                      <FiSend size={isMobile ? 14 : 18} /> Award {teamPoints.A} Point{teamPoints.A !== 1 ? 's' : ''} to Team A
                     </button>
                   )}
                   {teamPointsAwarded.A && (
@@ -1215,24 +1293,24 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 </div>
 
                 <div style={teamPointsAwarded.B ? styles.pointsCardBAwarded : styles.pointsCardB}>
-                  <div style={styles.pointsCardHeader}>
-                    <div style={styles.teamIconWrapperB}><FiUsers size={28} /></div>
+                  <div style={styles.pointsCardHeader} className="points-card-header">
+                    <div style={styles.teamIconWrapperB}><FiUsers size={isMobile ? 22 : 28} /></div>
                     <div>
                       <h3 style={styles.pointsTeamTitle}>Team B</h3>
                       <span style={styles.pointsMemberCount}>{teamB?.length || 0} members</span>
                     </div>
-                    {teamPointsAwarded.B && <div style={styles.awardedBadge}><FiCheckCircle size={16} /> Points Awarded</div>}
+                    {teamPointsAwarded.B && <div style={styles.awardedBadge} className="awarded-badge"><FiCheckCircle size={16} /> Points Awarded</div>}
                   </div>
                   <div style={styles.pointsDisplay}>
                     <div style={styles.pointsInfo}>
                       <div style={styles.pointsLabel}>Points per member:</div>
                       {teamPointsAwarded.B ? (
-                        <div style={styles.pointsValueAwarded}><FiStar size={24} color="#f59e0b" /><span>{teamPoints.B} point{teamPoints.B !== 1 ? 's' : ''}</span></div>
+                        <div style={styles.pointsValueAwarded}><FiStar size={isMobile ? 20 : 24} color="#f59e0b" /><span>{teamPoints.B} point{teamPoints.B !== 1 ? 's' : ''}</span></div>
                       ) : (
-                        <div style={styles.pointsInputWrapper}>
-                          <button style={styles.pointsAdjustBtn} onClick={() => setTeamPoints(prev => ({ ...prev, B: Math.max(0, prev.B - 1) }))}><FiMinus size={16} /></button>
-                          <input type="number" min="0" value={teamPoints.B} onChange={(e) => setTeamPoints(prev => ({ ...prev, B: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} />
-                          <button style={styles.pointsAdjustBtn} onClick={() => setTeamPoints(prev => ({ ...prev, B: prev.B + 1 }))}><FiPlus size={16} /></button>
+                        <div style={styles.pointsInputWrapper} className="points-input-wrapper">
+                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, B: Math.max(0, prev.B - 1) }))}><FiMinus size={isMobile ? 12 : 16} /></button>
+                          <input type="number" min="0" value={teamPoints.B} onChange={(e) => setTeamPoints(prev => ({ ...prev, B: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} className="points-input" />
+                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, B: prev.B + 1 }))}><FiPlus size={isMobile ? 12 : 16} /></button>
                         </div>
                       )}
                     </div>
@@ -1244,7 +1322,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   </div>
                   {!teamPointsAwarded.B && (teamB?.length || 0) > 0 && (
                     <button style={styles.awardTeamButton} onClick={() => awardTeamPoints('B', teamPoints.B)}>
-                      <FiSend size={18} /> Award {teamPoints.B} Point{teamPoints.B !== 1 ? 's' : ''} to Team B
+                      <FiSend size={isMobile ? 14 : 18} /> Award {teamPoints.B} Point{teamPoints.B !== 1 ? 's' : ''} to Team B
                     </button>
                   )}
                   {teamPointsAwarded.B && (
@@ -1270,7 +1348,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                 </div>
               )}
 
-              <div style={styles.pointsActions}>
+              <div style={styles.pointsActions} className="points-actions">
                 <button style={styles.backToSummaryButton} onClick={() => setPointsPhase(false)}>Back to Summary</button>
                 <button style={styles.finishRoundButton} onClick={onClose}><FiCheckCircle size={18} /> Finish Round</button>
               </div>
@@ -1299,12 +1377,12 @@ const styles = {
     justifyContent: 'center', 
     zIndex: 1000, 
     overflow: 'auto', 
-    padding: '20px' 
+    padding: 'clamp(12px, 4vw, 20px)' 
   },
   modal: { 
     backgroundColor: 'white', 
     borderRadius: '20px', 
-    padding: '30px', 
+    padding: 'clamp(16px, 5vw, 30px)', 
     width: '90%', 
     maxWidth: '1400px', 
     maxHeight: '90vh', 
@@ -1320,13 +1398,13 @@ const styles = {
     flexWrap: 'wrap' 
   },
   title: { 
-    fontSize: '24px', 
+    fontSize: 'clamp(18px, 5vw, 24px)', 
     fontWeight: '700', 
     color: '#1f2937', 
     margin: 0 
   },
   className: { 
-    fontSize: '18px', 
+    fontSize: 'clamp(14px, 4vw, 18px)', 
     color: '#6b7280', 
     margin: 0 
   },
@@ -1336,7 +1414,7 @@ const styles = {
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     cursor: 'pointer',
     display: 'flex',
@@ -1349,14 +1427,14 @@ const styles = {
     color: 'white', 
     border: 'none', 
     borderRadius: '8px', 
-    fontSize: '14px', 
+    fontSize: 'clamp(12px, 3.5vw, 14px)', 
     fontWeight: '500', 
     cursor: 'pointer' 
   },
   closeButton: { 
     background: 'none', 
     border: 'none', 
-    fontSize: '32px', 
+    fontSize: 'clamp(24px, 6vw, 32px)', 
     cursor: 'pointer', 
     color: '#6b7280', 
     padding: '0 8px' 
@@ -1370,17 +1448,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    color: '#991b1b'
+    color: '#991b1b',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   readyPhaseContainer: { 
-    padding: '20px', 
+    padding: 'clamp(16px, 5vw, 20px)', 
     backgroundColor: '#f0fdf4', 
     borderRadius: '16px', 
     marginBottom: '20px', 
     border: '2px solid #bbf7d0' 
   },
   readyTitle: { 
-    fontSize: '24px', 
+    fontSize: 'clamp(18px, 5vw, 24px)', 
     fontWeight: '700', 
     color: '#166534', 
     textAlign: 'center', 
@@ -1389,24 +1468,25 @@ const styles = {
   readySubtitle: { 
     textAlign: 'center', 
     color: '#15803d', 
-    marginBottom: '24px' 
+    marginBottom: '24px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   teamsReadyContainer: { 
     display: 'grid', 
     gridTemplateColumns: '1fr 1fr', 
-    gap: '24px', 
+    gap: 'clamp(16px, 4vw, 24px)', 
     marginBottom: '24px' 
   },
   teamReadyCardA: { 
     backgroundColor: '#eff6ff', 
     borderRadius: '16px', 
-    padding: '20px', 
+    padding: 'clamp(16px, 5vw, 20px)', 
     border: '2px solid #bfdbfe' 
   },
   teamReadyCardB: { 
     backgroundColor: '#fce7f3', 
     borderRadius: '16px', 
-    padding: '20px', 
+    padding: 'clamp(16px, 5vw, 20px)', 
     border: '2px solid #fbcfe8' 
   },
   teamReadyHeaderA: { 
@@ -1415,7 +1495,8 @@ const styles = {
     gap: '12px', 
     marginBottom: '16px', 
     paddingBottom: '12px', 
-    borderBottom: '2px solid #bfdbfe' 
+    borderBottom: '2px solid #bfdbfe',
+    flexWrap: 'wrap'
   },
   teamReadyHeaderB: { 
     display: 'flex', 
@@ -1423,10 +1504,11 @@ const styles = {
     gap: '12px', 
     marginBottom: '16px', 
     paddingBottom: '12px', 
-    borderBottom: '2px solid #fbcfe8' 
+    borderBottom: '2px solid #fbcfe8',
+    flexWrap: 'wrap'
   },
   memberCount: { 
-    fontSize: '12px', 
+    fontSize: 'clamp(10px, 3vw, 12px)', 
     color: '#6b7280', 
     backgroundColor: 'white', 
     padding: '4px 8px', 
@@ -1445,7 +1527,8 @@ const styles = {
     justifyContent: 'center', 
     gap: '8px', 
     color: '#10b981', 
-    fontWeight: '600' 
+    fontWeight: '600',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   readyStatusWaiting: { 
     display: 'flex',
@@ -1453,7 +1536,8 @@ const styles = {
     justifyContent: 'center',
     gap: '8px',
     color: '#f59e0b',
-    fontWeight: '600'
+    fontWeight: '600',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   teamMembersReadyList: {
     marginTop: '12px'
@@ -1463,13 +1547,15 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '8px 0',
-    fontSize: '13px',
-    borderBottom: '1px solid #e5e7eb'
+    fontSize: 'clamp(11px, 3.5vw, 13px)',
+    borderBottom: '1px solid #e5e7eb',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
   readyBadge: {
     padding: '2px 8px',
     borderRadius: '12px',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: '500',
     backgroundColor: '#d1fae5',
     color: '#065f46'
@@ -1477,19 +1563,19 @@ const styles = {
   notReadyBadge: {
     padding: '2px 8px',
     borderRadius: '12px',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: '500',
     backgroundColor: '#fee2e2',
     color: '#991b1b'
   },
   startRoundButton: {
     marginTop: '16px',
-    padding: '12px 24px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(20px, 6vw, 24px)',
     backgroundColor: '#10b981',
     color: 'white',
     border: 'none',
     borderRadius: '12px',
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'inline-flex',
@@ -1504,7 +1590,7 @@ const styles = {
     marginTop: '16px'
   },
   countdownNumber: {
-    fontSize: '64px',
+    fontSize: 'clamp(48px, 15vw, 64px)',
     fontWeight: 'bold',
     color: '#fbbf24',
     fontFamily: 'monospace'
@@ -1518,7 +1604,10 @@ const styles = {
     backgroundColor: '#fef3c7',
     borderRadius: '8px',
     color: '#92400e',
-    marginTop: '16px'
+    marginTop: '16px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
+    flexWrap: 'wrap',
+    textAlign: 'center'
   },
   allReadyInfo: {
     display: 'flex',
@@ -1530,12 +1619,13 @@ const styles = {
     borderRadius: '8px',
     color: '#065f46',
     marginTop: '16px',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    textAlign: 'center'
   },
   timerSection: {
     textAlign: 'center',
     marginBottom: '30px',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     backgroundColor: '#f9fafb',
     borderRadius: '16px'
   },
@@ -1550,14 +1640,14 @@ const styles = {
     textAlign: 'center'
   },
   timerNumber: {
-    fontSize: '48px',
+    fontSize: 'clamp(32px, 10vw, 48px)',
     fontWeight: 'bold',
     fontFamily: 'monospace',
     display: 'block',
     color: '#1f2937'
   },
   timerLabel: {
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3.5vw, 14px)',
     color: '#6b7280'
   },
   timerBar: {
@@ -1574,34 +1664,36 @@ const styles = {
     borderRadius: '5px'
   },
   timerStatus: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     color: '#6b7280'
   },
   questionCard: {
     backgroundColor: '#f3f4f6',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     borderRadius: '12px',
     marginBottom: '30px'
   },
   questionTitle: {
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 4vw, 18px)',
     fontWeight: '600',
     marginBottom: '12px',
     color: '#374151'
   },
   questionText: {
-    fontSize: '20px',
+    fontSize: 'clamp(14px, 4.5vw, 20px)',
     fontWeight: '500',
     color: '#1f2937',
-    margin: '0 0 16px 0'
+    margin: '0 0 16px 0',
+    wordBreak: 'break-word'
   },
   correctAnswerBox: {
     backgroundColor: '#d1fae5',
     padding: '12px',
     borderRadius: '8px',
     color: '#065f46',
-    marginTop: '12px'
+    marginTop: '12px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   teamsContainer: {
     display: 'grid',
@@ -1612,20 +1704,20 @@ const styles = {
   teamCardA: {
     backgroundColor: '#eff6ff',
     borderRadius: '16px',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     border: '2px solid #bfdbfe'
   },
   teamCardB: {
     backgroundColor: '#fce7f3',
     borderRadius: '16px',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     border: '2px solid #fbcfe8'
   },
   teamHeaderA: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: 'clamp(8px, 3vw, 12px)',
     marginBottom: '20px',
     paddingBottom: '12px',
     borderBottom: '2px solid #bfdbfe',
@@ -1635,31 +1727,32 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: '12px',
+    gap: 'clamp(8px, 3vw, 12px)',
     marginBottom: '20px',
     paddingBottom: '12px',
     borderBottom: '2px solid #fbcfe8',
     flexWrap: 'wrap'
   },
   teamTitle: {
-    fontSize: '20px',
+    fontSize: 'clamp(14px, 4vw, 20px)',
     fontWeight: '600',
     margin: 0
   },
   teamStats: {
     display: 'flex',
     gap: '12px',
-    alignItems: 'center'
+    alignItems: 'center',
+    flexWrap: 'wrap'
   },
   memberCount: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#6b7280',
     backgroundColor: 'white',
     padding: '4px 8px',
     borderRadius: '20px'
   },
   submissionCount: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#6b7280',
     backgroundColor: 'white',
     padding: '4px 8px',
@@ -1669,13 +1762,14 @@ const styles = {
     marginBottom: '20px'
   },
   answerLabel: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     marginBottom: '8px',
     color: '#4b5563',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   liveBadge: {
     fontSize: '10px',
@@ -1696,10 +1790,11 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '12px'
+    gap: '12px',
+    flexWrap: 'wrap'
   },
   answerText: {
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 4vw, 16px)',
     fontWeight: '500',
     color: '#1f2937',
     flex: 1,
@@ -1710,18 +1805,19 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     color: '#9ca3af',
-    fontStyle: 'italic'
+    fontStyle: 'italic',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   correctIcon: {
     color: '#10b981',
-    fontSize: '24px'
+    fontSize: 'clamp(20px, 6vw, 24px)'
   },
   incorrectIcon: {
     color: '#ef4444',
-    fontSize: '24px'
+    fontSize: 'clamp(20px, 6vw, 24px)'
   },
   majorityInfo: {
-    fontSize: '11px',
+    fontSize: 'clamp(10px, 3vw, 11px)',
     color: '#6b7280',
     textAlign: 'center',
     marginTop: '8px'
@@ -1740,13 +1836,14 @@ const styles = {
     marginBottom: '12px',
     paddingBottom: '8px',
     borderBottom: '1px solid #e5e7eb',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
-    color: '#4b5563'
+    color: '#4b5563',
+    flexWrap: 'wrap'
   },
   answerCount: {
     marginLeft: 'auto',
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     backgroundColor: '#e5e7eb',
     padding: '2px 8px',
     borderRadius: '12px'
@@ -1763,19 +1860,20 @@ const styles = {
     padding: '8px',
     backgroundColor: '#f0fdf4',
     borderRadius: '8px',
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 3.5vw, 12px)',
     color: '#166534',
-    marginBottom: '8px'
+    marginBottom: '8px',
+    flexWrap: 'wrap'
   },
   studentAnswerItem: {
     backgroundColor: 'white',
-    padding: '10px',
+    padding: 'clamp(8px, 3vw, 10px)',
     borderRadius: '8px',
     border: '1px solid #e5e7eb'
   },
   studentAnswerItemMissing: {
     backgroundColor: '#fef2f2',
-    padding: '10px',
+    padding: 'clamp(8px, 3vw, 10px)',
     borderRadius: '8px',
     border: '1px solid #fecaca'
   },
@@ -1783,10 +1881,12 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '6px'
+    marginBottom: '6px',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
   studentName: {
-    fontSize: '13px',
+    fontSize: 'clamp(12px, 3.5vw, 13px)',
     fontWeight: '600',
     color: '#1f2937'
   },
@@ -1808,20 +1908,22 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    gap: '8px'
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   studentAnswerText: {
-    fontSize: '13px',
+    fontSize: 'clamp(12px, 3.5vw, 13px)',
     color: '#374151',
     fontFamily: 'monospace',
-    flex: 1
+    flex: 1,
+    wordBreak: 'break-word'
   },
   studentAnswerMissing: {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
     color: '#9ca3af',
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 3.5vw, 12px)',
     fontStyle: 'italic'
   },
   submittedTime: {
@@ -1837,7 +1939,7 @@ const styles = {
     backgroundColor: '#f9fafb',
     borderRadius: '8px',
     color: '#9ca3af',
-    fontSize: '13px',
+    fontSize: 'clamp(11px, 3.5vw, 13px)',
     fontStyle: 'italic'
   },
   membersList: {
@@ -1850,20 +1952,22 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '8px 0',
-    fontSize: '14px',
-    borderBottom: '1px solid #f3f4f6'
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
+    borderBottom: '1px solid #f3f4f6',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
   roleBadge: (role) => ({
     padding: '2px 8px',
     borderRadius: '10px',
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: '500',
     backgroundColor: role === 'analyzer' ? '#ede9fe' : role === 'checker' ? '#fed7aa' : '#d1fae5',
     color: role === 'analyzer' ? '#6d28d9' : role === 'checker' ? '#92400e' : '#065f46'
   }),
   summaryCard: {
     backgroundColor: '#fef3c7',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     borderRadius: '12px',
     marginBottom: '20px'
   },
@@ -1875,12 +1979,13 @@ const styles = {
     marginBottom: '16px'
   },
   summaryItem: {
-    padding: '12px',
+    padding: 'clamp(12px, 4vw, 12px)',
     backgroundColor: 'white',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    wordBreak: 'break-word'
   },
   summaryAnswer: {
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 3.5vw, 12px)',
     color: '#6b7280',
     marginTop: '4px'
   },
@@ -1888,13 +1993,14 @@ const styles = {
     marginTop: '8px',
     paddingTop: '8px',
     borderTop: '1px solid #e5e7eb',
-    fontSize: '12px'
+    fontSize: 'clamp(11px, 3.5vw, 12px)'
   },
   summaryIndividualAnswer: {
     marginTop: '4px',
     marginLeft: '8px',
-    fontSize: '11px',
-    color: '#4b5563'
+    fontSize: 'clamp(10px, 3vw, 11px)',
+    color: '#4b5563',
+    wordBreak: 'break-word'
   },
   correctText: {
     color: '#10b981',
@@ -1915,17 +2021,18 @@ const styles = {
   explanationText: {
     marginTop: '8px',
     lineHeight: '1.6',
-    whiteSpace: 'pre-line'
+    whiteSpace: 'pre-line',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   awardPointsButton: {
     width: '100%',
     marginTop: '16px',
-    padding: '12px',
+    padding: 'clamp(10px, 4vw, 12px)',
     backgroundColor: '#f59e0b',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 4vw, 16px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
@@ -1941,7 +2048,7 @@ const styles = {
     marginBottom: '30px'
   },
   pointsTitle: {
-    fontSize: '28px',
+    fontSize: 'clamp(20px, 6vw, 28px)',
     fontWeight: '700',
     color: '#1f2937',
     marginTop: '12px',
@@ -1949,39 +2056,39 @@ const styles = {
   },
   pointsSubtitle: {
     color: '#6b7280',
-    fontSize: '14px'
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
   },
   pointsTeamsContainer: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '24px',
+    gap: 'clamp(16px, 4vw, 24px)',
     marginBottom: '30px'
   },
   pointsCardA: {
     backgroundColor: '#eff6ff',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #bfdbfe',
     transition: 'all 0.3s'
   },
   pointsCardAAwarded: {
     backgroundColor: '#eff6ff',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #bfdbfe',
     opacity: 0.85
   },
   pointsCardB: {
     backgroundColor: '#fce7f3',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #fbcfe8',
     transition: 'all 0.3s'
   },
   pointsCardBAwarded: {
     backgroundColor: '#fce7f3',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #fbcfe8',
     opacity: 0.85
   },
@@ -1991,7 +2098,8 @@ const styles = {
     gap: '16px',
     marginBottom: '24px',
     paddingBottom: '16px',
-    borderBottom: '1px solid #e5e7eb'
+    borderBottom: '1px solid #e5e7eb',
+    flexWrap: 'wrap'
   },
   teamIconWrapperA: {
     backgroundColor: '#dbeafe',
@@ -2006,13 +2114,13 @@ const styles = {
     color: '#db2777'
   },
   pointsTeamTitle: {
-    fontSize: '22px',
+    fontSize: 'clamp(16px, 5vw, 22px)',
     fontWeight: '700',
     margin: 0,
     color: '#1f2937'
   },
   pointsMemberCount: {
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 3vw, 12px)',
     color: '#6b7280'
   },
   awardedBadge: {
@@ -2024,8 +2132,9 @@ const styles = {
     color: 'white',
     padding: '6px 12px',
     borderRadius: '20px',
-    fontSize: '12px',
-    fontWeight: '500'
+    fontSize: 'clamp(10px, 3vw, 12px)',
+    fontWeight: '500',
+    flexWrap: 'wrap'
   },
   pointsDisplay: {
     marginBottom: '24px'
@@ -2034,7 +2143,7 @@ const styles = {
     marginBottom: '16px'
   },
   pointsLabel: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     color: '#6b7280',
     marginBottom: '8px'
   },
@@ -2042,18 +2151,19 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
     fontWeight: '700',
     color: '#f59e0b'
   },
   pointsInputWrapper: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px'
+    gap: '12px',
+    flexWrap: 'wrap'
   },
   pointsAdjustBtn: {
-    width: '36px',
-    height: '36px',
+    width: 'clamp(30px, 8vw, 36px)',
+    height: 'clamp(30px, 8vw, 36px)',
     borderRadius: '8px',
     border: '1px solid #d1d5db',
     backgroundColor: 'white',
@@ -2063,10 +2173,10 @@ const styles = {
     justifyContent: 'center'
   },
   pointsInput: {
-    width: '80px',
-    height: '48px',
+    width: 'clamp(60px, 15vw, 80px)',
+    height: 'clamp(40px, 10vw, 48px)',
     textAlign: 'center',
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 5vw, 20px)',
     fontWeight: '600',
     border: '2px solid #e5e7eb',
     borderRadius: '10px',
@@ -2079,26 +2189,28 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '14px'
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
+    flexWrap: 'wrap'
   },
   pointsBreakdown: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#9ca3af'
   },
   awardTeamButton: {
     width: '100%',
-    padding: '12px',
+    padding: 'clamp(10px, 4vw, 12px)',
     backgroundColor: '#10b981',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 4vw, 16px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '8px'
+    gap: '8px',
+    flexWrap: 'wrap'
   },
   membersPointsSummary: {
     marginTop: '20px',
@@ -2113,8 +2225,10 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '8px 0',
-    fontSize: '14px',
-    borderBottom: '1px solid #f3f4f6'
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
+    borderBottom: '1px solid #f3f4f6',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
   memberPointsValue: {
     fontWeight: '600',
@@ -2127,12 +2241,12 @@ const styles = {
     transform: 'translateX(-50%)',
     backgroundColor: '#dbeafe',
     color: '#1e40af',
-    padding: '12px 24px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(16px, 5vw, 24px)',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
     zIndex: 2000,
@@ -2146,12 +2260,12 @@ const styles = {
     transform: 'translateX(-50%)',
     backgroundColor: '#fce7f3',
     color: '#9d174d',
-    padding: '12px 24px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(16px, 5vw, 24px)',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
     zIndex: 2000,
@@ -2165,22 +2279,22 @@ const styles = {
     marginTop: '20px'
   },
   backToSummaryButton: {
-    padding: '12px 24px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(16px, 5vw, 24px)',
     backgroundColor: '#6b7280',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     cursor: 'pointer'
   },
   finishRoundButton: {
-    padding: '12px 32px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(20px, 6vw, 32px)',
     backgroundColor: '#3b82f6',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
@@ -2194,12 +2308,12 @@ const styles = {
     marginTop: '20px'
   },
   closeButtonMain: {
-    padding: '12px 32px',
+    padding: 'clamp(10px, 4vw, 12px) clamp(20px, 6vw, 32px)',
     backgroundColor: '#3b82f6',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '600',
     cursor: 'pointer'
   }

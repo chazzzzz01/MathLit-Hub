@@ -32,6 +32,16 @@ function Collaboration() {
   const [studentPoints, setStudentPoints] = useState({});
   const [refreshing, setRefreshing] = useState(false);
   const [pointsLastUpdated, setPointsLastUpdated] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // Handle window resize for responsive design
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Load classes for teacher
   const loadClasses = async () => {
@@ -64,11 +74,9 @@ function Collaboration() {
     try {
       console.log('📋 Loading students for class:', classId);
       
-      // Get students from classService (now returns with real Google user data)
       const studentsData = await classService.getClassStudents(classId);
       console.log('📋 Raw students data from service:', studentsData);
       
-      // Get team assignments
       const assignments = await classService.getClassTeamAssignments(classId);
       console.log('📋 Team assignments:', assignments);
       
@@ -80,15 +88,12 @@ function Collaboration() {
         };
       });
       
-      // Build student list with proper user data (name and email from Google Auth)
       const studentList = studentsData.map(enrollment => {
         const userData = enrollment.users || {};
         
-        // Use the real Google name and email
         let studentName = userData.name || 'Student';
         let studentEmail = userData.email || '';
         
-        // Fix any remaining placeholder names
         if (studentName === 'User' || studentName === '' || studentName === 'Student') {
           studentName = studentEmail?.split('@')[0] || 'Student';
         }
@@ -107,7 +112,6 @@ function Collaboration() {
       
       setStudents(studentList);
       
-      // Create points map
       const pointsMap = {};
       studentList.forEach(student => {
         pointsMap[student.id] = student.points;
@@ -115,12 +119,6 @@ function Collaboration() {
       setStudentPoints(pointsMap);
       
       console.log('📋 Final student list:', studentList.length, 'students');
-      console.log('📋 Student names and emails (from Google):', studentList.map(s => ({ 
-        name: s.name, 
-        email: s.email, 
-        points: s.points, 
-        team: s.team 
-      })));
       
       setPointsLastUpdated(new Date());
     } catch (error) {
@@ -351,6 +349,42 @@ function Collaboration() {
 
   const stats = calculateStats();
 
+  // Responsive styles based on screen size
+  const getResponsiveStyles = () => {
+    if (isMobile) {
+      return {
+        containerPadding: '16px 12px',
+        headerMarginBottom: '20px',
+        statsGridColumns: 'repeat(2, 1fr)',
+        splitLayoutDirection: 'column',
+        leftSideMinWidth: '100%',
+        rightSideMinWidth: '100%',
+        teamsWrapperDirection: 'column',
+        teamGap: '12px',
+        modalWidth: '95%',
+        modalPadding: '20px',
+        studentActionsWrap: 'wrap',
+        teamMemberGap: '8px'
+      };
+    }
+    return {
+      containerPadding: '32px 24px',
+      headerMarginBottom: '32px',
+      statsGridColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      splitLayoutDirection: 'row',
+      leftSideMinWidth: '350px',
+      rightSideMinWidth: '350px',
+      teamsWrapperDirection: 'row',
+      teamGap: '16px',
+      modalWidth: '90%',
+      modalPadding: '28px',
+      studentActionsWrap: 'nowrap',
+      teamMemberGap: '12px'
+    };
+  };
+
+  const responsive = getResponsiveStyles();
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -381,9 +415,9 @@ function Collaboration() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{...styles.container, padding: responsive.containerPadding}}>
       {/* Header Section */}
-      <div style={styles.header}>
+      <div style={{...styles.header, marginBottom: responsive.headerMarginBottom}}>
         <div style={styles.headerLeft}>
           <h1 style={styles.mainTitle}>Collaboration Hub</h1>
           <p style={styles.subtitle}>Manage teams, track performance, and start collaborative rounds</p>
@@ -398,14 +432,14 @@ function Collaboration() {
                 <div style={styles.dropdownButtonContent}>
                   {selectedClass ? (
                     <>
-                      <FiBookOpen size={18} color="#6366f1" />
+                      <FiBookOpen size={isMobile ? 14 : 18} color="#6366f1" />
                       <span style={styles.selectedClassName}>{selectedClass.name}</span>
                     </>
                   ) : (
                     <span style={styles.placeholderText}>Select a class</span>
                   )}
                 </div>
-                <FiChevronDown size={20} style={{
+                <FiChevronDown size={isMobile ? 16 : 20} style={{
                   transform: showDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
                   transition: 'transform 0.3s ease'
                 }} />
@@ -428,11 +462,11 @@ function Collaboration() {
                         onClick={() => handleClassSelect(classItem)}
                       >
                         <div style={styles.dropdownItemContent}>
-                          <FiBookOpen size={16} color="#6b7280" />
+                          <FiBookOpen size={isMobile ? 12 : 16} color="#6b7280" />
                           <span style={styles.dropdownItemName}>{classItem.name}</span>
                         </div>
                         <span style={styles.studentCount}>
-                          <FiUsers size={12} /> {classItem.students_count || 0}
+                          <FiUsers size={isMobile ? 10 : 12} /> {classItem.students_count || 0}
                         </span>
                       </div>
                     ))
@@ -454,7 +488,7 @@ function Collaboration() {
         <>
           {/* Stats Dashboard */}
           {stats && stats.totalGames > 0 && (
-            <div style={styles.statsGrid}>
+            <div style={{...styles.statsGrid, gridTemplateColumns: responsive.statsGridColumns}}>
               <div style={styles.statCard}>
                 <div style={styles.statIcon}><FiActivity /></div>
                 <div style={styles.statContent}>
@@ -489,27 +523,29 @@ function Collaboration() {
           {/* Tab Navigation */}
           <div style={styles.tabContainer}>
             <button 
-              style={{...styles.tabButton, ...(activeTab === 'teams' ? styles.tabActive : {})}}
+              style={{...styles.tabButton, ...(activeTab === 'teams' ? styles.tabActive : {}), fontSize: isMobile ? '12px' : '14px', padding: isMobile ? '8px 12px' : '10px 20px'}}
               onClick={() => setActiveTab('teams')}
             >
-              <FiUsers size={16} />
-              Team Management ({students.length} students)
+              <FiUsers size={isMobile ? 12 : 16} />
+              {!isMobile && `Team Management (${students.length} students)`}
+              {isMobile && `Teams (${students.length})`}
             </button>
             <button 
-              style={{...styles.tabButton, ...(activeTab === 'history' ? styles.tabActive : {})}}
+              style={{...styles.tabButton, ...(activeTab === 'history' ? styles.tabActive : {}), fontSize: isMobile ? '12px' : '14px', padding: isMobile ? '8px 12px' : '10px 20px'}}
               onClick={() => setActiveTab('history')}
             >
-              <FiClock size={16} />
-              Game History ({gameHistory.length})
+              <FiClock size={isMobile ? 12 : 16} />
+              {!isMobile && `Game History (${gameHistory.length})`}
+              {isMobile && `History (${gameHistory.length})`}
             </button>
           </div>
 
           {/* Main Content Area - Teams Tab */}
           {activeTab === 'teams' ? (
-            <div style={styles.splitLayout}>
+            <div style={{...styles.splitLayout, flexDirection: responsive.splitLayoutDirection, gap: isMobile ? '16px' : '24px'}}>
               {/* Left Side - Teams Containers */}
-              <div style={styles.leftSide}>
-                <div style={styles.teamsWrapper}>
+              <div style={{...styles.leftSide, minWidth: responsive.leftSideMinWidth}}>
+                <div style={{...styles.teamsWrapper, flexDirection: responsive.teamsWrapperDirection, gap: responsive.teamGap}}>
                   {/* Team A Container */}
                   <div style={styles.teamContainerA}>
                     <div style={styles.teamHeaderA}>
@@ -527,13 +563,13 @@ function Collaboration() {
                           const roleInfo = getRoleInfo(student.role);
                           const points = studentPoints[student.id] || 0;
                           return (
-                            <div key={student.id} style={styles.teamMemberItem}>
+                            <div key={student.id} style={{...styles.teamMemberItem, gap: responsive.teamMemberGap}}>
                               <div style={styles.teamMemberAvatar}>
                                 {student.name?.charAt(0) || 'S'}
                               </div>
                               <div style={styles.teamMemberInfo}>
                                 <div style={styles.teamMemberName}>{student.name}</div>
-                                {student.email && (
+                                {!isMobile && student.email && (
                                   <div style={styles.teamMemberEmail}>
                                     <FiMail size={10} />
                                     <span>{student.email}</span>
@@ -577,13 +613,13 @@ function Collaboration() {
                           const roleInfo = getRoleInfo(student.role);
                           const points = studentPoints[student.id] || 0;
                           return (
-                            <div key={student.id} style={styles.teamMemberItem}>
+                            <div key={student.id} style={{...styles.teamMemberItem, gap: responsive.teamMemberGap}}>
                               <div style={styles.teamMemberAvatar}>
                                 {student.name?.charAt(0) || 'S'}
                               </div>
                               <div style={styles.teamMemberInfo}>
                                 <div style={styles.teamMemberName}>{student.name}</div>
-                                {student.email && (
+                                {!isMobile && student.email && (
                                   <div style={styles.teamMemberEmail}>
                                     <FiMail size={10} />
                                     <span>{student.email}</span>
@@ -613,27 +649,27 @@ function Collaboration() {
                 
                 {/* Start Round Button */}
                 <button style={styles.startButton} onClick={handleStartRound}>
-                  <FiPlay size={20} />
+                  <FiPlay size={isMobile ? 16 : 20} />
                   Start New Round
                 </button>
               </div>
 
               {/* Right Side - All Students List */}
-              <div style={styles.rightSide}>
+              <div style={{...styles.rightSide, minWidth: responsive.rightSideMinWidth}}>
                 <div style={styles.studentsCard}>
                   <div style={styles.studentsHeader}>
                     <h3 style={styles.cardTitle}>
-                      <FiUsers size={20} />
+                      <FiUsers size={isMobile ? 16 : 20} />
                       All Students ({students.length})
                     </h3>
                     <div style={styles.headerButtons}>
-                      {pointsLastUpdated && (
+                      {pointsLastUpdated && !isMobile && (
                         <span style={styles.lastUpdated}>
                           Updated: {pointsLastUpdated.toLocaleTimeString()}
                         </span>
                       )}
                       <button onClick={refreshAll} style={styles.refreshButton} title="Refresh students">
-                        <FiRefreshCw size={16} className={refreshing ? 'spin' : ''} />
+                        <FiRefreshCw size={isMobile ? 14 : 16} className={refreshing ? 'spin' : ''} />
                       </button>
                     </div>
                   </div>
@@ -668,7 +704,7 @@ function Collaboration() {
                             </div>
                             <div style={styles.studentInfo}>
                               <div style={styles.studentName}>{student.name}</div>
-                              {student.email && (
+                              {!isMobile && student.email && (
                                 <div style={styles.studentDetail}>
                                   <FiMail size={12} />
                                   <span>{student.email}</span>
@@ -678,7 +714,7 @@ function Collaboration() {
                                 <FiStar size={10} color="#f59e0b" /> {points} points
                               </div>
                             </div>
-                            <div style={styles.studentActions}>
+                            <div style={{...styles.studentActions, flexWrap: responsive.studentActionsWrap}}>
                               <button 
                                 style={styles.assignButton} 
                                 onClick={() => handleAssignTeam(student)}
@@ -703,7 +739,7 @@ function Collaboration() {
                             </div>
                             <div style={styles.studentInfo}>
                               <div style={styles.studentName}>{student.name}</div>
-                              {student.email && (
+                              {!isMobile && student.email && (
                                 <div style={styles.studentDetail}>
                                   <FiMail size={12} />
                                   <span>{student.email}</span>
@@ -713,7 +749,7 @@ function Collaboration() {
                                 <FiStar size={10} color="#f59e0b" /> {points} points
                               </div>
                             </div>
-                            <div style={styles.studentActions}>
+                            <div style={{...styles.studentActions, flexWrap: responsive.studentActionsWrap}}>
                               <div style={styles.teamBadgeA}>Team A</div>
                               <div style={{...styles.roleBadgeSmall, backgroundColor: roleInfo.bgColor, color: roleInfo.color}}>
                                 {roleInfo.icon}
@@ -741,7 +777,7 @@ function Collaboration() {
                             </div>
                             <div style={styles.studentInfo}>
                               <div style={styles.studentName}>{student.name}</div>
-                              {student.email && (
+                              {!isMobile && student.email && (
                                 <div style={styles.studentDetail}>
                                   <FiMail size={12} />
                                   <span>{student.email}</span>
@@ -751,7 +787,7 @@ function Collaboration() {
                                 <FiStar size={10} color="#f59e0b" /> {points} points
                               </div>
                             </div>
-                            <div style={styles.studentActions}>
+                            <div style={{...styles.studentActions, flexWrap: responsive.studentActionsWrap}}>
                               <div style={styles.teamBadgeB}>Team B</div>
                               <div style={{...styles.roleBadgeSmall, backgroundColor: roleInfo.bgColor, color: roleInfo.color}}>
                                 {roleInfo.icon}
@@ -789,30 +825,30 @@ function Collaboration() {
               ) : (
                 <>
                   {stats && (
-                    <div style={styles.summaryCards}>
+                    <div style={{...styles.summaryCards, gridTemplateColumns: responsive.statsGridColumns}}>
                       <div style={styles.summaryCard}>
-                        <FiBarChart2 size={20} color="#6366f1" />
+                        <FiBarChart2 size={isMobile ? 16 : 20} color="#6366f1" />
                         <div>
                           <div style={styles.summaryLabel}>Total Rounds</div>
                           <div style={styles.summaryValue}>{stats.totalGames}</div>
                         </div>
                       </div>
                       <div style={styles.summaryCard}>
-                        <FiBarChart2 size={20} color="#ec4899" />
+                        <FiBarChart2 size={isMobile ? 16 : 20} color="#ec4899" />
                         <div>
                           <div style={styles.summaryLabel}>Team A Wins</div>
                           <div style={styles.summaryValue}>{stats.teamAWins}</div>
                         </div>
                       </div>
                       <div style={styles.summaryCard}>
-                        <FiPieChart size={20} color="#10b981" />
+                        <FiPieChart size={isMobile ? 16 : 20} color="#10b981" />
                         <div>
                           <div style={styles.summaryLabel}>Team B Wins</div>
                           <div style={styles.summaryValue}>{stats.teamBWins}</div>
                         </div>
                       </div>
                       <div style={styles.summaryCard}>
-                        <FiPieChart size={20} color="#f59e0b" />
+                        <FiPieChart size={isMobile ? 16 : 20} color="#f59e0b" />
                         <div>
                           <div style={styles.summaryLabel}>Ties</div>
                           <div style={styles.summaryValue}>{stats.ties}</div>
@@ -823,31 +859,29 @@ function Collaboration() {
 
                   <div style={styles.historyTimeline}>
                     <h3 style={styles.historyTitle}>
-                      <FiClock size={18} />
+                      <FiClock size={isMobile ? 14 : 18} />
                       Round History
                     </h3>
                     <div style={styles.timelineList}>
                       {gameHistory.map((game) => (
-                        <div key={game.id} style={styles.historyItem}>
+                        <div key={game.id} style={{...styles.historyItem, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px'}}>
                           <div style={styles.historyDate}>
-                            <FiCalendar size={14} />
+                            <FiCalendar size={isMobile ? 10 : 14} />
                             <span>{new Date(game.date).toLocaleDateString()}</span>
-                            <span style={styles.historyTime}>{new Date(game.date).toLocaleTimeString()}</span>
+                            {!isMobile && <span style={styles.historyTime}>{new Date(game.date).toLocaleTimeString()}</span>}
                           </div>
                           <div style={styles.historyContent}>
                             <div style={styles.roundNumber}>Round #{game.roundNumber}</div>
-                            <div style={styles.questionPreview}>Question: {game.question.substring(0, 60)}...</div>
-                            <div style={styles.scoreContainer}>
+                            <div style={styles.questionPreview}>Question: {game.question.substring(0, isMobile ? 40 : 60)}...</div>
+                            <div style={{...styles.scoreContainer, flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '12px' : '20px'}}>
                               <div style={styles.teamAScore}>
                                 <span style={styles.teamALabel}>Team A</span>
                                 <span style={styles.scoreValue}>{game.teamAScore > 0 ? '✓ Correct' : '✗ Incorrect'}</span>
-                                {game.teamAAnswer && <span style={styles.answerPreview}>Answer: {game.teamAAnswer}</span>}
                               </div>
                               <div style={styles.vsDivider}>VS</div>
                               <div style={styles.teamBScore}>
                                 <span style={styles.teamBLabel}>Team B</span>
                                 <span style={styles.scoreValue}>{game.teamBScore > 0 ? '✓ Correct' : '✗ Incorrect'}</span>
-                                {game.teamBAnswer && <span style={styles.answerPreview}>Answer: {game.teamBAnswer}</span>}
                               </div>
                             </div>
                             <div style={styles.gameDetails}>
@@ -877,13 +911,13 @@ function Collaboration() {
       {/* Assign Team Modal */}
       {showAssignModal && selectedStudent && (
         <div style={styles.modalOverlay} onClick={() => setShowAssignModal(false)}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+          <div style={{...styles.modal, width: responsive.modalWidth, padding: responsive.modalPadding}} onClick={(e) => e.stopPropagation()}>
             <h3 style={styles.modalTitle}>Assign {selectedStudent.name}</h3>
             <p style={styles.modalSubtitle}>{selectedStudent.email}</p>
             
             <div style={styles.modalSection}>
               <label style={styles.modalLabel}>Select Team:</label>
-              <div style={styles.teamOptions}>
+              <div style={{...styles.teamOptions, flexDirection: isMobile ? 'column' : 'row'}}>
                 <button 
                   style={{...styles.teamOptionButton, ...(selectedTeam === 'A' ? styles.teamOptionSelectedA : {})}} 
                   onClick={() => setSelectedTeam('A')}
@@ -901,32 +935,32 @@ function Collaboration() {
 
             <div style={styles.modalSection}>
               <label style={styles.modalLabel}>Select Role:</label>
-              <div style={styles.roleOptions}>
+              <div style={{...styles.roleOptions, flexDirection: isMobile ? 'column' : 'row'}}>
                 <button 
                   style={{...styles.roleOptionButton, ...(selectedRole === 'analyzer' ? styles.roleOptionAnalyzer : {})}} 
                   onClick={() => setSelectedRole('analyzer')}
                 >
-                  <FiUserCheck size={16} />
+                  <FiUserCheck size={isMobile ? 12 : 16} />
                   Analyzer
                 </button>
                 <button 
                   style={{...styles.roleOptionButton, ...(selectedRole === 'checker' ? styles.roleOptionChecker : {})}} 
                   onClick={() => setSelectedRole('checker')}
                 >
-                  <FiUserX size={16} />
+                  <FiUserX size={isMobile ? 12 : 16} />
                   Checker
                 </button>
                 <button 
                   style={{...styles.roleOptionButton, ...(selectedRole === 'solver' ? styles.roleOptionSolver : {})}} 
                   onClick={() => setSelectedRole('solver')}
                 >
-                  <FiUserPlus size={16} />
+                  <FiUserPlus size={isMobile ? 12 : 16} />
                   Solver
                 </button>
               </div>
             </div>
 
-            <div style={styles.modalActions}>
+            <div style={{...styles.modalActions, flexDirection: isMobile ? 'column' : 'row'}}>
               <button style={styles.cancelModalButton} onClick={() => setShowAssignModal(false)}>
                 Cancel
               </button>
@@ -951,7 +985,6 @@ const styles = {
     width: '100%',
     minHeight: '100vh',
     backgroundColor: '#f8fafc',
-    padding: '32px 24px',
     margin: 0,
     boxSizing: 'border-box',
   },
@@ -986,7 +1019,7 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     maxWidth: '1400px',
-    margin: '0 auto 32px auto',
+    margin: '0 auto',
     flexWrap: 'wrap',
     gap: '20px',
   },
@@ -998,19 +1031,20 @@ const styles = {
     alignItems: 'center',
   },
   mainTitle: {
-    fontSize: '28px',
+    fontSize: 'clamp(20px, 6vw, 28px)',
     fontWeight: '700',
     color: '#0f172a',
     margin: 0,
     letterSpacing: '-0.02em',
   },
   subtitle: {
-    fontSize: '14px',
+    fontSize: 'clamp(11px, 3.5vw, 14px)',
     color: '#64748b',
     margin: '8px 0 0 0',
   },
   classSelectorWrapper: {
-    minWidth: '260px',
+    minWidth: 'clamp(200px, 50vw, 260px)',
+    width: '100%',
   },
   loadingContainer: {
     display: 'flex',
@@ -1031,7 +1065,7 @@ const styles = {
   },
   emptyClassState: {
     textAlign: 'center',
-    padding: '80px 20px',
+    padding: 'clamp(40px, 15vw, 80px) 20px',
     backgroundColor: 'white',
     borderRadius: '24px',
     maxWidth: '600px',
@@ -1039,22 +1073,21 @@ const styles = {
     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
   },
   emptyClassIcon: {
-    fontSize: '64px',
+    fontSize: 'clamp(48px, 15vw, 64px)',
     marginBottom: '20px',
   },
   emptyClassTitle: {
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 5vw, 20px)',
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: '8px',
   },
   emptyClassText: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     color: '#64748b',
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '16px',
     maxWidth: '1400px',
     margin: '0 auto 32px auto',
@@ -1062,35 +1095,35 @@ const styles = {
   statCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    padding: '16px 20px',
+    padding: 'clamp(12px, 4vw, 16px) clamp(16px, 5vw, 20px)',
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
+    gap: 'clamp(12px, 4vw, 16px)',
     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     border: '1px solid #e2e8f0',
   },
   statIcon: {
-    width: '48px',
-    height: '48px',
+    width: 'clamp(36px, 12vw, 48px)',
+    height: 'clamp(36px, 12vw, 48px)',
     backgroundColor: '#eef2ff',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     color: '#6366f1',
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
   },
   statContent: {
     display: 'flex',
     flexDirection: 'column',
   },
   statValue: {
-    fontSize: '24px',
+    fontSize: 'clamp(18px, 5vw, 24px)',
     fontWeight: '700',
     color: '#0f172a',
   },
   statLabel: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#64748b',
     marginTop: '4px',
   },
@@ -1101,13 +1134,12 @@ const styles = {
     margin: '0 auto 24px auto',
     borderBottom: '1px solid #e2e8f0',
     paddingBottom: '0',
+    flexWrap: 'wrap',
   },
   tabButton: {
-    padding: '10px 20px',
     backgroundColor: 'transparent',
     border: 'none',
     borderRadius: '10px 10px 0 0',
-    fontSize: '14px',
     fontWeight: '500',
     color: '#64748b',
     cursor: 'pointer',
@@ -1126,29 +1158,26 @@ const styles = {
     gap: '24px',
     maxWidth: '1400px',
     margin: '0 auto',
-    flexWrap: 'wrap',
   },
   leftSide: {
     flex: '1',
-    minWidth: '350px',
     display: 'flex',
     flexDirection: 'column',
     gap: '20px',
   },
   rightSide: {
     flex: '1.2',
-    minWidth: '350px',
   },
   studentsCard: {
     backgroundColor: 'white',
     borderRadius: '20px',
-    padding: '20px',
+    padding: 'clamp(16px, 5vw, 20px)',
     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
     border: '1px solid #e2e8f0',
     minHeight: '500px',
   },
   cardTitle: {
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '600',
     color: '#0f172a',
     margin: 0,
@@ -1161,6 +1190,8 @@ const styles = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '20px',
+    flexWrap: 'wrap',
+    gap: '10px',
   },
   headerButtons: {
     display: 'flex',
@@ -1185,21 +1216,20 @@ const styles = {
   },
   teamsWrapper: {
     display: 'flex',
-    flexDirection: 'row',
     gap: '16px',
   },
   teamContainerA: {
     flex: 1,
     backgroundColor: '#f0fdf4',
     borderRadius: '16px',
-    padding: '16px',
+    padding: 'clamp(12px, 4vw, 16px)',
     border: '1px solid #bbf7d0',
   },
   teamContainerB: {
     flex: 1,
     backgroundColor: '#fef2f2',
     borderRadius: '16px',
-    padding: '16px',
+    padding: 'clamp(12px, 4vw, 16px)',
     border: '1px solid #fecaca',
   },
   teamHeaderA: {
@@ -1221,10 +1251,10 @@ const styles = {
     color: '#991b1b',
   },
   teamIcon: {
-    fontSize: '18px',
+    fontSize: 'clamp(14px, 4vw, 18px)',
   },
   teamTitle: {
-    fontSize: '16px',
+    fontSize: 'clamp(13px, 4vw, 16px)',
     fontWeight: '600',
     margin: 0,
     flex: 1,
@@ -1247,14 +1277,13 @@ const styles = {
   teamMemberItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
     padding: '10px',
     backgroundColor: 'white',
     borderRadius: '12px',
   },
   teamMemberAvatar: {
-    width: '32px',
-    height: '32px',
+    width: 'clamp(28px, 8vw, 32px)',
+    height: 'clamp(28px, 8vw, 32px)',
     backgroundColor: '#f1f5f9',
     borderRadius: '50%',
     display: 'flex',
@@ -1268,7 +1297,7 @@ const styles = {
     flex: 1,
   },
   teamMemberName: {
-    fontSize: '13px',
+    fontSize: 'clamp(12px, 3.5vw, 13px)',
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: '2px',
@@ -1328,12 +1357,12 @@ const styles = {
   },
   startButton: {
     width: '100%',
-    padding: '14px',
+    padding: 'clamp(12px, 4vw, 14px)',
     backgroundColor: '#6366f1',
     color: 'white',
     border: 'none',
     borderRadius: '14px',
-    fontSize: '15px',
+    fontSize: 'clamp(13px, 4vw, 15px)',
     fontWeight: '600',
     cursor: 'pointer',
     display: 'flex',
@@ -1348,7 +1377,7 @@ const styles = {
   },
   dropdownButton: {
     width: '100%',
-    padding: '12px 16px',
+    padding: 'clamp(10px, 3.5vw, 12px) clamp(12px, 4vw, 16px)',
     backgroundColor: 'white',
     border: '1px solid #e2e8f0',
     borderRadius: '12px',
@@ -1364,13 +1393,13 @@ const styles = {
     gap: '10px',
   },
   selectedClassName: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     color: '#0f172a',
   },
   placeholderText: {
     color: '#94a3b8',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
   },
   dropdownMenu: {
     position: 'absolute',
@@ -1386,7 +1415,7 @@ const styles = {
     overflowY: 'auto',
   },
   dropdownItem: {
-    padding: '12px 16px',
+    padding: 'clamp(10px, 3vw, 12px) clamp(12px, 4vw, 16px)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1402,12 +1431,12 @@ const styles = {
     gap: '10px',
   },
   dropdownItemName: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     color: '#0f172a',
   },
   studentCount: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#64748b',
     display: 'flex',
     alignItems: 'center',
@@ -1434,6 +1463,7 @@ const styles = {
     backgroundColor: '#f8fafc',
     borderRadius: '12px',
     border: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
   },
   studentItemAssignedA: {
     display: 'flex',
@@ -1443,6 +1473,7 @@ const styles = {
     backgroundColor: '#f0fdf4',
     borderRadius: '12px',
     border: '1px solid #bbf7d0',
+    flexWrap: 'wrap',
   },
   studentItemAssignedB: {
     display: 'flex',
@@ -1452,10 +1483,11 @@ const styles = {
     backgroundColor: '#fef2f2',
     borderRadius: '12px',
     border: '1px solid #fecaca',
+    flexWrap: 'wrap',
   },
   studentAvatar: {
-    width: '40px',
-    height: '40px',
+    width: 'clamp(36px, 10vw, 40px)',
+    height: 'clamp(36px, 10vw, 40px)',
     backgroundColor: '#e2e8f0',
     borderRadius: '50%',
     display: 'flex',
@@ -1467,9 +1499,10 @@ const styles = {
   },
   studentInfo: {
     flex: 1,
+    minWidth: '120px',
   },
   studentName: {
-    fontSize: '14px',
+    fontSize: 'clamp(13px, 4vw, 14px)',
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: '2px',
@@ -1498,7 +1531,6 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     flexShrink: 0,
-    flexWrap: 'wrap',
   },
   assignButton: {
     padding: '6px 14px',
@@ -1568,7 +1600,7 @@ const styles = {
     width: '30px',
     height: '30px',
     border: '3px solid #e2e8f0',
-        borderTop: '3px solid #6366f1',
+    borderTop: '3px solid #6366f1',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -1611,36 +1643,35 @@ const styles = {
   },
   summaryCards: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
     gap: '16px',
     marginBottom: '32px',
   },
   summaryCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
-    padding: '16px 20px',
+    padding: 'clamp(12px, 4vw, 16px) clamp(16px, 5vw, 20px)',
     display: 'flex',
     alignItems: 'center',
     gap: '14px',
     border: '1px solid #e2e8f0',
   },
   summaryLabel: {
-    fontSize: '12px',
+    fontSize: '10px',
     color: '#64748b',
   },
   summaryValue: {
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 5vw, 20px)',
     fontWeight: '700',
     color: '#0f172a',
   },
   historyTimeline: {
     backgroundColor: 'white',
     borderRadius: '20px',
-    padding: '24px',
+    padding: 'clamp(16px, 5vw, 24px)',
     border: '1px solid #e2e8f0',
   },
   historyTitle: {
-    fontSize: '16px',
+    fontSize: 'clamp(14px, 4vw, 16px)',
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: '20px',
@@ -1655,20 +1686,18 @@ const styles = {
   },
   historyItem: {
     display: 'flex',
-    gap: '20px',
-    padding: '16px',
+    padding: 'clamp(12px, 4vw, 16px)',
     backgroundColor: '#f8fafc',
     borderRadius: '14px',
     border: '1px solid #e2e8f0',
   },
   historyDate: {
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     gap: '6px',
-    minWidth: '80px',
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     color: '#64748b',
+    minWidth: '80px',
   },
   historyTime: {
     fontSize: '10px',
@@ -1678,28 +1707,21 @@ const styles = {
     flex: 1,
   },
   roundNumber: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '600',
     color: '#6366f1',
     marginBottom: '6px',
   },
   questionPreview: {
-    fontSize: '12px',
+    fontSize: 'clamp(11px, 3vw, 12px)',
     color: '#64748b',
     marginBottom: '10px',
     fontStyle: 'italic',
   },
-  answerPreview: {
-    fontSize: '10px',
-    color: '#94a3b8',
-    marginLeft: '8px',
-  },
   scoreContainer: {
     display: 'flex',
     alignItems: 'center',
-    gap: '20px',
     marginBottom: '12px',
-    flexWrap: 'wrap',
   },
   teamAScore: {
     display: 'flex',
@@ -1714,7 +1736,7 @@ const styles = {
     flexWrap: 'wrap',
   },
   teamALabel: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     fontWeight: '500',
     color: '#166534',
     backgroundColor: '#dcfce7',
@@ -1722,7 +1744,7 @@ const styles = {
     borderRadius: '12px',
   },
   teamBLabel: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     fontWeight: '500',
     color: '#991b1b',
     backgroundColor: '#fee2e2',
@@ -1730,12 +1752,12 @@ const styles = {
     borderRadius: '12px',
   },
   scoreValue: {
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '600',
     color: '#0f172a',
   },
   vsDivider: {
-    fontSize: '12px',
+    fontSize: 'clamp(10px, 3vw, 12px)',
     fontWeight: '600',
     color: '#94a3b8',
   },
@@ -1769,20 +1791,18 @@ const styles = {
   modal: {
     backgroundColor: 'white',
     borderRadius: '24px',
-    padding: '28px',
-    width: '90%',
     maxWidth: '460px',
     boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
   },
   modalTitle: {
-    fontSize: '20px',
+    fontSize: 'clamp(16px, 5vw, 20px)',
     fontWeight: '600',
     color: '#0f172a',
     marginBottom: '8px',
     textAlign: 'center',
   },
   modalSubtitle: {
-    fontSize: '13px',
+    fontSize: 'clamp(11px, 3vw, 13px)',
     color: '#64748b',
     textAlign: 'center',
     marginBottom: '24px',
@@ -1803,10 +1823,10 @@ const styles = {
   },
   teamOptionButton: {
     flex: 1,
-    padding: '12px',
+    padding: 'clamp(10px, 4vw, 12px)',
     border: '2px solid #e2e8f0',
     borderRadius: '12px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '600',
     cursor: 'pointer',
     backgroundColor: 'white',
@@ -1825,14 +1845,13 @@ const styles = {
   roleOptions: {
     display: 'flex',
     gap: '12px',
-    flexWrap: 'wrap',
   },
   roleOptionButton: {
     flex: 1,
-    padding: '10px',
+    padding: 'clamp(8px, 3vw, 10px)',
     border: '2px solid #e2e8f0',
     borderRadius: '10px',
-    fontSize: '13px',
+    fontSize: 'clamp(11px, 3vw, 13px)',
     fontWeight: '500',
     cursor: 'pointer',
     backgroundColor: 'white',
@@ -1864,23 +1883,23 @@ const styles = {
   },
   cancelModalButton: {
     flex: 1,
-    padding: '12px',
+    padding: 'clamp(10px, 4vw, 12px)',
     backgroundColor: '#f1f5f9',
     color: '#475569',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     cursor: 'pointer',
   },
   confirmModalButton: {
     flex: 1,
-    padding: '12px',
+    padding: 'clamp(10px, 4vw, 12px)',
     backgroundColor: '#6366f1',
     color: 'white',
     border: 'none',
     borderRadius: '10px',
-    fontSize: '14px',
+    fontSize: 'clamp(12px, 3.5vw, 14px)',
     fontWeight: '500',
     cursor: 'pointer',
   },
@@ -1897,10 +1916,62 @@ styleSheet.textContent = `
     animation: spin 1s linear infinite;
   }
   
-  @media (max-width: 768px) {
-    .teams-wrapper {
-      flex-direction: column;
+  /* Ultra small devices (297px width) */
+  @media (max-width: 320px) {
+    .student-item, .student-item-assigned-a, .student-item-assigned-b {
+      flex-direction: column !important;
+      text-align: center !important;
     }
+    
+    .student-avatar {
+      margin: 0 auto !important;
+    }
+    
+    .student-info {
+      text-align: center !important;
+      width: 100% !important;
+    }
+    
+    .student-points-display {
+      margin: 8px auto !important;
+    }
+    
+    .student-actions {
+      justify-content: center !important;
+      width: 100% !important;
+    }
+    
+    .team-member-item {
+      flex-direction: column !important;
+      text-align: center !important;
+    }
+    
+    .team-member-info {
+      text-align: center !important;
+    }
+    
+    .role-badge, .student-points-badge {
+      margin: 4px auto !important;
+    }
+    
+    .history-item {
+      flex-direction: column !important;
+    }
+    
+    .history-date {
+      justify-content: center !important;
+    }
+  }
+  
+  /* Prevent overflow on very small screens */
+  * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Make tables and containers scrollable on mobile */
+  .students-list, .team-members-list {
+    -webkit-overflow-scrolling: touch;
   }
 `;
 document.head.appendChild(styleSheet);

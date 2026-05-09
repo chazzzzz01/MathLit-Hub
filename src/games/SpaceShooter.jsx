@@ -1,4 +1,4 @@
-// src/games/SpaceShooter.jsx - FULLY RESPONSIVE with dynamic enemy sizing
+// src/games/SpaceShooter.jsx - FULLY RESPONSIVE with larger question text
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaArrowRight, FaCrosshairs } from 'react-icons/fa';
@@ -138,10 +138,11 @@ const SpaceShooter = () => {
 
   const getRandomQuestion = useCallback(() => questions[Math.floor(Math.random() * questions.length)], []);
 
-  // Function to calculate enemy dimensions based on text
+  // Function to calculate enemy dimensions based on text with larger padding
   const calculateEnemyDimensions = useCallback((text) => {
     const ctx = document.createElement('canvas').getContext('2d');
-    ctx.font = `bold 11px "Courier New", monospace`;
+    // Larger font size for better visibility on mobile
+    ctx.font = `bold 14px "Courier New", monospace`;
     
     let displayText = text;
     if (displayText && displayText.includes('. ')) {
@@ -149,12 +150,12 @@ const SpaceShooter = () => {
     }
     
     const textWidth = ctx.measureText(displayText).width;
-    // Width: text width + padding (min 95, max 200)
-    const width = Math.min(200, Math.max(95, textWidth + 20));
+    // Width: text width + more padding (min 110, max 220)
+    const width = Math.min(220, Math.max(110, textWidth + 30));
     // Height: based on text length (taller for longer text)
-    let height = 60;
-    if (textWidth > 140) height = 75;
-    if (textWidth > 170) height = 85;
+    let height = 70;
+    if (textWidth > 140) height = 85;
+    if (textWidth > 180) height = 100;
     
     return { width, height };
   }, []);
@@ -268,7 +269,7 @@ const SpaceShooter = () => {
     if (game.keys['Space']) shoot();
     game.bullets = game.bullets.filter(b => { b.y -= b.speed; return b.y > -20; });
     game.spawnTimer++;
-    const maxEnemies = Math.min(8, 5 + Math.floor(level / 2));
+    const maxEnemies = Math.min(6, 4 + Math.floor(level / 2));
     if (game.spawnTimer > (game.spawnDelay || 120) && game.enemies.length < maxEnemies) { const newEnemy = createEnemy(); if (newEnemy) { newEnemy.y = -60; newEnemy.x = Math.random() * (800 - newEnemy.width - 10); game.enemies.push(newEnemy); game.spawnTimer = 0; } }
     game.enemies.forEach(e => { 
       e.x += e.horizontalSpeed * e.direction; 
@@ -343,26 +344,29 @@ const SpaceShooter = () => {
     
     game.enemies.forEach(e => {
       // Black background with dynamic size
-      ctx.fillStyle = '#000000';
+      ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(e.x, e.y, e.width, e.height);
-      ctx.fillStyle = '#2a0000';
+      ctx.fillStyle = '#16213e';
       ctx.fillRect(e.x + 3, e.y + 3, e.width - 6, e.height - 6);
-      ctx.fillStyle = '#ff0000';
-      ctx.fillRect(e.x + 10, e.y + 12, 12, 6);
-      ctx.fillRect(e.x + e.width - 22, e.y + 12, 12, 6);
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#ff3333';
+      ctx.fillRect(e.x + 10, e.y + 12, 12, 8);
+      ctx.fillRect(e.x + e.width - 22, e.y + 12, 12, 8);
+      
+      // Lighter text color - bright cyan/white for better visibility
+      ctx.fillStyle = '#e0e0e0';
       
       let displayText = e.displayAnswer;
       if (displayText && displayText.includes('. ')) {
         displayText = displayText.substring(displayText.indexOf('. ') + 2);
       }
       
-      // Dynamic font size based on box width
-      let fontSize = 11;
+      // Larger font size for better visibility on mobile (14px base)
+      let fontSize = 14;
       ctx.font = `bold ${fontSize}px "Courier New", monospace`;
       let textWidth = ctx.measureText(displayText || "?").width;
       
-      while (textWidth > e.width - 12 && fontSize > 8) {
+      // Adjust font size down if needed, but keep minimum 11px
+      while (textWidth > e.width - 16 && fontSize > 11) {
         fontSize--;
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
         textWidth = ctx.measureText(displayText || "?").width;
@@ -371,7 +375,7 @@ const SpaceShooter = () => {
       // Check if text needs two lines
       let line1 = displayText;
       let line2 = "";
-      if (textWidth > e.width - 12 && fontSize <= 8) {
+      if (textWidth > e.width - 16 && fontSize <= 11) {
         const words = displayText.split(' ');
         line1 = "";
         line2 = "";
@@ -379,7 +383,7 @@ const SpaceShooter = () => {
         for (let i = 0; i < words.length; i++) {
           const testLine = currentLine + (currentLine ? " " : "") + words[i];
           const testWidth = ctx.measureText(testLine).width;
-          if (testWidth > e.width - 12 && currentLine !== "") {
+          if (testWidth > e.width - 16 && currentLine !== "") {
             line1 = currentLine;
             line2 = words.slice(i).join(' ');
             break;
@@ -391,11 +395,11 @@ const SpaceShooter = () => {
           line1 = displayText.substring(0, midPoint);
           line2 = displayText.substring(midPoint);
         }
-        fontSize = 9;
+        fontSize = 12;
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
       }
       
-      // Center text in the dynamically sized box
+      // Center text in the dynamically sized box with better shadow for contrast
       if (line2) {
         const line1Width = ctx.measureText(line1).width;
         const line2Width = ctx.measureText(line2).width;
@@ -404,57 +408,59 @@ const SpaceShooter = () => {
         const line1Y = e.y + (e.height / 2) - 10;
         const line2Y = e.y + (e.height / 2) + 10;
         
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 3;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
         ctx.fillText(line1, line1X, line1Y);
         ctx.fillText(line2, line2X, line2Y);
         ctx.shadowBlur = 0;
       } else {
         const textX = e.x + (e.width / 2) - (textWidth / 2);
-        const textY = e.y + (e.height / 2) + 5;
+        const textY = e.y + (e.height / 2) + 6;
         
-        ctx.shadowColor = 'black';
-        ctx.shadowBlur = 3;
+        ctx.shadowColor = 'rgba(0,0,0,0.8)';
+        ctx.shadowBlur = 4;
         ctx.fillText(displayText || "?", textX, textY);
         ctx.shadowBlur = 0;
       }
       
-      // Silver border
-      ctx.strokeStyle = '#888888';
-      ctx.lineWidth = 2;
+      // Brighter border
+      ctx.strokeStyle = '#ffaa44';
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
     });
     
     if (feedback.message && gameState === 'playing') { 
       ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336'; 
-      ctx.font = `bold ${Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)))}px Arial`; 
+      ctx.font = `bold ${Math.min(22, Math.max(16, 22 * (canvasDimensions.width / 800)))}px Arial`; 
       ctx.fillText(feedback.message, 180, 120); 
       setTimeout(() => setFeedback({ message: '', type: '' }), 1500); 
     }
     if (showLevelAnnouncement && gameState === 'playing') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, 800, 800);
-      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(40, Math.max(28, 40 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(levelAnnouncement, 280, 380);
-      ctx.fillStyle = '#ffffff'; ctx.font = `${Math.min(22, Math.max(16, 22 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Press SPACE to start!', 290, 460);
-      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Shoot the correct answer for each question!', 250, 520);
+      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(50, Math.max(35, 50 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(levelAnnouncement, 280, 380);
+      ctx.fillStyle = '#ffffff'; ctx.font = `${Math.min(28, Math.max(20, 28 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Press SPACE to start!', 260, 460);
+      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Shoot the correct answer for each question!', 220, 520);
     }
-    const titleFont = Math.min(18, Math.max(12, 18 * (canvasDimensions.width / 800)));
+    const titleFont = Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)));
     ctx.fillStyle = '#ffffff'; ctx.font = `bold ${titleFont}px Arial`; ctx.fillText(`Score: ${score}`, 20, 40);
-    ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 70);
-    ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(24, Math.max(18, 24 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`LEVEL ${level}`, 20, 120);
-    ctx.fillStyle = '#aaffaa'; ctx.font = `bold ${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 150);
+    ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 75);
+    ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(28, Math.max(20, 28 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`LEVEL ${level}`, 20, 125);
+    ctx.fillStyle = '#aaffaa'; ctx.font = `bold ${Math.min(18, Math.max(13, 18 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 155);
     ctx.fillStyle = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
-    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 180);
+    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 185);
     const requiredCorrect = 5 + Math.floor(level / 2); const progress = (correctShots / requiredCorrect) * 100;
-    ctx.fillStyle = '#666666'; ctx.fillRect(20, 200, 150, 12);
-    ctx.fillStyle = '#4caf50'; ctx.fillRect(20, 200, (progress / 100) * 150, 12);
-    ctx.fillStyle = '#cccccc'; ctx.font = `${Math.min(14, Math.max(10, 14 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`${correctShots}/${requiredCorrect} to level up`, 20, 195);
-    if (totalShots > 0) { ctx.fillStyle = '#88ff88'; ctx.fillText(`Accuracy: ${Math.round((totalCorrect / totalShots) * 100)}% (${totalCorrect}/${totalShots})`, 20, 230); }
-    ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(12, Math.max(8, 12 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 250);
-    ctx.fillText(`✅ ${correctAnswers} | ❌ ${wrongAnswers}`, 20, 265);
+    ctx.fillStyle = '#666666'; ctx.fillRect(20, 210, 150, 12);
+    ctx.fillStyle = '#4caf50'; ctx.fillRect(20, 210, (progress / 100) * 150, 12);
+    ctx.fillStyle = '#cccccc'; ctx.font = `${Math.min(15, Math.max(11, 15 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`${correctShots}/${requiredCorrect} to level up`, 20, 205);
+    if (totalShots > 0) { ctx.fillStyle = '#88ff88'; ctx.fillText(`Accuracy: ${Math.round((totalCorrect / totalShots) * 100)}% (${totalCorrect}/${totalShots})`, 20, 240); }
+    ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(13, Math.max(9, 13 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 260);
+    ctx.fillText(`✅ ${correctAnswers} | ❌ ${wrongAnswers}`, 20, 278);
     if (currentQuestion && !showLevelAnnouncement && game.gameActive && gameState === 'playing') {
-      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(14, Math.max(11, 14 * (canvasDimensions.width / 800)))}px Arial`;
+      // MUCH LARGER question text for mobile visibility
+      ctx.fillStyle = '#ffd700'; 
+      ctx.font = `bold ${Math.min(22, Math.max(17, 22 * (canvasDimensions.width / 800)))}px Arial`;
       let qText = currentQuestion.text;
-      const maxWidth = 580;
+      const maxWidth = 560;
       const words = qText.split(' ');
       let lines = [];
       let currentLine = '';
@@ -473,16 +479,17 @@ const SpaceShooter = () => {
       
       let yOffset = 35;
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(`Q: ${lines[i]}`, 200, yOffset);
-        yOffset += 18;
+        ctx.fillText(`${lines[i]}`, 200, yOffset);
+        yOffset += 26;
       }
       
-      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(12, Math.max(9, 12 * (canvasDimensions.width / 800)))}px Arial`; 
-      ctx.fillText('Shoot the correct answer!', 260, yOffset + 5);
+      ctx.fillStyle = '#88ff88'; 
+      ctx.font = `bold ${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; 
+      ctx.fillText('Shoot the correct answer!', 240, yOffset + 8);
     }
-    if (!showLevelAnnouncement && game.gameActive && !isMobile && gameState === 'playing') { ctx.fillStyle = '#888888'; ctx.font = `${Math.min(12, Math.max(8, 12 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('← → Move', 20, 770); ctx.fillText('SPACE Shoot', 20, 790); }
+    if (!showLevelAnnouncement && game.gameActive && !isMobile && gameState === 'playing') { ctx.fillStyle = '#888888'; ctx.font = `${Math.min(14, Math.max(10, 14 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('← → Move', 20, 770); ctx.fillText('SPACE Shoot', 20, 790); }
     if (!showLevelAnnouncement && game.gameActive && gameState === 'playing') { ctx.fillStyle = '#ff8888'; ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40); }
-    if (gameState === 'playing' && !showLevelAnnouncement) { ctx.fillStyle = '#aaaaaa'; const mins = Math.floor(timeSpent / 60); const secs = timeSpent % 60; ctx.fillText(`Time: ${mins}:${secs.toString().padStart(2, '0')}`, 700, 70); }
+    if (gameState === 'playing' && !showLevelAnnouncement) { ctx.fillStyle = '#aaaaaa'; const mins = Math.floor(timeSpent / 60); const secs = timeSpent % 60; ctx.fillText(`Time: ${mins}:${secs.toString().padStart(2, '0')}`, 700, 75); }
   }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasDimensions]);
 
   useEffect(() => {
@@ -575,11 +582,11 @@ const SpaceShooter = () => {
       {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
         <div style={styles.mobileControls}>
           <div style={styles.leftControls}>
-            <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}><FaArrowLeft size={24} /></button>
-            <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}><FaArrowRight size={24} /></button>
+            <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}><FaArrowLeft size={28} /></button>
+            <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}><FaArrowRight size={28} /></button>
           </div>
           <div style={styles.rightControls}>
-            <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}><FaCrosshairs size={24} /></button>
+            <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}><FaCrosshairs size={28} /></button>
           </div>
         </div>
       )}
@@ -609,25 +616,25 @@ const styles = {
     backgroundColor: 'rgba(0,0,0,0.85)', 
     color: 'white', 
     border: '2px solid rgba(255,255,255,0.3)', 
-    padding: '8px 14px', 
+    padding: '10px 16px', 
     borderRadius: '8px', 
     cursor: 'pointer', 
     display: 'flex', 
     alignItems: 'center', 
-    gap: '6px', 
-    fontSize: '12px', 
+    gap: '8px', 
+    fontSize: '14px', 
     fontWeight: 'bold', 
     zIndex: 1000,
     '@media (max-width: 768px)': { 
       top: '5px', 
       left: '5px', 
-      padding: '6px 10px', 
-      fontSize: '10px'
+      padding: '8px 12px', 
+      fontSize: '12px'
     }
   },
   backIcon: { 
-    fontSize: '12px',
-    '@media (max-width: 768px)': { fontSize: '10px' }
+    fontSize: '14px',
+    '@media (max-width: 768px)': { fontSize: '12px' }
   },
   gameWrapper: { 
     position: 'relative', 
@@ -641,7 +648,7 @@ const styles = {
     borderRadius: '10px', 
     overflow: 'hidden',
     '@media (max-width: 768px)': { 
-      marginTop: '45px',
+      marginTop: '50px',
       marginBottom: '0',
       width: 'calc(100% - 16px)',
       borderRadius: '8px'
@@ -682,23 +689,23 @@ const styles = {
     width: '100%', 
     maxWidth: '500px',
     '@media (max-width: 768px)': {
-      gap: '10px',
+      gap: '12px',
       padding: '15px',
       maxWidth: '90%'
     }
   },
   gameTitle: { 
-    fontSize: '24px', 
+    fontSize: '28px', 
     textAlign: 'center', 
     color: '#ffd700', 
-    '@media (min-width: 769px)': { fontSize: '36px' },
-    '@media (max-width: 768px)': { fontSize: '20px' }
+    '@media (min-width: 769px)': { fontSize: '42px' },
+    '@media (max-width: 768px)': { fontSize: '24px' }
   },
   gameSubtitle: { 
-    fontSize: '13px', 
+    fontSize: '16px', 
     textAlign: 'center', 
-    '@media (min-width: 769px)': { fontSize: '18px' },
-    '@media (max-width: 768px)': { fontSize: '11px' }
+    '@media (min-width: 769px)': { fontSize: '20px' },
+    '@media (max-width: 768px)': { fontSize: '14px' }
   },
   features: { 
     backgroundColor: 'rgba(0,0,0,0.7)', 
@@ -706,27 +713,27 @@ const styles = {
     borderRadius: '10px', 
     marginTop: '10px', 
     textAlign: 'left', 
-    lineHeight: '1.6', 
+    lineHeight: '1.8', 
     width: '100%', 
-    fontSize: '11px', 
+    fontSize: '13px', 
     border: '1px solid rgba(255,255,255,0.2)', 
     maxHeight: '300px', 
     overflow: 'auto', 
-    '@media (min-width: 769px)': { padding: '20px', fontSize: '16px', maxHeight: '400px' },
-    '@media (max-width: 768px)': { padding: '10px', fontSize: '9px', maxHeight: '200px' }
+    '@media (min-width: 769px)': { padding: '20px', fontSize: '18px', maxHeight: '400px' },
+    '@media (max-width: 768px)': { padding: '12px', fontSize: '12px', maxHeight: '250px' }
   },
   startButton: { 
-    padding: '12px 30px', 
-    fontSize: '16px', 
+    padding: '14px 35px', 
+    fontSize: '18px', 
     fontWeight: 'bold', 
     background: 'linear-gradient(135deg, #4CAF50, #45a049)', 
     color: 'white', 
     border: 'none', 
     borderRadius: '50px', 
     cursor: 'pointer', 
-    minWidth: '160px', 
-    '@media (min-width: 769px)': { padding: '14px 40px', fontSize: '20px', minWidth: '200px' },
-    '@media (max-width: 768px)': { padding: '10px 20px', fontSize: '14px', minWidth: '130px' }
+    minWidth: '180px', 
+    '@media (min-width: 769px)': { padding: '16px 45px', fontSize: '22px', minWidth: '220px' },
+    '@media (max-width: 768px)': { padding: '12px 25px', fontSize: '16px', minWidth: '150px' }
   },
   gameOverOverlay: { 
     position: 'absolute', 
@@ -747,60 +754,60 @@ const styles = {
     display: 'flex', 
     flexDirection: 'column', 
     alignItems: 'center', 
-    gap: '10px', 
+    gap: '12px', 
     padding: '20px',
     '@media (max-width: 768px)': {
-      gap: '6px',
-      padding: '12px'
+      gap: '8px',
+      padding: '15px'
     }
   },
   gameOverTitle: { 
-    fontSize: '24px', 
+    fontSize: '28px', 
     color: '#ff6b6b', 
-    '@media (min-width: 769px)': { fontSize: '42px' },
-    '@media (max-width: 768px)': { fontSize: '20px' }
+    '@media (min-width: 769px)': { fontSize: '48px' },
+    '@media (max-width: 768px)': { fontSize: '24px' }
   },
   finalScore: { 
-    fontSize: '14px', 
-    margin: '3px 0', 
-    '@media (min-width: 769px)': { fontSize: '24px', margin: '5px 0' },
-    '@media (max-width: 768px)': { fontSize: '12px' }
+    fontSize: '18px', 
+    margin: '5px 0', 
+    '@media (min-width: 769px)': { fontSize: '28px', margin: '8px 0' },
+    '@media (max-width: 768px)': { fontSize: '16px' }
   },
   retryButton: { 
-    padding: '10px 25px', 
-    fontSize: '14px', 
+    padding: '12px 30px', 
+    fontSize: '16px', 
     fontWeight: 'bold', 
     background: 'linear-gradient(135deg, #2196F3, #1976D2)', 
     color: 'white', 
     border: 'none', 
     borderRadius: '50px', 
     cursor: 'pointer', 
-    minWidth: '140px', 
-    '@media (min-width: 769px)': { padding: '12px 35px', fontSize: '18px', minWidth: '160px' },
-    '@media (max-width: 768px)': { padding: '8px 18px', fontSize: '12px', minWidth: '110px' }
+    minWidth: '160px', 
+    '@media (min-width: 769px)': { padding: '14px 40px', fontSize: '20px', minWidth: '180px' },
+    '@media (max-width: 768px)': { padding: '10px 22px', fontSize: '14px', minWidth: '130px' }
   },
   mobileControls: { 
     position: 'fixed', 
-    bottom: '10px', 
+    bottom: '15px', 
     left: 0, 
     right: 0, 
     display: 'flex', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    padding: '10px 20px', 
+    padding: '12px 25px', 
     backgroundColor: 'rgba(0,0,0,0.85)', 
     zIndex: 100, 
     borderTop: '1px solid rgba(255,255,255,0.2)',
     '@media (max-width: 768px)': {
-      bottom: '5px',
-      padding: '8px 15px'
+      bottom: '10px',
+      padding: '10px 20px'
     }
   },
   leftControls: { 
     display: 'flex', 
-    gap: '20px',
+    gap: '25px',
     '@media (max-width: 768px)': {
-      gap: '15px'
+      gap: '20px'
     }
   },
   rightControls: { 
@@ -809,16 +816,16 @@ const styles = {
   mobileButton: { 
     backgroundColor: 'rgba(255,255,255,0.2)', 
     border: '2px solid rgba(255,255,255,0.6)', 
-    borderRadius: '50px', 
-    width: '60px', 
-    height: '60px', 
+    borderRadius: '60px', 
+    width: '65px', 
+    height: '65px', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
     color: 'white', 
     cursor: 'pointer', 
-    '@media (min-width: 769px)': { width: '70px', height: '70px' },
-    '@media (max-width: 768px)': { width: '50px', height: '50px' }
+    '@media (min-width: 769px)': { width: '75px', height: '75px' },
+    '@media (max-width: 768px)': { width: '55px', height: '55px' }
   },
   shootButton: { 
     backgroundColor: 'rgba(255,80,80,0.8)', 
@@ -827,7 +834,7 @@ const styles = {
 };
 
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `button:hover:enabled { transform: scale(1.05); } button:active { transform: scale(0.95); } @media (max-width: 480px) { .mobileButton { width: 44px !important; height: 44px !important; } .leftControls { gap: 12px !important; } }`;
+styleSheet.textContent = `button:hover:enabled { transform: scale(1.05); } button:active { transform: scale(0.95); } @media (max-width: 480px) { .mobileButton { width: 48px !important; height: 48px !important; } .leftControls { gap: 15px !important; } }`;
 document.head.appendChild(styleSheet);
 
 export default SpaceShooter;
