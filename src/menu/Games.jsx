@@ -1,4 +1,4 @@
-// src/menu/Games.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
+ 
 import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaTrash, FaTimes, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { GiPuzzle, GiSwordsEmblem, GiConsoleController } from 'react-icons/gi';

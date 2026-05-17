@@ -81,7 +81,8 @@ const LandingPage = () => {
   };
 
   return (
-    <div style={activeSection === 'home' && !imageError ? styles.containerWithBg : styles.containerWithoutBg}>
+    // FIXED: Always use containerWithBg - background should never disappear
+    <div style={!imageError ? styles.containerWithBg : styles.containerWithoutBg}>
       {/* Navigation Bar */}
       <nav style={styles.navbar} className="nav-container">
         <div style={styles.navContent}>

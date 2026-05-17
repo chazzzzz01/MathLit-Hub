@@ -54,6 +54,41 @@ const AboutUs = () => {
         </div>
       </section>
 
+      {/* Learning Objectives Section - NEW */}
+      <section style={styles.learningObjectivesSection}>
+        <div style={styles.sectionContent}>
+          <h2 style={styles.sectionTitle}>Learning Objectives</h2>
+          <div style={styles.objectivesGrid}>
+            <div style={styles.objectiveCard}>
+              <div style={styles.objectiveNumber}>01</div>
+              <div style={styles.objectiveIcon}>🎯</div>
+              <h3 style={styles.objectiveTitle}>Identify Methods</h3>
+              <p style={styles.objectiveText}>
+                Identify the different methods in finding the equation of a line, including two-point form, point-slope form, slope-intercept form, and x and y intercepts.
+              </p>
+            </div>
+
+            <div style={styles.objectiveCard}>
+              <div style={styles.objectiveNumber}>02</div>
+              <div style={styles.objectiveIcon}>📐</div>
+              <h3 style={styles.objectiveTitle}>Solve Problems</h3>
+              <p style={styles.objectiveText}>
+                Solve problems involving slope, intercepts, and linear equations accurately using appropriate mathematical procedures and formulas.
+              </p>
+            </div>
+
+            <div style={styles.objectiveCard}>
+              <div style={styles.objectiveNumber}>03</div>
+              <div style={styles.objectiveIcon}>💡</div>
+              <h3 style={styles.objectiveTitle}>Develop Skills</h3>
+              <p style={styles.objectiveText}>
+                Develop mathematical literacy, critical thinking, and problem-solving skills through interactive and web-based learning activities provided in the MathLit Hub.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section style={styles.section}>
         <h2 style={styles.sectionTitle}>Features</h2>
@@ -246,6 +281,15 @@ const AboutUs = () => {
           box-shadow: 0 20px 40px rgba(0,0,0,0.15);
           transition: all 0.3s ease;
         }
+        
+        .objective-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .objective-card:hover {
+          transform: translateY(-8px);
+          box-shadow: 0 20px 30px -10px rgba(37, 99, 235, 0.3);
+        }
       `}</style>
     </div>
   );
@@ -320,6 +364,10 @@ const styles = {
     padding: 'clamp(60px, 10vh, 80px) 20px',
     backgroundColor: '#F9FAFB'
   },
+  learningObjectivesSection: {
+    padding: 'clamp(60px, 10vh, 80px) 20px',
+    background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #EFF6FF 100%)',
+  },
   researchersSection: {
     padding: 'clamp(60px, 10vh, 80px) 20px',
     backgroundColor: '#1E1B4B',
@@ -349,6 +397,52 @@ const styles = {
     lineHeight: '1.8',
     maxWidth: '800px',
     margin: '0 auto',
+    textAlign: 'center'
+  },
+  // Learning Objectives Styles
+  objectivesGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(320px, 100%), 1fr))',
+    gap: 'clamp(24px, 4vw, 32px)',
+    maxWidth: '1200px',
+    margin: '0 auto'
+  },
+  objectiveCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '20px',
+    padding: 'clamp(28px, 5vw, 36px)',
+    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
+    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    textAlign: 'center',
+    border: '1px solid rgba(37, 99, 235, 0.2)',
+    position: 'relative',
+    overflow: 'hidden',
+    cursor: 'pointer'
+  },
+  objectiveNumber: {
+    position: 'absolute',
+    top: '16px',
+    right: '20px',
+    fontSize: '48px',
+    fontWeight: '800',
+    color: 'rgba(37, 99, 235, 0.08)',
+    letterSpacing: '-0.02em'
+  },
+  objectiveIcon: {
+    fontSize: '56px',
+    marginBottom: '20px',
+    display: 'inline-block'
+  },
+  objectiveTitle: {
+    fontSize: 'clamp(20px, 4vw, 24px)',
+    color: '#111827',
+    marginBottom: '16px',
+    fontWeight: '700'
+  },
+  objectiveText: {
+    fontSize: 'clamp(14px, 3.5vw, 16px)',
+    color: '#4B5563',
+    lineHeight: '1.7',
     textAlign: 'center'
   },
   offeringsGrid: {
