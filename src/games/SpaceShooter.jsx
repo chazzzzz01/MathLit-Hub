@@ -1,7 +1,62 @@
-// src/games/SpaceShooter.jsx - FULLY RESPONSIVE with larger question text
+// src/games/SpaceShooter.jsx - FULLY RESPONSIVE with MUSIC & SOUND EFFECTS
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaArrowRight, FaCrosshairs } from 'react-icons/fa';
+import { FaArrowLeft, FaArrowRight, FaCrosshairs, FaVolumeUp, FaVolumeMute, FaMusic } from 'react-icons/fa';
+
+// Background Music using HTML5 Audio with spec2.mp3 (same as EquationEscapeRoom)
+class BackgroundMusic {
+  constructor() {
+    this.audio = null;
+    this.isPlaying = false;
+    this.isMuted = false;
+    this.volume = 0.3;
+  }
+
+  initAudio() {
+    if (!this.audio) {
+      this.audio = new Audio('/src/games/sounds/spec2.mp3');
+      this.audio.loop = true;
+      this.audio.volume = this.isMuted ? 0 : this.volume;
+    }
+    return this.audio;
+  }
+
+  setMuted(muted) {
+    this.isMuted = muted;
+    if (this.audio) {
+      this.audio.volume = muted ? 0 : this.volume;
+    }
+  }
+
+  setVolume(volume) {
+    this.volume = volume;
+    if (this.audio && !this.isMuted) {
+      this.audio.volume = volume;
+    }
+  }
+
+  startMusic() {
+    if (this.isPlaying) return;
+    this.initAudio();
+    this.audio.play().catch(e => console.log('Audio play error:', e));
+    this.isPlaying = true;
+  }
+
+  stopMusic() {
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.currentTime = 0;
+    }
+    this.isPlaying = false;
+  }
+
+  resumeAudioContext() {
+    if (this.audio && !this.isPlaying && !this.isMuted) {
+      this.audio.play().catch(e => console.log('Resume error:', e));
+      this.isPlaying = true;
+    }
+  }
+}
 
 const SpaceShooter = () => {
   const navigate = useNavigate();
@@ -28,6 +83,16 @@ const SpaceShooter = () => {
   const [timeSpent, setTimeSpent] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [wrongAnswers, setWrongAnswers] = useState(0);
+  
+  // Music states (same as EquationEscapeRoom)
+  const [isMusicMuted, setIsMusicMuted] = useState(false);
+  const [isSoundEffectsMuted, setIsSoundEffectsMuted] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.3);
+  const [showMusicNote, setShowMusicNote] = useState(false);
+  
+  // Background music instance
+  const backgroundMusic = useRef(null);
+  const sfxAudioContext = useRef(null);
 
   const gameRef = useRef({
     player: { x: 380, y: 750, width: 40, height: 40 },
@@ -46,6 +111,240 @@ const SpaceShooter = () => {
   });
 
   const xpSoFar = React.useMemo(() => (correctAnswers * 10) - (wrongAnswers * 5), [correctAnswers, wrongAnswers]);
+
+  // Load saved preferences
+  useEffect(() => {
+    const savedMusicMute = localStorage.getItem('spaceShooterMusicMuted');
+    const savedSfxMute = localStorage.getItem('spaceShooterSfxMuted');
+    const savedVolume = localStorage.getItem('spaceShooterMusicVolume');
+    
+    if (savedMusicMute !== null) setIsMusicMuted(savedMusicMute === 'true');
+    if (savedSfxMute !== null) setIsSoundEffectsMuted(savedSfxMute === 'true');
+    if (savedVolume !== null) {
+      const vol = parseFloat(savedVolume);
+      setMusicVolume(vol);
+      if (backgroundMusic.current) backgroundMusic.current.setVolume(vol);
+    }
+  }, []);
+
+  // Initialize Background Music
+  useEffect(() => {
+    backgroundMusic.current = new BackgroundMusic();
+    backgroundMusic.current.setMuted(isMusicMuted);
+    backgroundMusic.current.setVolume(musicVolume);
+    
+    // Initialize SFX Audio Context
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      sfxAudioContext.current = new AudioCtx();
+    } catch(e) {
+      console.log('Web Audio API for SFX not supported');
+    }
+    
+    return () => {
+      if (backgroundMusic.current) {
+        backgroundMusic.current.stopMusic();
+      }
+      if (sfxAudioContext.current) {
+        sfxAudioContext.current.close();
+      }
+    };
+  }, []);
+
+  // Handle music playback based on game state
+  useEffect(() => {
+    if (backgroundMusic.current) {
+      backgroundMusic.current.setMuted(isMusicMuted);
+      
+      if (gameState === 'playing' && !showLevelAnnouncement && !isMusicMuted) {
+        backgroundMusic.current.startMusic();
+      } else {
+        backgroundMusic.current.stopMusic();
+      }
+    }
+  }, [gameState, showLevelAnnouncement, isMusicMuted]);
+
+  // Update volume when changed
+  useEffect(() => {
+    if (backgroundMusic.current) {
+      backgroundMusic.current.setVolume(musicVolume);
+    }
+  }, [musicVolume]);
+
+  // Toggle music function
+  const toggleMusic = () => {
+    const newMuteState = !isMusicMuted;
+    setIsMusicMuted(newMuteState);
+    localStorage.setItem('spaceShooterMusicMuted', newMuteState);
+    if (backgroundMusic.current) backgroundMusic.current.setMuted(newMuteState);
+    
+    setShowMusicNote(true);
+    setTimeout(() => setShowMusicNote(false), 1000);
+  };
+
+  const toggleSoundEffects = () => {
+    const newMuteState = !isSoundEffectsMuted;
+    setIsSoundEffectsMuted(newMuteState);
+    localStorage.setItem('spaceShooterSfxMuted', newMuteState);
+  };
+
+  const handleMusicVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setMusicVolume(newVolume);
+    if (backgroundMusic.current) backgroundMusic.current.setVolume(newVolume);
+    localStorage.setItem('spaceShooterMusicVolume', newVolume);
+  };
+
+  // Sound effect functions using Web Audio API
+  const playShootSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      
+      oscillator.type = 'square';
+      oscillator.frequency.value = 880;
+      gain.gain.value = 0.1;
+      
+      oscillator.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
+      oscillator.stop(ctx.currentTime + 0.3);
+    } catch (error) {
+      console.log('Error playing shoot sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const playExplosionSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      
+      oscillator.type = 'sawtooth';
+      oscillator.frequency.value = 200;
+      gain.gain.value = 0.15;
+      
+      oscillator.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
+      oscillator.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.5);
+      oscillator.stop(ctx.currentTime + 0.5);
+    } catch (error) {
+      console.log('Error playing explosion sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const playLevelUpSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const notes = [523.25, 659.25, 783.99];
+      notes.forEach((freq, index) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.value = freq;
+        gain.gain.value = 0.1;
+        
+        oscillator.start(ctx.currentTime + index * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + index * 0.1 + 0.3);
+        oscillator.stop(ctx.currentTime + index * 0.1 + 0.3);
+      });
+    } catch (error) {
+      console.log('Error playing level up sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const playGameOverSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const notes = [440, 349.23, 261.63];
+      notes.forEach((freq, index) => {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+        
+        oscillator.type = 'sawtooth';
+        oscillator.frequency.value = freq;
+        gain.gain.value = 0.15;
+        
+        oscillator.start(ctx.currentTime + index * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + index * 0.15 + 0.4);
+        oscillator.stop(ctx.currentTime + index * 0.15 + 0.4);
+      });
+    } catch (error) {
+      console.log('Error playing game over sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const playCorrectSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 523.25;
+      gain.gain.value = 0.12;
+      
+      oscillator.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.2);
+      oscillator.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2);
+      oscillator.stop(ctx.currentTime + 0.3);
+    } catch (error) {
+      console.log('Error playing correct sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const playWrongSound = useCallback(() => {
+    if (isSoundEffectsMuted || !sfxAudioContext.current) return;
+    try {
+      const ctx = sfxAudioContext.current;
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      
+      oscillator.type = 'triangle';
+      oscillator.frequency.value = 174.61;
+      gain.gain.value = 0.12;
+      
+      oscillator.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
+      oscillator.frequency.exponentialRampToValueAtTime(130.81, ctx.currentTime + 0.3);
+      oscillator.stop(ctx.currentTime + 0.4);
+    } catch (error) {
+      console.log('Error playing wrong sound:', error);
+    }
+  }, [isSoundEffectsMuted]);
+
+  const resumeAudio = useCallback(() => {
+    if (backgroundMusic.current) {
+      backgroundMusic.current.resumeAudioContext();
+    }
+    if (sfxAudioContext.current && sfxAudioContext.current.state === 'suspended') {
+      sfxAudioContext.current.resume();
+    }
+  }, []);
 
   const sendXPUpdate = useCallback((isCorrect, userAnswer, correctAnswer, questionText) => {
     if (window.parent !== window) {
@@ -87,6 +386,9 @@ const SpaceShooter = () => {
     if (gameState === 'playing' && !gameResultSent && gameStartTime) {
       const currentTimeSpent = Math.floor((Date.now() - gameStartTime) / 1000);
       sendGameResult(false, score, currentTimeSpent, { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong });
+    }
+    if (backgroundMusic.current) {
+      backgroundMusic.current.stopMusic();
     }
     navigate('/studenthub/games');
   };
@@ -138,10 +440,8 @@ const SpaceShooter = () => {
 
   const getRandomQuestion = useCallback(() => questions[Math.floor(Math.random() * questions.length)], []);
 
-  // Function to calculate enemy dimensions based on text with larger padding
   const calculateEnemyDimensions = useCallback((text) => {
     const ctx = document.createElement('canvas').getContext('2d');
-    // Larger font size for better visibility on mobile
     ctx.font = `bold 14px "Courier New", monospace`;
     
     let displayText = text;
@@ -150,9 +450,7 @@ const SpaceShooter = () => {
     }
     
     const textWidth = ctx.measureText(displayText).width;
-    // Width: text width + more padding (min 110, max 220)
     const width = Math.min(220, Math.max(110, textWidth + 30));
-    // Height: based on text length (taller for longer text)
     let height = 70;
     if (textWidth > 140) height = 85;
     if (textWidth > 180) height = 100;
@@ -169,7 +467,6 @@ const SpaceShooter = () => {
     const displayAnswer = isCorrect ? correctOptionText : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
     const levelBaseSpeed = gameRef.current.baseEnemySpeed * (1 + (level - 1) * 0.15);
     
-    // Calculate dynamic dimensions based on text
     const dimensions = calculateEnemyDimensions(displayAnswer);
     
     return { 
@@ -205,9 +502,10 @@ const SpaceShooter = () => {
   }, [showLevelAnnouncement]);
 
   const advanceToNextLevel = useCallback(() => {
+    playLevelUpSound();
     setLevel(prev => { const newLevel = prev + 1; setHighestLevel(h => Math.max(h, newLevel)); gameRef.current.currentSpeedMultiplier = 1.0; gameRef.current.spawnDelay = Math.max(60, 120 - (newLevel - 1) * 8); setLevelAnnouncement(`LEVEL ${newLevel}`); setShowLevelAnnouncement(true); gameRef.current.waitingForSpace = true; gameRef.current.gameActive = false; setCurrentQuestion(getRandomQuestion()); gameRef.current.enemies = []; gameRef.current.bullets = []; const enemyCount = Math.min(5, 3 + Math.floor(newLevel / 3)); for (let i = 0; i < enemyCount; i++) { const e = createEnemy(); if (e) { e.y = -60 - (i * 50); gameRef.current.enemies.push(e); } } setFeedback({ message: `🔥 LEVEL UP! Level ${newLevel} 🔥`, type: 'success' }); return newLevel; });
     setCorrectShots(0);
-  }, [getRandomQuestion, createEnemy]);
+  }, [getRandomQuestion, createEnemy, playLevelUpSound]);
 
   const initLevel = useCallback(() => {
     gameRef.current.enemies = []; gameRef.current.bullets = []; gameRef.current.particles = []; gameRef.current.spawnTimer = 0; gameRef.current.baseEnemySpeed = 0.8; gameRef.current.currentSpeedMultiplier = 1.0; gameRef.current.spawnDelay = 120;
@@ -218,6 +516,7 @@ const SpaceShooter = () => {
   }, [getRandomQuestion, createEnemy]);
 
   const startGame = () => {
+    resumeAudio();
     gameRef.current.gameActive = false;
     gameRef.current.waitingForSpace = false;
     setScore(0);
@@ -244,10 +543,11 @@ const SpaceShooter = () => {
   const shoot = useCallback(() => {
     const now = Date.now();
     if (now - gameRef.current.lastShot < 300) return;
+    playShootSound();
     setTotalShots(prev => prev + 1);
     gameRef.current.bullets.push({ x: gameRef.current.player.x + 35, y: gameRef.current.player.y - 20, width: 4, height: 10, speed: 7 });
     gameRef.current.lastShot = now;
-  }, []);
+  }, [playShootSound]);
 
   const increaseSpeed = useCallback(() => {
     gameRef.current.currentSpeedMultiplier = Math.min(2.5, gameRef.current.currentSpeedMultiplier + 0.1);
@@ -284,6 +584,7 @@ const SpaceShooter = () => {
         if (b.x < e.x + e.width && b.x + b.width > e.x && b.y < e.y + e.height && b.y + b.height > e.y) {
           sendXPUpdate(e.isCorrect, e.displayAnswer, e.correctAnswerLetter, e.questionText);
           if (e.isCorrect) {
+            playCorrectSound();
             setCorrectAnswers(prev => prev + 1); setScore(s => s + 100); setTotalCorrect(prev => prev + 1);
             setCorrectShots(prev => { setFeedback({ message: `+100 Correct! +10 XP! Speed: ${game.currentSpeedMultiplier.toFixed(1)}x | Level: ${level}`, type: 'success' }); return prev + 1; });
             for (let i = 0; i < 20; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 30 });
@@ -298,14 +599,15 @@ const SpaceShooter = () => {
               enemy.isCorrect = isEnemyCorrect; 
               const newAnswer = isEnemyCorrect ? (currentQuestion?.options || []).find(opt => opt.startsWith(currentQuestion?.correctAnswer || "")) : wrongOps[Math.floor(Math.random() * wrongOps.length)];
               enemy.displayAnswer = newAnswer;
-              // Update enemy dimensions based on new text
               const newDimensions = calculateEnemyDimensions(newAnswer);
               enemy.width = newDimensions.width;
               enemy.height = newDimensions.height;
             });
           } else {
+            playWrongSound();
             setWrongAnswers(prev => prev + 1); setTotalWrong(prev => prev + 1);
             setWrongShots(prev => { const newWrong = prev + 1; setScore(s => Math.max(0, s - 10)); setFeedback({ message: `-10 Wrong! ❌ | Correct: ${e.allOptions.find(opt => opt.startsWith(e.correctAnswerLetter))} (-5 XP!) (${newWrong}/3 mistakes) | Speed reset!`, type: 'error' }); game.currentSpeedMultiplier = 1.0; game.spawnDelay = Math.max(60, 120 - (level - 1) * 8); const levelBaseSpeed = game.baseEnemySpeed * (1 + (level - 1) * 0.15); game.enemies.forEach(enemy => { enemy.speed = levelBaseSpeed; enemy.horizontalSpeed = (0.5 + Math.random() * 0.5) * Math.min(2.5, (level * 0.1)); }); for (let i = 0; i < 15; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 20 }); if (newWrong >= 3) { 
+                playGameOverSound();
                 game.gameActive = false; 
                 const finalTimeSpent = Math.floor((Date.now() - (gameStartTime || Date.now())) / 1000); 
                 sendGameResult(false, score, finalTimeSpent, { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong + 1 }); 
@@ -316,6 +618,7 @@ const SpaceShooter = () => {
               return newWrong; 
             });
           }
+          playExplosionSound();
           game.bullets.splice(bi, 1); game.enemies.splice(ei, 1); break;
         }
       }
@@ -323,7 +626,7 @@ const SpaceShooter = () => {
     const requiredCorrectShots = 5 + Math.floor(level / 2);
     if (correctShots >= requiredCorrectShots && game.gameActive && !game.waitingForSpace) advanceToNextLevel();
     game.particles = game.particles.filter(p => { p.x += p.vx; p.y += p.vy; p.life--; return p.life > 0; });
-  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, shoot, createEnemy, calculateEnemyDimensions]);
+  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, shoot, createEnemy, calculateEnemyDimensions, playCorrectSound, playWrongSound, playExplosionSound, playGameOverSound]);
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
@@ -343,7 +646,6 @@ const SpaceShooter = () => {
     game.particles.forEach(p => { ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`; ctx.fillRect(p.x, p.y, 4, 4); });
     
     game.enemies.forEach(e => {
-      // Black background with dynamic size
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(e.x, e.y, e.width, e.height);
       ctx.fillStyle = '#16213e';
@@ -352,7 +654,6 @@ const SpaceShooter = () => {
       ctx.fillRect(e.x + 10, e.y + 12, 12, 8);
       ctx.fillRect(e.x + e.width - 22, e.y + 12, 12, 8);
       
-      // Lighter text color - bright cyan/white for better visibility
       ctx.fillStyle = '#e0e0e0';
       
       let displayText = e.displayAnswer;
@@ -360,19 +661,16 @@ const SpaceShooter = () => {
         displayText = displayText.substring(displayText.indexOf('. ') + 2);
       }
       
-      // Larger font size for better visibility on mobile (14px base)
       let fontSize = 14;
       ctx.font = `bold ${fontSize}px "Courier New", monospace`;
       let textWidth = ctx.measureText(displayText || "?").width;
       
-      // Adjust font size down if needed, but keep minimum 11px
       while (textWidth > e.width - 16 && fontSize > 11) {
         fontSize--;
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
         textWidth = ctx.measureText(displayText || "?").width;
       }
       
-      // Check if text needs two lines
       let line1 = displayText;
       let line2 = "";
       if (textWidth > e.width - 16 && fontSize <= 11) {
@@ -399,7 +697,6 @@ const SpaceShooter = () => {
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
       }
       
-      // Center text in the dynamically sized box with better shadow for contrast
       if (line2) {
         const line1Width = ctx.measureText(line1).width;
         const line2Width = ctx.measureText(line2).width;
@@ -423,7 +720,6 @@ const SpaceShooter = () => {
         ctx.shadowBlur = 0;
       }
       
-      // Brighter border
       ctx.strokeStyle = '#ffaa44';
       ctx.lineWidth = 2.5;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
@@ -456,7 +752,6 @@ const SpaceShooter = () => {
     ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(13, Math.max(9, 13 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 260);
     ctx.fillText(`✅ ${correctAnswers} | ❌ ${wrongAnswers}`, 20, 278);
     if (currentQuestion && !showLevelAnnouncement && game.gameActive && gameState === 'playing') {
-      // MUCH LARGER question text for mobile visibility
       ctx.fillStyle = '#ffd700'; 
       ctx.font = `bold ${Math.min(22, Math.max(17, 22 * (canvasDimensions.width / 800)))}px Arial`;
       let qText = currentQuestion.text;
@@ -530,8 +825,32 @@ const SpaceShooter = () => {
   const totalXPEarned = (correctAnswers * 10) - (wrongAnswers * 5);
 
   return (
-    <div style={styles.container}>
-      <button onClick={handleBackToGames} style={styles.backButton}><FaArrowLeft style={styles.backIcon} /> Back</button>
+    <div style={styles.container} onClick={resumeAudio}>
+      {/* Music Controls - Same as EquationEscapeRoom */}
+      <div style={styles.musicControls}>
+        <button onClick={toggleMusic} style={styles.musicButton} title={isMusicMuted ? "Unmute Music" : "Mute Music"}>
+          {isMusicMuted ? <FaVolumeMute /> : <FaMusic />}
+        </button>
+        <button onClick={toggleSoundEffects} style={styles.musicButton} title={isSoundEffectsMuted ? "Unmute Sound Effects" : "Mute Sound Effects"}>
+          {isSoundEffectsMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={musicVolume}
+          onChange={handleMusicVolumeChange}
+          style={styles.volumeSlider}
+          title="Music Volume"
+        />
+      </div>
+      
+      {showMusicNote && <div style={styles.musicNoteAnimation}>🎵</div>}
+
+      <div style={styles.topBar}>
+        <button onClick={handleBackToGames} style={styles.backButton}><FaArrowLeft style={styles.backIcon} /> Back</button>
+      </div>
       <div style={styles.gameWrapper}>
         <canvas 
           ref={canvasRef} 
@@ -558,6 +877,7 @@ const SpaceShooter = () => {
                 <p>⭐ +10 XP/correct, -5 XP/wrong</p>
                 <p>💀 3 mistakes = Game Over!</p>
                 <p>⚡ Each correct = speed increase!</p>
+                <p>🎵 Background music: spec2.mp3</p>
               </div>
               <button onClick={startGame} style={styles.startButton}>Start Game</button>
             </div>
@@ -609,10 +929,64 @@ const styles = {
     position: 'relative',
     overflow: 'auto'
   },
-  backButton: { 
+  musicControls: { 
     position: 'fixed', 
-    top: '10px', 
-    left: '10px', 
+    top: '12px', 
+    right: '12px', 
+    display: 'flex', 
+    gap: '8px', 
+    alignItems: 'center', 
+    zIndex: 1001, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    padding: '6px 12px', 
+    borderRadius: '20px', 
+    backdropFilter: 'blur(5px)', 
+    '@media (min-width: 769px)': { top: '20px', right: '20px', padding: '8px 16px', gap: '12px' } 
+  },
+  musicButton: { 
+    backgroundColor: '#4a6fa5', 
+    color: 'white', 
+    border: 'none', 
+    width: '32px', 
+    height: '32px', 
+    borderRadius: '50%', 
+    cursor: 'pointer', 
+    display: 'flex', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    fontSize: '14px', 
+    transition: 'all 0.3s', 
+    '&:hover': { transform: 'scale(1.05)' }, 
+    '@media (min-width: 769px)': { width: '40px', height: '40px', fontSize: '18px' } 
+  },
+  volumeSlider: { 
+    width: '60px', 
+    height: '3px', 
+    cursor: 'pointer', 
+    backgroundColor: '#667eea', 
+    borderRadius: '3px', 
+    '@media (min-width: 769px)': { width: '80px' } 
+  },
+  musicNoteAnimation: { 
+    position: 'fixed', 
+    top: '50%', 
+    left: '50%', 
+    transform: 'translate(-50%, -50%)', 
+    fontSize: '60px', 
+    animation: 'musicNote 1s ease-out', 
+    pointerEvents: 'none', 
+    zIndex: 2000, 
+    '@media (min-width: 769px)': { fontSize: '100px' } 
+  },
+  topBar: {
+    position: 'fixed',
+    top: '10px',
+    left: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  backButton: { 
     backgroundColor: 'rgba(0,0,0,0.85)', 
     color: 'white', 
     border: '2px solid rgba(255,255,255,0.3)', 
@@ -624,10 +998,7 @@ const styles = {
     gap: '8px', 
     fontSize: '14px', 
     fontWeight: 'bold', 
-    zIndex: 1000,
     '@media (max-width: 768px)': { 
-      top: '5px', 
-      left: '5px', 
       padding: '8px 12px', 
       fontSize: '12px'
     }
@@ -833,8 +1204,20 @@ const styles = {
   }
 };
 
+// Add keyframe animation for music note
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `button:hover:enabled { transform: scale(1.05); } button:active { transform: scale(0.95); } @media (max-width: 480px) { .mobileButton { width: 48px !important; height: 48px !important; } .leftControls { gap: 15px !important; } }`;
+styleSheet.textContent = `
+  button:hover:enabled { transform: scale(1.05); } 
+  button:active { transform: scale(0.95); } 
+  @keyframes musicNote { 
+    0% { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 1; } 
+    100% { transform: translate(-50%, -150%) scale(1.5) rotate(20deg); opacity: 0; } 
+  }
+  @media (max-width: 480px) { .mobileButton { width: 48px !important; height: 48px !important; } .leftControls { gap: 15px !important; } }
+  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; } 
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; cursor: pointer; } 
+  @media (min-width: 769px) { input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; } }
+`;
 document.head.appendChild(styleSheet);
 
 export default SpaceShooter;

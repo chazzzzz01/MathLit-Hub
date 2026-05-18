@@ -1,5 +1,5 @@
-// src/games/equation-function/EscapeRoom.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
-import React, { useState, useEffect, useCallback } from 'react';
+// src/games/equation-function/EscapeRoom.jsx - FULLY RESPONSIVE with MP3 Sound Effects
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 const animationStyles = `
   @keyframes shake { 0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); } }
@@ -7,6 +7,7 @@ const animationStyles = `
   @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
   @keyframes fadeOut { 0% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2); } }
   @keyframes enemyAttack { 0% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } 100% { transform: translate(-50%, -50%) scale(1); } }
+  @keyframes correctFlash { 0% { background-color: rgba(76, 175, 80, 0); } 50% { background-color: rgba(76, 175, 80, 0.5); } 100% { background-color: rgba(76, 175, 80, 0); } }
 `;
 
 if (!document.querySelector('#escape-room-styles')) {
@@ -16,7 +17,181 @@ if (!document.querySelector('#escape-room-styles')) {
   document.head.appendChild(styleSheet);
 }
 
-const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGameStateUpdate, savedGameState, clearSavedState }) => {
+const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGameStateUpdate, savedGameState, clearSavedState, isSfxMuted = false }) => {
+  // Audio refs for MP3 files from src/games/sounds/
+  const correctSoundRef = useRef(null);
+  const wrongSoundRef = useRef(null);
+  const enemyDefeatSoundRef = useRef(null);
+  const gameOverSoundRef = useRef(null);
+  const victorySoundRef = useRef(null);
+  const doorSoundRef = useRef(null);
+  const attackSoundRef = useRef(null);
+  
+  // Initialize audio elements with correct path
+  useEffect(() => {
+    // Use the correct path src/games/sounds/
+    const soundPath = '/src/games/sounds/';
+    
+    console.log('Attempting to load sounds from:', soundPath);
+    
+    // Create audio elements
+    correctSoundRef.current = new Audio(`${soundPath}clap.mp3`);
+    wrongSoundRef.current = new Audio(`${soundPath}boo.mp3`);
+    enemyDefeatSoundRef.current = new Audio(`${soundPath}enemy-defeat.mp3`);
+    gameOverSoundRef.current = new Audio(`${soundPath}game-over.mp3`);
+    victorySoundRef.current = new Audio(`${soundPath}victory.mp3`);
+    doorSoundRef.current = new Audio(`${soundPath}door-open.mp3`);
+    attackSoundRef.current = new Audio(`${soundPath}attack.mp3`);
+    
+    // Set volumes
+    correctSoundRef.current.volume = 0.8;
+    wrongSoundRef.current.volume = 0.7;
+    enemyDefeatSoundRef.current.volume = 0.7;
+    gameOverSoundRef.current.volume = 0.8;
+    victorySoundRef.current.volume = 0.7;
+    doorSoundRef.current.volume = 0.6;
+    attackSoundRef.current.volume = 0.6;
+    
+    // Add event listeners to check loading
+    const handleCanPlay = (soundName) => {
+      console.log(`✅ ${soundName} sound loaded successfully`);
+    };
+    
+    const handleError = (soundName, e) => {
+      console.error(`❌ Failed to load ${soundName} sound:`, e);
+      // Try alternative path
+      const altPath = '/games/sounds/';
+      console.log(`Trying alternative path: ${altPath}${soundName}.mp3`);
+      const altAudio = new Audio(`${altPath}${soundName}.mp3`);
+      if (soundName === 'clap') correctSoundRef.current = altAudio;
+      if (soundName === 'boo') wrongSoundRef.current = altAudio;
+      altAudio.volume = 0.7;
+      altAudio.load();
+    };
+    
+    correctSoundRef.current.addEventListener('canplaythrough', () => handleCanPlay('clap'));
+    correctSoundRef.current.addEventListener('error', (e) => handleError('clap', e));
+    wrongSoundRef.current.addEventListener('canplaythrough', () => handleCanPlay('boo'));
+    wrongSoundRef.current.addEventListener('error', (e) => handleError('boo', e));
+    
+    // Preload sounds
+    correctSoundRef.current.load();
+    wrongSoundRef.current.load();
+    enemyDefeatSoundRef.current.load();
+    gameOverSoundRef.current.load();
+    victorySoundRef.current.load();
+    doorSoundRef.current.load();
+    attackSoundRef.current.load();
+    
+    return () => {
+      // Cleanup
+      const sounds = [correctSoundRef, wrongSoundRef, enemyDefeatSoundRef, gameOverSoundRef, victorySoundRef, doorSoundRef, attackSoundRef];
+      sounds.forEach(sound => {
+        if (sound.current) {
+          sound.current.pause();
+          sound.current.currentTime = 0;
+          sound.current = null;
+        }
+      });
+    };
+  }, []);
+  
+  const playSound = (soundRef, soundName) => {
+    if (!isSfxMuted && soundRef.current) {
+      try {
+        soundRef.current.currentTime = 0;
+        const playPromise = soundRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              console.log(`🔊 Playing ${soundName} sound`);
+            })
+            .catch(e => {
+              console.log(`⚠️ Could not play ${soundName} sound:`, e);
+              // Fallback to Web Audio if MP3 fails
+              playFallbackSound(soundName);
+            });
+        }
+      } catch(e) {
+        console.log(`Sound error for ${soundName}:`, e);
+        playFallbackSound(soundName);
+      }
+    } else if (!isSfxMuted) {
+      console.log(`🎵 Using fallback sound for ${soundName}`);
+      playFallbackSound(soundName);
+    }
+  };
+  
+  // Fallback sounds using Web Audio API (in case MP3 files don't load)
+  const playFallbackSound = (soundType) => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioContext();
+      
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      
+      const now = audioCtx.currentTime;
+      
+      if (soundType === 'correct') {
+        // Happy clap-like sound
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.frequency.value = 523.25;
+        gainNode.gain.value = 0.3;
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.3);
+        oscillator.stop(now + 0.3);
+        
+        // Add a second quick note for clap effect
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.connect(gain2);
+        gain2.connect(audioCtx.destination);
+        osc2.frequency.value = 659.25;
+        gain2.gain.value = 0.2;
+        osc2.start(now + 0.05);
+        gain2.gain.exponentialRampToValueAtTime(0.00001, now + 0.35);
+        osc2.stop(now + 0.35);
+      } else if (soundType === 'wrong') {
+        // Sad boo-like sound
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.frequency.value = 220;
+        oscillator.type = 'sawtooth';
+        gainNode.gain.value = 0.25;
+        oscillator.start();
+        gainNode.gain.exponentialRampToValueAtTime(0.00001, now + 0.5);
+        oscillator.stop(now + 0.5);
+        
+        // Add pitch bend for "boo" effect
+        oscillator.frequency.setValueAtTime(220, now);
+        oscillator.frequency.exponentialRampToValueAtTime(165, now + 0.3);
+      } else if (soundType === 'defeat') {
+        // Victory fanfare
+        const freqs = [523.25, 659.25, 783.99];
+        freqs.forEach((freq, i) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.frequency.value = freq;
+          gain.gain.value = 0.2;
+          osc.start(now + i * 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.00001, now + i * 0.15 + 0.4);
+          osc.stop(now + i * 0.15 + 0.4);
+        });
+      }
+    } catch(e) {
+      console.log('Fallback sound error:', e);
+    }
+  };
+
   const shuffleArray = (array) => {
     const shuffled = [...array];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -58,22 +233,30 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
   const [defeatedEnemy, setDefeatedEnemy] = useState(null);
   const [escapeDoorOpen, setEscapeDoorOpen] = useState(false);
   const [roomShake, setRoomShake] = useState(false);
+  const [correctFlash, setCorrectFlash] = useState(false);
 
   const totalPuzzles = puzzles.length;
   const xpSoFar = (correctAnswers * 10) - (wrongAnswers * 5);
   const distanceToDoor = 100 - playerPosition;
 
   useEffect(() => { if (puzzlesCompleted === totalPuzzles) setEscapeDoorOpen(true); }, [puzzlesCompleted, totalPuzzles]);
+  
   const shakeRoom = () => { setRoomShake(true); setTimeout(() => setRoomShake(false), 300); };
-  const triggerEnemyAttack = () => { setEnemyAttacking(true); setTimeout(() => setEnemyAttacking(false), 500); };
+  
+  const triggerEnemyAttack = () => { 
+    setEnemyAttacking(true); 
+    playSound(attackSoundRef, 'attack');
+    setTimeout(() => setEnemyAttacking(false), 500); 
+  };
 
   const handlePlayerDeath = useCallback(() => {
     setGameActive(false);
     setFeedback("💀 GAME OVER! The enemies overwhelmed you! 💀");
+    playSound(gameOverSoundRef, 'gameover');
     const timeSpent = 300 - timeLeft;
     const accuracy = ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1);
     if (onComplete) onComplete(false);
-  }, [score, puzzlesCompleted, timeLeft, totalPuzzles, onComplete]);
+  }, [puzzlesCompleted, timeLeft, totalPuzzles, onComplete]);
 
   useEffect(() => { setPlayerPosition((puzzlesCompleted / totalPuzzles) * 100); }, [puzzlesCompleted, totalPuzzles]);
   useEffect(() => { if (lives <= 0 && gameActive) handlePlayerDeath(); }, [lives, gameActive, handlePlayerDeath]);
@@ -135,6 +318,7 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
             clearInterval(timer);
             setGameActive(false);
             setFeedback("Time's up! Game over!");
+            playSound(gameOverSoundRef, 'gameover');
             const timeSpent = 300;
             const accuracy = ((puzzlesCompleted / totalPuzzles) * 100).toFixed(1);
             if (onComplete) onComplete(false);
@@ -145,10 +329,11 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [gameActive, currentPuzzle, timeLeft, puzzlesCompleted, score, totalPuzzles, lives, onComplete]);
+  }, [gameActive, currentPuzzle, timeLeft, puzzlesCompleted, totalPuzzles, lives, onComplete]);
 
   const showEnemyDefeat = (enemy, defeatMessage) => {
     setDefeatedEnemy({ enemy, defeatMessage });
+    playSound(enemyDefeatSoundRef, 'defeat');
     setTimeout(() => setDefeatedEnemy(null), 1500);
   };
 
@@ -164,6 +349,12 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
     }
     
     if (isCorrect) {
+      // Play clap sound for correct answer
+      console.log('👏 Playing clap sound for correct answer!');
+      playSound(correctSoundRef, 'correct');
+      setCorrectFlash(true);
+      setTimeout(() => setCorrectFlash(false), 300);
+      
       setCorrectAnswers(prev => prev + 1);
       const pointsEarned = 100;
       const newScore = score + pointsEarned;
@@ -176,6 +367,12 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
       setShowHint(false);
       setMcSelection(null);
       setAttempts(0);
+      
+      if (newPuzzlesCompleted === totalPuzzles) {
+        playSound(doorSoundRef, 'door');
+        setTimeout(() => playSound(victorySoundRef, 'victory'), 500);
+      }
+      
       if (currentPuzzle + 1 < totalPuzzles) {
         setCurrentPuzzle(currentPuzzle + 1);
       } else if (newPuzzlesCompleted === totalPuzzles) {
@@ -194,6 +391,9 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
         if (clearSavedState) clearSavedState();
       }
     } else {
+      // Play boo sound for wrong answer
+      console.log('👎 Playing boo sound for wrong answer!');
+      playSound(wrongSoundRef, 'wrong');
       shakeRoom();
       triggerEnemyAttack();
       const newLives = lives - 1;
@@ -235,6 +435,7 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
   return (
     <div style={{...styles.container, animation: roomShake ? 'shake 0.3s ease-in-out 0s 2' : 'none'}}>
       {defeatedEnemy && (<div style={styles.enemyDefeatOverlay}><div style={styles.enemyDefeatBubble}><span style={styles.enemyDefeatEmoji}>{defeatedEnemy.enemy.emoji}</span><span style={styles.enemyDefeatText}>{defeatedEnemy.defeatMessage}</span><span style={styles.enemyDefeatXp}>+10 XP!</span></div></div>)}
+      
       <div style={styles.visualRoom}>
         <div style={styles.roomWalls}>
           <div style={styles.roomWallLeft}></div><div style={styles.roomWallRight}></div><div style={styles.roomWallTop}></div><div style={styles.roomFloor}></div>
@@ -245,7 +446,8 @@ const EscapeRoom = ({ onComplete, onScore, challengeScore, sendGameResult, onGam
         <div style={{...styles.playerSprite, left: `${Math.max(20, Math.min(180, 80 + (playerPosition * 1.5)))}px`}}><div style={styles.playerAvatar}><span style={styles.playerEmoji}>🧙</span><div style={styles.playerNameTag}>You</div></div></div>
         {enemyAttacking && <div style={styles.bloodEffect}><span>💀</span></div>}
       </div>
-      <div style={styles.puzzleArea}>
+      
+      <div style={{...styles.puzzleArea, animation: correctFlash ? 'correctFlash 0.3s ease-in-out' : 'none'}}>
         <div style={styles.header}>
           <div style={styles.scoreTimeContainer}><div style={styles.score}>⭐ Score: {score}</div><div style={styles.timer}>⏱️ {formatTime(timeLeft)}</div><div style={styles.livesContainer}><span>❤️ Lives: </span>{[...Array(3)].map((_, i) => <span key={i} style={{color: i < lives ? '#ff4444' : '#333', fontSize: '16px'}}>{i < lives ? '❤️' : '🖤'}</span>)}</div></div>
           <div style={styles.xpDisplay}><span>⭐ XP: {xpSoFar}</span><span style={styles.xpBreakdown}>(+{correctAnswers * 10}/-{wrongAnswers * 5})</span></div>

@@ -1,8 +1,66 @@
-// src/games/EquationEscapeRoom.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
-import React, { useState, useEffect, useCallback } from 'react';
+// src/games/EquationEscapeRoom.jsx - FULLY RESPONSIVE with WORKING Background Music
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaPlay, FaSave } from 'react-icons/fa';
+import { FaArrowLeft, FaPlay, FaSave, FaVolumeUp, FaVolumeMute, FaMusic } from 'react-icons/fa';
 import EscapeRoom from './equation-function/EscapeRoom.jsx';
+
+// Background Music using HTML5 Audio with equation.mp3
+class BackgroundMusic {
+  constructor() {
+    this.audio = null;
+    this.isPlaying = false;
+    this.isMuted = false;
+    this.volume = 0.3;
+  }
+
+  initAudio() {
+    if (!this.audio) {
+      this.audio = new Audio('/src/games/sounds/equation.mp3');
+      this.audio.loop = true;
+      this.audio.volume = this.isMuted ? 0 : this.volume;
+    }
+    return this.audio;
+  }
+
+  setMuted(muted) {
+    this.isMuted = muted;
+    if (this.audio) {
+      this.audio.volume = muted ? 0 : this.volume;
+    }
+  }
+
+  setVolume(volume) {
+    this.volume = volume;
+    if (this.audio && !this.isMuted) {
+      this.audio.volume = volume;
+    }
+  }
+
+  startMusic() {
+    if (this.isPlaying) return;
+    this.initAudio();
+    this.audio.play().catch(e => console.log('Audio play error:', e));
+    this.isPlaying = true;
+  }
+
+  stopMusic() {
+    if (this.audio) {
+      this.audio.pause();
+      this.audio.currentTime = 0;
+    }
+    this.isPlaying = false;
+  }
+
+  resumeAudioContext() {
+    // For HTML5 Audio, just try to play if not playing
+    if (this.audio && !this.isPlaying && !this.isMuted) {
+      this.audio.play().catch(e => console.log('Resume error:', e));
+      this.isPlaying = true;
+    }
+  }
+}
+
+const backgroundMusic = new BackgroundMusic();
 
 const EquationEscapeRoom = () => {
   const navigate = useNavigate();
@@ -14,17 +72,79 @@ const EquationEscapeRoom = () => {
   const [gameStartTime, setGameStartTime] = useState(null);
   const [savedGameState, setSavedGameState] = useState(null);
   const [shouldLoadSaved, setShouldLoadSaved] = useState(false);
+  
+  // Music state
+  const [isMusicMuted, setIsMusicMuted] = useState(false);
+  const [isSoundEffectsMuted, setIsSoundEffectsMuted] = useState(false);
+  const [musicVolume, setMusicVolume] = useState(0.3);
+  const [showMusicNote, setShowMusicNote] = useState(false);
 
+  // Load saved preferences
   useEffect(() => {
-    const savedState = localStorage.getItem('equationEscapeRoomState');
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        const twentyFourHours = 24 * 60 * 60 * 1000;
-        if (Date.now() - parsedState.timestamp < twentyFourHours) setSavedGameState(parsedState);
-        else localStorage.removeItem('equationEscapeRoomState');
-      } catch (error) { console.error('Error loading saved game state:', error); }
+    const savedMusicMute = localStorage.getItem('equationMusicMuted');
+    const savedSfxMute = localStorage.getItem('equationSfxMuted');
+    const savedVolume = localStorage.getItem('equationMusicVolume');
+    
+    if (savedMusicMute !== null) setIsMusicMuted(savedMusicMute === 'true');
+    if (savedSfxMute !== null) setIsSoundEffectsMuted(savedSfxMute === 'true');
+    if (savedVolume !== null) {
+      const vol = parseFloat(savedVolume);
+      setMusicVolume(vol);
+      backgroundMusic.setVolume(vol);
     }
+  }, []);
+
+  // Handle music playback based on game mode
+  useEffect(() => {
+    backgroundMusic.setMuted(isMusicMuted);
+    
+    if (activeGameMode === 'escape' && !isMusicMuted) {
+      backgroundMusic.startMusic();
+    } else {
+      backgroundMusic.stopMusic();
+    }
+    
+    return () => {
+      backgroundMusic.stopMusic();
+    };
+  }, [activeGameMode, isMusicMuted]);
+
+  // Update volume when changed
+  useEffect(() => {
+    backgroundMusic.setVolume(musicVolume);
+  }, [musicVolume]);
+
+  const toggleMusic = () => {
+    const newMuteState = !isMusicMuted;
+    setIsMusicMuted(newMuteState);
+    localStorage.setItem('equationMusicMuted', newMuteState);
+    backgroundMusic.setMuted(newMuteState);
+    
+    // If unmuting and game is active, ensure music plays
+    if (!newMuteState && activeGameMode === 'escape') {
+      backgroundMusic.startMusic();
+    }
+    
+    setShowMusicNote(true);
+    setTimeout(() => setShowMusicNote(false), 1000);
+  };
+
+  const toggleSoundEffects = () => {
+    const newMuteState = !isSoundEffectsMuted;
+    setIsSoundEffectsMuted(newMuteState);
+    localStorage.setItem('equationSfxMuted', newMuteState);
+  };
+
+  const handleMusicVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setMusicVolume(newVolume);
+    backgroundMusic.setVolume(newVolume);
+    localStorage.setItem('equationMusicVolume', newVolume);
+  };
+
+  // Resume audio on user interaction
+  const resumeAudio = useCallback(() => {
+    backgroundMusic.resumeAudioContext();
   }, []);
 
   const saveGameState = useCallback((gameState) => {
@@ -69,7 +189,15 @@ const EquationEscapeRoom = () => {
   }, [gameResultSent]);
 
   const handleBack = () => { if (activeGameMode !== 'start') setActiveGameMode('start'); };
-  const startEscapeRoom = (loadSaved = false) => { setActiveGameMode('escape'); setGameStartTime(Date.now()); setShouldLoadSaved(loadSaved); setGameResultSent(false); setPlayTime(0); if (!loadSaved) clearSavedGameState(); };
+  const startEscapeRoom = (loadSaved = false) => { 
+    setActiveGameMode('escape'); 
+    setGameStartTime(Date.now()); 
+    setShouldLoadSaved(loadSaved); 
+    setGameResultSent(false); 
+    setPlayTime(0); 
+    if (!loadSaved) clearSavedGameState();
+    resumeAudio();
+  };
   const handleEscapeComplete = useCallback((completed) => { if (completed) clearSavedGameState(); setActiveGameMode('start'); }, [clearSavedGameState]);
   const handleGameStateUpdate = useCallback((gameState) => { saveGameState(gameState); if (gameState.puzzlesCompleted !== undefined) setPuzzlesCompleted(gameState.puzzlesCompleted); if (gameState.challengeScore !== undefined) setChallengeScore(gameState.challengeScore); if (gameState.timeLeft !== undefined) setPlayTime(360 - gameState.timeLeft); }, [saveGameState]);
   const formatTimeRemaining = (timeLeft) => `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
@@ -77,16 +205,81 @@ const EquationEscapeRoom = () => {
   useEffect(() => { return () => setGameStartTime(null); }, []);
 
   return (
-    <div style={styles.container}>
+    <div style={styles.container} onClick={resumeAudio}>
+      {/* Music Controls */}
+      <div style={styles.musicControls}>
+        <button onClick={toggleMusic} style={styles.musicButton} title={isMusicMuted ? "Unmute Music" : "Mute Music"}>
+          {isMusicMuted ? <FaVolumeMute /> : <FaMusic />}
+        </button>
+        <button onClick={toggleSoundEffects} style={styles.musicButton} title={isSoundEffectsMuted ? "Unmute Sound Effects" : "Mute Sound Effects"}>
+          {isSoundEffectsMuted ? <FaVolumeMute /> : <FaVolumeUp />}
+        </button>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={musicVolume}
+          onChange={handleMusicVolumeChange}
+          style={styles.volumeSlider}
+          title="Music Volume"
+        />
+      </div>
+      
+      {showMusicNote && <div style={styles.musicNoteAnimation}>🎵</div>}
+
       {activeGameMode !== 'start' && (<button onClick={handleBack} style={styles.backButton}><FaArrowLeft style={styles.backIcon} /><span style={styles.backText}>Back</span></button>)}
-      {activeGameMode === 'start' && (<div style={styles.startContainer}><div style={styles.header}><h1 style={styles.title}>EQUATION ESCAPE</h1><p style={styles.subtitle}>Master Linear Equations & Escape!</p></div><div style={styles.modeSelection}><div style={styles.modeCards}><div style={styles.modeCard}><div style={styles.modeIcon}>🚪</div><h3 style={styles.modeCardTitle}>Escape Room</h3><p style={styles.modeDescription}>Solve 10 linear equation puzzles to escape in 6 minutes!</p><div style={styles.modeFeatures}><span style={styles.featureBadge}>⭐ 10 Puzzles</span><span style={styles.featureBadge}>⏱️ 6 Minutes</span><span style={styles.featureBadge}>🎯 Classic</span></div>{savedGameState && (<div style={styles.continueWrapper}><button onClick={() => startEscapeRoom(true)} style={styles.continueButton}><FaPlay style={styles.continueButtonIcon} /> Continue <span style={styles.continueBadge}>{savedGameState.puzzlesCompleted || 0}/10 • {formatTimeRemaining(savedGameState.timeLeft || 360)}</span></button></div>)}<div onClick={() => startEscapeRoom(false)} style={styles.modeDifficulty}>Start Game</div></div></div></div></div>)}
-      {activeGameMode === 'escape' && (<div style={styles.gameFullContainer}><EscapeRoom onComplete={handleEscapeComplete} onScore={setChallengeScore} challengeScore={challengeScore} sendGameResult={sendGameResult} onGameStateUpdate={handleGameStateUpdate} savedGameState={shouldLoadSaved ? savedGameState : null} clearSavedState={clearSavedGameState} /></div>)}
+      
+      {activeGameMode === 'start' && (<div style={styles.startContainer}>
+        <div style={styles.header}>
+          <h1 style={styles.title}>EQUATION ESCAPE</h1>
+          <p style={styles.subtitle}>Master Linear Equations & Escape!</p>
+        </div>
+        <div style={styles.modeSelection}>
+          <div style={styles.modeCards}>
+            <div style={styles.modeCard}>
+              <div style={styles.modeIcon}>🚪</div>
+              <h3 style={styles.modeCardTitle}>Escape Room</h3>
+              <p style={styles.modeDescription}>Solve 10 linear equation puzzles to escape in 6 minutes!</p>
+              <div style={styles.modeFeatures}>
+                <span style={styles.featureBadge}>⭐ 10 Puzzles</span>
+                <span style={styles.featureBadge}>⏱️ 6 Minutes</span>
+                <span style={styles.featureBadge}>🎯 Classic</span>
+              </div>
+              {savedGameState && (<div style={styles.continueWrapper}>
+                <button onClick={() => startEscapeRoom(true)} style={styles.continueButton}>
+                  <FaPlay style={styles.continueButtonIcon} /> Continue 
+                  <span style={styles.continueBadge}>{savedGameState.puzzlesCompleted || 0}/10 • {formatTimeRemaining(savedGameState.timeLeft || 360)}</span>
+                </button>
+              </div>)}
+              <div onClick={() => startEscapeRoom(false)} style={styles.modeDifficulty}>Start Game</div>
+            </div>
+          </div>
+        </div>
+      </div>)}
+      
+      {activeGameMode === 'escape' && (<div style={styles.gameFullContainer}>
+        <EscapeRoom 
+          onComplete={handleEscapeComplete} 
+          onScore={setChallengeScore} 
+          challengeScore={challengeScore} 
+          sendGameResult={sendGameResult} 
+          onGameStateUpdate={handleGameStateUpdate} 
+          savedGameState={shouldLoadSaved ? savedGameState : null} 
+          clearSavedState={clearSavedGameState}
+          isSfxMuted={isSoundEffectsMuted}
+        />
+      </div>)}
     </div>
   );
 };
 
 const styles = {
   container: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%', backgroundColor: '#1a1a2e', color: '#fff', fontFamily: 'Arial, sans-serif', overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box' },
+  musicControls: { position: 'fixed', top: '12px', right: '12px', display: 'flex', gap: '8px', alignItems: 'center', zIndex: 1001, backgroundColor: 'rgba(0,0,0,0.6)', padding: '6px 12px', borderRadius: '20px', backdropFilter: 'blur(5px)', '@media (min-width: 769px)': { top: '20px', right: '20px', padding: '8px 16px', gap: '12px' } },
+  musicButton: { backgroundColor: '#4a6fa5', color: 'white', border: 'none', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', transition: 'all 0.3s', '&:hover': { transform: 'scale(1.05)' }, '@media (min-width: 769px)': { width: '40px', height: '40px', fontSize: '18px' } },
+  volumeSlider: { width: '60px', height: '3px', cursor: 'pointer', backgroundColor: '#667eea', borderRadius: '3px', '@media (min-width: 769px)': { width: '80px' } },
+  musicNoteAnimation: { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', fontSize: '60px', animation: 'musicNote 1s ease-out', pointerEvents: 'none', zIndex: 2000, '@media (min-width: 769px)': { fontSize: '100px' } },
   startContainer: { width: '100%', minHeight: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '60px 16px', '@media (min-width: 769px)': { padding: '80px 20px' } },
   gameFullContainer: { width: '100%', minHeight: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '12px', '@media (min-width: 769px)': { padding: '20px' } },
   backButton: { position: 'fixed', top: '12px', left: '12px', backgroundColor: '#4a6fa5', color: 'white', border: 'none', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 'bold', zIndex: 1000, minHeight: '40px', '@media (min-width: 769px)': { top: '20px', left: '20px', padding: '10px 20px', fontSize: '14px', gap: '8px' } },
@@ -111,7 +304,19 @@ const styles = {
 };
 
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `button:hover { opacity: 0.9; } div[style*="cursor: pointer"]:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); } @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } @media (max-width: 480px) { button { min-height: 40px; } }`;
+styleSheet.textContent = `
+  button:hover { opacity: 0.9; } 
+  div[style*="cursor: pointer"]:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); } 
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } 
+  @keyframes musicNote { 
+    0% { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 1; } 
+    100% { transform: translate(-50%, -150%) scale(1.5) rotate(20deg); opacity: 0; } 
+  }
+  @media (max-width: 480px) { button { min-height: 40px; } } 
+  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; } 
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; cursor: pointer; } 
+  @media (min-width: 769px) { input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; } }
+`;
 document.head.appendChild(styleSheet);
 
 export default EquationEscapeRoom;
