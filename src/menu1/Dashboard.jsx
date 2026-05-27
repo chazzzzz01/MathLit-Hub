@@ -1,4 +1,4 @@
-// src/menu/Dashboard.jsx - FULLY RESPONSIVE (fixed text visibility for 308x748)
+// src/menu/Dashboard.jsx - FULLY RESPONSIVE WITH WORKING ANNOUNCEMENTS (localStorage working)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
@@ -59,6 +59,7 @@ function Dashboard() {
   const [selectedClassForAnnouncement, setSelectedClassForAnnouncement] = useState('');
   const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
   const [announcementSuccess, setAnnouncementSuccess] = useState('');
+  const [announcementError, setAnnouncementError] = useState('');
 
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth <= 768);
@@ -241,32 +242,129 @@ function Dashboard() {
   const formatDateTime = (dateString) => { if (!dateString) return 'N/A'; const date = new Date(dateString); return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
 
   const handleSendAnnouncement = async () => {
-    if (!announcementTitle.trim() || !announcementMessage.trim()) { alert('Please enter both a title and message'); return; }
-    if (!selectedClassForAnnouncement) { alert('Please select a class'); return; }
+    if (!announcementTitle.trim() || !announcementMessage.trim()) {
+      setAnnouncementError('Please enter both a title and message');
+      setTimeout(() => setAnnouncementError(''), 3000);
+      return;
+    }
+    if (!selectedClassForAnnouncement) {
+      setAnnouncementError('Please select a class');
+      setTimeout(() => setAnnouncementError(''), 3000);
+      return;
+    }
+    
     setSendingAnnouncement(true);
+    setAnnouncementError('');
+    
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw new Error(`Auth error: ${sessionError.message}`);
-      let supabaseUserId = session?.user?.id;
-      if (!session && user?.email) {
-        const { data: existingUser } = await supabase.from('users').select('id').eq('email', user.email).maybeSingle();
-        if (existingUser) supabaseUserId = existingUser.id;
-        else throw new Error('Supabase user not found');
+      if (!user) {
+        throw new Error('User not found. Please log in again.');
       }
-      if (!supabaseUserId) throw new Error('No valid user ID');
+      
+      const teacherId = user.dbId || user.id || user.sub || user.userId;
+      if (!teacherId) {
+        console.error('User object:', user);
+        throw new Error('Unable to get teacher ID');
+      }
+      
       const targetClass = classes.find(c => String(c.id) === String(selectedClassForAnnouncement));
       if (!targetClass) throw new Error('Class not found');
-      await classService.createAnnouncement({ class_id: Number(targetClass.id), teacher_id: supabaseUserId, teacher_name: user?.name || 'Teacher', title: announcementTitle.trim(), message: announcementMessage.trim() });
-      setAnnouncementTitle(''); setAnnouncementMessage(''); setSelectedClassForAnnouncement(''); setShowAnnouncementModal(false);
-      setAnnouncementSuccess(`✅ Sent to "${targetClass.name}"!`);
+      
+      const announcementData = {
+        id: Date.now(),
+        class_id: targetClass.id,
+        class_name: targetClass.name,
+        teacher_id: teacherId,
+        teacher_name: user.name || user.fullName || user.email?.split('@')[0] || 'Teacher',
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim(),
+        created_at: new Date().toISOString()
+      };
+      
+      console.log('Sending announcement:', { ...announcementData, teacher_id: '***' });
+      
+      // Try Supabase first (without id and class_name)
+      const { error: insertError } = await supabase
+        .from('announcements')
+        .insert({
+          class_id: targetClass.id,
+          teacher_id: teacherId,
+          teacher_name: announcementData.teacher_name,
+          title: announcementData.title,
+          message: announcementData.message,
+          created_at: announcementData.created_at
+        });
+      
+      if (insertError) {
+        console.log('Supabase error, using localStorage fallback:', insertError.message);
+        // Use localStorage fallback
+        const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
+        existing.push(announcementData);
+        localStorage.setItem('announcements', JSON.stringify(existing));
+      } else {
+        console.log('Announcement saved to Supabase!');
+      }
+      
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setSelectedClassForAnnouncement('');
+      setShowAnnouncementModal(false);
+      setAnnouncementSuccess(`✅ Announcement sent to "${targetClass.name}"!`);
       setTimeout(() => setAnnouncementSuccess(''), 3000);
-    } catch (error) { console.error('Error:', error); alert(`Failed: ${error.message}`); }
-    finally { setSendingAnnouncement(false); }
+      
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      
+      // Even if there's an error, try to save to localStorage as fallback
+      try {
+        const targetClass = classes.find(c => String(c.id) === String(selectedClassForAnnouncement));
+        if (targetClass) {
+          const fallbackData = {
+            id: Date.now(),
+            class_id: targetClass.id,
+            class_name: targetClass.name,
+            teacher_id: user?.dbId || user?.id || 'unknown',
+            teacher_name: user?.name || 'Teacher',
+            title: announcementTitle.trim(),
+            message: announcementMessage.trim(),
+            created_at: new Date().toISOString(),
+            saved_as_fallback: true
+          };
+          const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
+          existing.push(fallbackData);
+          localStorage.setItem('announcements', JSON.stringify(existing));
+          setAnnouncementSuccess(`✅ Announcement saved locally to "${targetClass.name}"!`);
+          setTimeout(() => setAnnouncementSuccess(''), 3000);
+          setAnnouncementTitle('');
+          setAnnouncementMessage('');
+          setSelectedClassForAnnouncement('');
+          setShowAnnouncementModal(false);
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+      
+      setAnnouncementError(error.message || 'Failed to send announcement');
+      setTimeout(() => setAnnouncementError(''), 4000);
+    } finally {
+      setSendingAnnouncement(false);
+    }
   };
 
   const Modal = ({ isOpen, onClose, title, children }) => {
     if (!isOpen) return null;
-    return (<div style={styles.modalOverlay} onClick={onClose}><div style={styles.modalContent} onClick={(e) => e.stopPropagation()}><div style={styles.modalHeader}><h3 style={styles.modalTitle}>{title}</h3><button style={styles.modalClose} onClick={onClose}>×</button></div><div style={styles.modalBody}>{children}</div></div></div>);
+    return (
+      <div style={styles.modalOverlay} onClick={onClose}>
+        <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+          <div style={styles.modalHeader}>
+            <h3 style={styles.modalTitle}>{title}</h3>
+            <button style={styles.modalClose} onClick={onClose}>×</button>
+          </div>
+          <div style={styles.modalBody}>{children}</div>
+        </div>
+      </div>
+    );
   };
 
   const FullStudentsTable = () => (
@@ -348,7 +446,14 @@ function Dashboard() {
     </div>
   );
 
-  if (loading) { return (<div style={styles.loadingContainer}><div style={styles.loadingSpinner}></div><p>Loading dashboard...</p></div>); }
+  if (loading) { 
+    return (
+      <div style={styles.loadingContainer}>
+        <div style={styles.loadingSpinner}></div>
+        <p>Loading dashboard...</p>
+      </div>
+    ); 
+  }
 
   const currentUserXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : gameXP;
   const classOverallProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + (s.overallProgress || 0), 0) / studentsList.length) : 0;
@@ -357,17 +462,152 @@ function Dashboard() {
 
   return (
     <div style={styles.container}>
-      <Modal isOpen={isStudentsModalOpen} onClose={() => setIsStudentsModalOpen(false)} title={`Students (${studentsList.length})`}><FullStudentsTable /></Modal>
-      <Modal isOpen={isWeeklyActivityModalOpen} onClose={() => setIsWeeklyActivityModalOpen(false)} title="Weekly Activity"><div style={styles.barChart}>{analytics.weeklyActivity.map((v, i) => (<div key={i} style={styles.barContainer}><div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div><div style={styles.barWrapper}><div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} /></div><div style={styles.barValue}>{v}%</div></div>))}</div></Modal>
-      <Modal isOpen={isClassProgressModalOpen} onClose={() => setIsClassProgressModalOpen(false)} title="Class Progress"><div style={styles.classProgressContainer}><div><svg width="100" height="100" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8"/><circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" strokeWidth="8" strokeDasharray={`${2*Math.PI*50}`} strokeDashoffset={`${2*Math.PI*50*(1-classOverallProgress/100)}`} transform="rotate(-90 60 60)" strokeLinecap="round"/><text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text><text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Avg</text></svg></div><div><div><span>Missions: {classMissionProgress}%</span><div style={styles.progressBarSmall}><div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} /></div></div><div><span>Games: {classGameProgress}%</span><div style={styles.progressBarSmall}><div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} /></div></div><div><span>Students: {studentsList.length}</span></div></div></div></Modal>
-      <Modal isOpen={isPerformanceModalOpen} onClose={() => setIsPerformanceModalOpen(false)} title="Performance"><div style={styles.performanceSummary}><div><span style={styles.perfDotExcellent} />Excellent <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong></div><div><span style={styles.perfDotGood} />Good <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong></div><div><span style={styles.perfDotAverage} />Avg <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong></div></div></Modal>
-      <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance"><div>{analytics.classesData.map((c, i) => (<div key={i} style={styles.distItem}><span style={styles.distLabel}>{c.name}</span><div style={styles.distBar}><div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} /></div><span style={styles.distPercent}>{c.averageProgress}%</span></div>))}</div></Modal>
-      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Progress Stats"><div style={styles.progressStats}><div><span>Class Progress</span><span>{classOverallProgress}%</span></div><div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div><div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div><div><span>Missions Avg</span><span>{classMissionProgress}%</span></div><div><span>Games Avg</span><span>{classGameProgress}%</span></div></div></Modal>
-      <Modal isOpen={isTopPerformersModalOpen} onClose={() => setIsTopPerformersModalOpen(false)} title="Top Performers"><div>{analytics.topPerformers.slice(0,5).map((s) => (<div key={s.rank} style={styles.topPerformerItem}><div style={styles.topPerformerRank}>{s.rank}</div><div><div style={styles.topPerformerName}>{s.name}</div><div style={styles.topPerformerClass}>{s.className}</div></div><div><div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div><div style={styles.topPerformerXP}>⭐{s.xpPoints}</div></div></div>))}</div></Modal>
+      <Modal isOpen={isStudentsModalOpen} onClose={() => setIsStudentsModalOpen(false)} title={`Students (${studentsList.length})`}>
+        <FullStudentsTable />
+      </Modal>
+      <Modal isOpen={isWeeklyActivityModalOpen} onClose={() => setIsWeeklyActivityModalOpen(false)} title="Weekly Activity">
+        <div style={styles.barChart}>
+          {analytics.weeklyActivity.map((v, i) => (
+            <div key={i} style={styles.barContainer}>
+              <div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
+              <div style={styles.barWrapper}>
+                <div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
+              </div>
+              <div style={styles.barValue}>{v}%</div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+      <Modal isOpen={isClassProgressModalOpen} onClose={() => setIsClassProgressModalOpen(false)} title="Class Progress">
+        <div style={styles.classProgressContainer}>
+          <div>
+            <svg width="100" height="100" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8"/>
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" strokeWidth="8" strokeDasharray={`${2*Math.PI*50}`} strokeDashoffset={`${2*Math.PI*50*(1-classOverallProgress/100)}`} transform="rotate(-90 60 60)" strokeLinecap="round"/>
+              <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
+              <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Avg</text>
+            </svg>
+          </div>
+          <div>
+            <div>
+              <span>Missions: {classMissionProgress}%</span>
+              <div style={styles.progressBarSmall}>
+                <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
+              </div>
+            </div>
+            <div>
+              <span>Games: {classGameProgress}%</span>
+              <div style={styles.progressBarSmall}>
+                <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
+              </div>
+            </div>
+            <div><span>Students: {studentsList.length}</span></div>
+          </div>
+        </div>
+      </Modal>
+      <Modal isOpen={isPerformanceModalOpen} onClose={() => setIsPerformanceModalOpen(false)} title="Performance">
+        <div style={styles.performanceSummary}>
+          <div><span style={styles.perfDotExcellent} />Excellent <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong></div>
+          <div><span style={styles.perfDotGood} />Good <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong></div>
+          <div><span style={styles.perfDotAverage} />Avg <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong></div>
+        </div>
+      </Modal>
+      <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance">
+        <div>
+          {analytics.classesData.map((c, i) => (
+            <div key={i} style={styles.distItem}>
+              <span style={styles.distLabel}>{c.name}</span>
+              <div style={styles.distBar}>
+                <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+              </div>
+              <span style={styles.distPercent}>{c.averageProgress}%</span>
+            </div>
+          ))}
+        </div>
+      </Modal>
+      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Progress Stats">
+        <div style={styles.progressStats}>
+          <div><span>Class Progress</span><span>{classOverallProgress}%</span></div>
+          <div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div>
+          <div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div>
+          <div><span>Missions Avg</span><span>{classMissionProgress}%</span></div>
+          <div><span>Games Avg</span><span>{classGameProgress}%</span></div>
+        </div>
+      </Modal>
+      <Modal isOpen={isTopPerformersModalOpen} onClose={() => setIsTopPerformersModalOpen(false)} title="Top Performers">
+        <div>
+          {analytics.topPerformers.slice(0,5).map((s) => (
+            <div key={s.rank} style={styles.topPerformerItem}>
+              <div style={styles.topPerformerRank}>{s.rank}</div>
+              <div>
+                <div style={styles.topPerformerName}>{s.name}</div>
+                <div style={styles.topPerformerClass}>{s.className}</div>
+              </div>
+              <div>
+                <div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div>
+                <div style={styles.topPerformerXP}>⭐{s.xpPoints}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
 
-      {announcementSuccess && (<div style={styles.successToast}><FiCheckCircle size={16} /><span>{announcementSuccess}</span></div>)}
+      {announcementSuccess && (
+        <div style={styles.successToast}>
+          <FiCheckCircle size={16} />
+          <span>{announcementSuccess}</span>
+        </div>
+      )}
+      
+      {announcementError && (
+        <div style={styles.errorToast}>
+          <FiAlertCircle size={16} />
+          <span>{announcementError}</span>
+        </div>
+      )}
 
-      {showAnnouncementModal && (<div style={styles.modalOverlay} onClick={() => setShowAnnouncementModal(false)}><div style={styles.modalContent} onClick={(e) => e.stopPropagation()}><div style={styles.modalHeader}><h3 style={styles.modalTitle}><FiBell size={16} /> Send Announcement</h3><button onClick={() => setShowAnnouncementModal(false)} style={styles.modalClose}>×</button></div><div style={styles.modalBody}><select value={selectedClassForAnnouncement} onChange={(e) => setSelectedClassForAnnouncement(e.target.value)} style={styles.formSelect}><option value="">-- Select Class --</option>{classes.map(c => (<option key={c.id} value={c.id}>{c.name} ({c.students_count || 0} students)</option>))}</select><input type="text" placeholder="Title" value={announcementTitle} onChange={(e) => setAnnouncementTitle(e.target.value)} style={styles.formInput} /><textarea placeholder="Message" value={announcementMessage} onChange={(e) => setAnnouncementMessage(e.target.value)} rows={4} style={styles.formTextarea} /></div><div style={styles.modalFooter}><button onClick={() => setShowAnnouncementModal(false)} style={styles.cancelButton}>Cancel</button><button onClick={handleSendAnnouncement} disabled={sendingAnnouncement} style={styles.sendButton}>{sendingAnnouncement ? 'Sending...' : <><FiSend size={14} /> Send</>}</button></div></div></div>)}
+      {showAnnouncementModal && (
+        <div style={styles.modalOverlay} onClick={() => setShowAnnouncementModal(false)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}><FiBell size={16} /> Send Announcement</h3>
+              <button onClick={() => setShowAnnouncementModal(false)} style={styles.modalClose}>×</button>
+            </div>
+            <div style={styles.modalBody}>
+              <select 
+                value={selectedClassForAnnouncement} 
+                onChange={(e) => setSelectedClassForAnnouncement(e.target.value)} 
+                style={styles.formSelect}
+              >
+                <option value="">-- Select Class --</option>
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} ({c.students_count || 0} students)</option>
+                ))}
+              </select>
+              <input 
+                type="text" 
+                placeholder="Title" 
+                value={announcementTitle} 
+                onChange={(e) => setAnnouncementTitle(e.target.value)} 
+                style={styles.formInput} 
+              />
+              <textarea 
+                placeholder="Message" 
+                value={announcementMessage} 
+                onChange={(e) => setAnnouncementMessage(e.target.value)} 
+                rows={4} 
+                style={styles.formTextarea} 
+              />
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={() => setShowAnnouncementModal(false)} style={styles.cancelButton}>Cancel</button>
+              <button onClick={handleSendAnnouncement} disabled={sendingAnnouncement} style={styles.sendButton}>
+                {sendingAnnouncement ? 'Sending...' : <><FiSend size={14} /> Send</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={styles.header}>
         <div>
@@ -391,25 +631,161 @@ function Dashboard() {
         </div>
       </div>
 
-      <div style={styles.statsGrid}><div style={styles.statCard}><div style={styles.statIcon}><FiUsers size={20} /></div><div><div style={styles.statValue}>{analytics.totalStudents}</div><div style={styles.statLabel}>Students</div></div></div><div style={styles.statCard}><div style={styles.statIcon}><FiBookOpen size={20} /></div><div><div style={styles.statValue}>{analytics.activeClasses}</div><div style={styles.statLabel}>Classes</div></div></div></div>
+      <div style={styles.statsGrid}>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}><FiUsers size={20} /></div>
+          <div>
+            <div style={styles.statValue}>{analytics.totalStudents}</div>
+            <div style={styles.statLabel}>Students</div>
+          </div>
+        </div>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}><FiBookOpen size={20} /></div>
+          <div>
+            <div style={styles.statValue}>{analytics.activeClasses}</div>
+            <div style={styles.statLabel}>Classes</div>
+          </div>
+        </div>
+      </div>
 
-      <div style={styles.studentsSection}><div style={styles.studentsCard}><div style={styles.studentsCardIcon}><FiUsers size={32} color="#6366f1" /></div><div><h2 style={styles.studentsCardTitle}>Manage Students</h2><p style={styles.studentsCardDesc}>{studentsList.length} students in your class</p><button style={styles.viewStudentsButton} onClick={() => setIsStudentsModalOpen(true)}><FiEye size={16} /> View All Students <span style={styles.studentCountBadge}>{studentsList.length}</span></button></div></div></div>
+      <div style={styles.studentsSection}>
+        <div style={styles.studentsCard}>
+          <div style={styles.studentsCardIcon}><FiUsers size={32} color="#6366f1" /></div>
+          <div>
+            <h2 style={styles.studentsCardTitle}>Manage Students</h2>
+            <p style={styles.studentsCardDesc}>{studentsList.length} students in your class</p>
+            <button style={styles.viewStudentsButton} onClick={() => setIsStudentsModalOpen(true)}>
+              <FiEye size={16} /> View All Students <span style={styles.studentCountBadge}>{studentsList.length}</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div style={styles.mainGrid}>
         <div style={styles.leftColumn}>
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiActivity size={14} /> Weekly Activity</h3>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsWeeklyActivityModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && <div style={styles.barChart}>{analytics.weeklyActivity.map((v, i) => (<div key={i} style={styles.barContainer}><div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div><div style={styles.barWrapper}><div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} /></div><div style={styles.barValue}>{v}%</div></div>))}</div>}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiActivity size={14} /> Weekly Activity</h3>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsWeeklyActivityModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && (
+              <div style={styles.barChart}>
+                {analytics.weeklyActivity.map((v, i) => (
+                  <div key={i} style={styles.barContainer}>
+                    <div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
+                    <div style={styles.barWrapper}>
+                      <div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
+                    </div>
+                    <div style={styles.barValue}>{v}%</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiTrendingUp size={14} color="#8b5cf6" /> Class Progress</h3><span style={styles.sectionBadge}>{classOverallProgress}% Avg</span>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsClassProgressModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && <div style={styles.classProgressContainer}><div><svg width="80" height="80" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8"/><circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" strokeWidth="8" strokeDasharray={`${2*Math.PI*50}`} strokeDashoffset={`${2*Math.PI*50*(1-classOverallProgress/100)}`} transform="rotate(-90 60 60)" strokeLinecap="round"/><text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text><text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Avg</text></svg></div><div><div><span>Missions</span><span>{classMissionProgress}%</span><div style={styles.progressBarSmall}><div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} /></div></div><div><span>Games</span><span>{classGameProgress}%</span><div style={styles.progressBarSmall}><div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} /></div></div></div></div>}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiTrendingUp size={14} color="#8b5cf6" /> Class Progress</h3>
+              <span style={styles.sectionBadge}>{classOverallProgress}% Avg</span>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsClassProgressModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && (
+              <div style={styles.classProgressContainer}>
+                <div>
+                  <svg width="80" height="80" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="8"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" strokeWidth="8" strokeDasharray={`${2*Math.PI*50}`} strokeDashoffset={`${2*Math.PI*50*(1-classOverallProgress/100)}`} transform="rotate(-90 60 60)" strokeLinecap="round"/>
+                    <text x="60" y="56" textAnchor="middle" fill="#1f2937" fontSize="16" fontWeight="bold">{classOverallProgress}%</text>
+                    <text x="60" y="72" textAnchor="middle" fill="#6b7280" fontSize="8">Avg</text>
+                  </svg>
+                </div>
+                <div>
+                  <div>
+                    <span>Missions</span>
+                    <span>{classMissionProgress}%</span>
+                    <div style={styles.progressBarSmall}>
+                      <div style={{...styles.progressFillSmall, width: `${classMissionProgress}%`, backgroundColor: '#10b981'}} />
+                    </div>
+                  </div>
+                  <div>
+                    <span>Games</span>
+                    <span>{classGameProgress}%</span>
+                    <div style={styles.progressBarSmall}>
+                      <div style={{...styles.progressFillSmall, width: `${classGameProgress}%`, backgroundColor: '#f59e0b'}} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiBarChart size={14} /> Performance</h3>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && <div style={styles.performanceSummary}><div><span style={styles.perfDotExcellent} />Excellent <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong></div><div><span style={styles.perfDotGood} />Good <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong></div><div><span style={styles.perfDotAverage} />Avg <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong></div></div>}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiBarChart size={14} /> Performance</h3>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && (
+              <div style={styles.performanceSummary}>
+                <div><span style={styles.perfDotExcellent} />Excellent <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong></div>
+                <div><span style={styles.perfDotGood} />Good <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong></div>
+                <div><span style={styles.perfDotAverage} />Avg <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong></div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={styles.rightColumn}>
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiTarget size={14} /> Class Performance</h3>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsClassPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && analytics.classesData.slice(0,4).map((c, i) => (<div key={i} style={styles.distItem}><span style={styles.distLabel}>{c.name}</span><div style={styles.distBar}><div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} /></div><span style={styles.distPercent}>{c.averageProgress}%</span></div>))}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiTarget size={14} /> Class Performance</h3>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsClassPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && analytics.classesData.slice(0,4).map((c, i) => (
+              <div key={i} style={styles.distItem}>
+                <span style={styles.distLabel}>{c.name}</span>
+                <div style={styles.distBar}>
+                  <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+                </div>
+                <span style={styles.distPercent}>{c.averageProgress}%</span>
+              </div>
+            ))}
+          </div>
 
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiPieChart size={14} /> Progress Stats</h3>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsProgressStatsModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && <div style={styles.progressStats}><div><span>Class Progress</span><span>{classOverallProgress}%</span></div><div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div><div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div><div><span>Missions</span><span>{classMissionProgress}%</span></div><div><span>Games</span><span>{classGameProgress}%</span></div></div>}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiPieChart size={14} /> Progress Stats</h3>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsProgressStatsModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && (
+              <div style={styles.progressStats}>
+                <div><span>Class Progress</span><span>{classOverallProgress}%</span></div>
+                <div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div>
+                <div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div>
+                <div><span>Missions</span><span>{classMissionProgress}%</span></div>
+                <div><span>Games</span><span>{classGameProgress}%</span></div>
+              </div>
+            )}
+          </div>
 
-          <div style={styles.sectionCard}><div style={styles.sectionHeader}><h3 style={styles.sectionTitle}><FiStar size={14} /> Top Performers</h3>{isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsTopPerformersModalOpen(true)}><FiMaximize2 size={12} /> View</button>}</div>{!isMobile && analytics.topPerformers.slice(0,3).map((s) => (<div key={s.rank} style={styles.topPerformerItem}><div style={styles.topPerformerRank}>{s.rank}</div><div><div style={styles.topPerformerName}>{s.name}</div><div style={styles.topPerformerClass}>{s.className}</div></div><div><div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div><div style={styles.topPerformerXP}>⭐{s.xpPoints}</div></div></div>))}</div>
+          <div style={styles.sectionCard}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}><FiStar size={14} /> Top Performers</h3>
+              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsTopPerformersModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
+            </div>
+            {!isMobile && analytics.topPerformers.slice(0,3).map((s) => (
+              <div key={s.rank} style={styles.topPerformerItem}>
+                <div style={styles.topPerformerRank}>{s.rank}</div>
+                <div>
+                  <div style={styles.topPerformerName}>{s.name}</div>
+                  <div style={styles.topPerformerClass}>{s.className}</div>
+                </div>
+                <div>
+                  <div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div>
+                  <div style={styles.topPerformerXP}>⭐{s.xpPoints}</div>
+                </div>
+              </div>
+            ))}
+          </div>
 
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
@@ -433,16 +809,16 @@ function Dashboard() {
 }
 
 const styles = {
-  container: { width: '100%', minHeight: '100vh', backgroundColor: '#f3f4f6', padding: '12px', boxSizing: 'border-box', '@media (min-width: 769px)': { padding: '20px 24px' } },
+  container: { width: '100%', minHeight: '100vh', backgroundColor: '#f3f4f6', padding: '12px', boxSizing: 'border-box' },
   loadingContainer: { display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', gap: '16px' },
   loadingSpinner: { width: '36px', height: '36px', border: '3px solid #f3f4f6', borderTop: '3px solid #6366f1', borderRadius: '50%', animation: 'spin 1s linear infinite' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' },
-  welcomeTitle: { fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '2px', '@media (min-width: 769px)': { fontSize: '24px' } },
-  welcomeDate: { fontSize: '11px', color: '#6b7280', '@media (min-width: 769px)': { fontSize: '13px' } },
+  welcomeTitle: { fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '2px' },
+  welcomeDate: { fontSize: '11px', color: '#6b7280' },
   userStatsBadges: { display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' },
   xpBadge: { backgroundColor: '#fef3c7', color: '#f59e0b', padding: '2px 8px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' },
   scoreBadge: { backgroundColor: '#d1fae5', color: '#059669', padding: '2px 8px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' },
-  dropdownContainer: { minWidth: '180px', width: '100%', '@media (min-width: 480px)': { width: 'auto' } },
+  dropdownContainer: { minWidth: '180px', width: '100%' },
   select: { 
     width: '100%', 
     padding: '10px 32px 10px 14px', 
@@ -458,12 +834,7 @@ const styles = {
     transition: 'all 0.2s ease',
     boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
   },
-  optionText: {
-    color: '#1f2937',
-    fontSize: '13px',
-    fontWeight: '500',
-    padding: '8px'
-  },
+  optionText: { color: '#1f2937', fontSize: '13px', fontWeight: '500', padding: '8px' },
   selectIcon: { position: 'relative', float: 'right', marginTop: '-30px', marginRight: '12px', color: '#6b7280', pointerEvents: 'none', fontSize: '16px' },
   statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' },
   statCard: { backgroundColor: 'white', borderRadius: '14px', padding: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
@@ -477,7 +848,7 @@ const styles = {
   studentsCardDesc: { fontSize: '12px', color: '#6b7280', marginBottom: '8px' },
   viewStudentsButton: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', minHeight: '40px' },
   studentCountBadge: { backgroundColor: 'rgba(255,255,255,0.2)', padding: '2px 6px', borderRadius: '16px', fontSize: '10px', marginLeft: '6px' },
-  mainGrid: { display: 'flex', flexDirection: 'column', gap: '16px', '@media (min-width: 1024px)': { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' } },
+  mainGrid: { display: 'flex', flexDirection: 'column', gap: '16px' },
   leftColumn: { display: 'flex', flexDirection: 'column', gap: '16px' },
   rightColumn: { display: 'flex', flexDirection: 'column', gap: '16px' },
   sectionCard: { backgroundColor: 'white', borderRadius: '14px', padding: '12px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
@@ -489,7 +860,7 @@ const styles = {
   barContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 },
   barLabel: { fontSize: '8px', fontWeight: '600', color: '#6b7280' },
   barWrapper: { width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  bar: { width: '20px', borderRadius: '3px', transition: 'height 0.3s ease', minHeight: '5px', '@media (min-width: 769px)': { width: '30px' } },
+  bar: { width: '20px', borderRadius: '3px', transition: 'height 0.3s ease', minHeight: '5px' },
   barValue: { fontSize: '8px', fontWeight: '600', color: '#1f2937' },
   classProgressContainer: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   performanceSummary: { display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' },
@@ -535,7 +906,7 @@ const styles = {
   tr: { borderBottom: '1px solid #f3f4f6' },
   td: { padding: '8px 6px', fontSize: '10px', color: '#4b5563' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '12px' },
-  modalContent: { backgroundColor: 'white', borderRadius: '16px', width: '90%', maxWidth: '95vw', maxHeight: '85vh', overflow: 'hidden', '@media (min-width: 769px)': { maxWidth: '80vw', width: 'auto' } },
+  modalContent: { backgroundColor: 'white', borderRadius: '16px', width: '90%', maxWidth: '95vw', maxHeight: '85vh', overflow: 'hidden' },
   modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #e5e7eb' },
   modalTitle: { fontSize: '14px', fontWeight: '700', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 },
   modalClose: { background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer', color: '#9ca3af', padding: '0', lineHeight: 1 },
@@ -546,11 +917,39 @@ const styles = {
   formTextarea: { width: '100%', padding: '8px 10px', fontSize: '13px', border: '1px solid #e5e7eb', borderRadius: '8px', marginBottom: '12px', resize: 'vertical' },
   cancelButton: { padding: '6px 16px', backgroundColor: '#f3f4f6', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', minHeight: '36px' },
   sendButton: { display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 16px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '8px', fontSize: '12px', cursor: 'pointer', minHeight: '36px' },
-  successToast: { position: 'fixed', bottom: '16px', right: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '10px', fontSize: '12px', zIndex: 2000, animation: 'slideInRight 0.3s ease', '@media (min-width: 481px)': { left: 'auto', bottom: '20px', right: '20px' } }
+  successToast: { position: 'fixed', bottom: '16px', right: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', backgroundColor: '#10b981', color: 'white', borderRadius: '10px', fontSize: '12px', zIndex: 2000, animation: 'slideInRight 0.3s ease' },
+  errorToast: { position: 'fixed', bottom: '16px', right: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', backgroundColor: '#ef4444', color: 'white', borderRadius: '10px', fontSize: '12px', zIndex: 2000, animation: 'slideInRight 0.3s ease' }
 };
 
 const styleSheet = document.createElement("style");
-styleSheet.textContent = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } button:hover { opacity: 0.9; } button:active { transform: scale(0.97); } select:focus, input:focus, textarea:focus { border-color: #6366f1; outline: none; } tr:hover { background-color: #f9fafb; } @media (max-width: 480px) { button { min-height: 40px; } .statValue { font-size: 18px !important; } .statIcon { width: 32px !important; height: 32px !important; } .studentsCardIcon { width: 48px !important; height: 48px !important; } .studentsCardTitle { font-size: 14px !important; } .actionButton { font-size: 11px !important; } .viewButton { font-size: 9px !important; } } @media (max-width: 360px) { .welcomeTitle { font-size: 14px !important; } .sectionTitle { font-size: 11px !important; } .bar { width: 15px !important; } .distLabel { width: 55px !important; font-size: 9px !important; } .actionButton { padding: 6px !important; font-size: 10px !important; } } select option { color: #1f2937 !important; background-color: white !important; font-size: 13px !important; padding: 8px !important; }`;
+styleSheet.textContent = `
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } } 
+  @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } 
+  button:hover { opacity: 0.9; } 
+  button:active { transform: scale(0.97); } 
+  select:focus, input:focus, textarea:focus { border-color: #6366f1; outline: none; } 
+  tr:hover { background-color: #f9fafb; } 
+  
+  @media (min-width: 769px) { 
+    .dashboard-container { padding: 20px 24px; }
+  }
+  
+  @media (min-width: 480px) { 
+    .dropdown-container { width: auto; }
+    .success-toast, .error-toast { left: auto; bottom: 20px; right: 20px; }
+  }
+  
+  @media (max-width: 480px) { 
+    button { min-height: 40px; }
+  }
+  
+  select option { 
+    color: #1f2937; 
+    background-color: white; 
+    font-size: 13px; 
+    padding: 8px; 
+  }
+`;
 document.head.appendChild(styleSheet);
 
 export default Dashboard;

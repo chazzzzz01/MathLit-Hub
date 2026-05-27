@@ -1,14 +1,16 @@
-// src/menu/ClassView.jsx - FULLY RESPONSIVE
+// src/menu/ClassView.jsx - FULLY RESPONSIVE WITH SELECTABLE ANNOUNCEMENTS & BULK DELETE
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   FiBookOpen, FiClock, FiStar, FiUsers, 
   FiCalendar, FiTrendingUp, FiCheck, FiCopy,
   FiAward, FiTarget, FiDollarSign, FiPieChart,
-  FiBell, FiMail, FiArrowLeft, FiZap, FiBox, FiHexagon, FiUser
+  FiBell, FiMail, FiArrowLeft, FiZap, FiBox, FiHexagon, FiUser,
+  FiTrash2, FiCheckSquare, FiSquare
 } from 'react-icons/fi';
 import { IoGameController } from 'react-icons/io5';
 import { classService } from '../services/classService';
+import { supabase } from '../lib/supabase';
 
 function ClassView({ classId, classData: passedClassData, onBack }) {
   const navigate = useNavigate();
@@ -21,9 +23,17 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
   const [copiedCode, setCopiedCode] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isTeacher, setIsTeacher] = useState(false);
   const [announcements, setAnnouncements] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [teacherName, setTeacherName] = useState('Loading...');
+  const [deletingAnnouncementId, setDeletingAnnouncementId] = useState(null);
+  
+  // New state for selectable announcements
+  const [selectedAnnouncements, setSelectedAnnouncements] = useState(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectAll, setSelectAll] = useState(false);
+  
   const [totalScores, setTotalScores] = useState({
     totalHighScore: 0,
     totalLastScores: 0,
@@ -60,10 +70,17 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
   };
 
   useEffect(() => {
-    // Get current user email from localStorage
+    // Get current user from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setCurrentUserEmail(user.email);
     setCurrentUserId(user.dbId || user.id);
+    
+    // Check if user is teacher
+    const isUserTeacher = user.role === 'teacher' || 
+                         user.isTeacher === true || 
+                         user.type === 'teacher' ||
+                         user.userType === 'teacher';
+    setIsTeacher(isUserTeacher);
     
     // Load game scores
     const savedProgress = localStorage.getItem('gameProgress');
@@ -82,14 +99,20 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     }
   }, [classId, passedClassData]);
 
+  // Reset selection when exiting selection mode
+  useEffect(() => {
+    if (!isSelectionMode) {
+      setSelectedAnnouncements(new Set());
+      setSelectAll(false);
+    }
+  }, [isSelectionMode]);
+
   const loadClassDataFromProps = async () => {
     try {
       setLoading(true);
       
-      // Fetch complete class details including teacher information
       const fullClassData = await classService.getClassById(passedClassData.id);
       
-      // Extract teacher name properly
       let teacher = 'Teacher';
       if (fullClassData) {
         if (fullClassData.teacher_name) {
@@ -101,7 +124,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         }
       }
       
-      // If still no teacher, check passed data
       if (teacher === 'Teacher' && passedClassData) {
         if (passedClassData.teacher_name) {
           teacher = passedClassData.teacher_name;
@@ -110,10 +132,8 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         }
       }
       
-      console.log('🎓 Teacher name found:', teacher);
       setTeacherName(teacher);
       
-      // Update class data with teacher info
       setClassData({
         ...passedClassData,
         teacher_name: teacher,
@@ -124,15 +144,10 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       setMissions(classMissions);
       
       const classStudents = await classService.getClassStudents(passedClassData.id);
-      
-      // Enrich students with game progress data
       const enrichedStudents = await enrichStudentsWithProgress(classStudents);
       setStudents(enrichedStudents);
-      
-      // Calculate stats
       calculateStats(enrichedStudents, classMissions);
       
-      // Get user progress
       const enrollment = enrichedStudents.find(s => s.student_id === currentUserId);
       if (enrollment) {
         setUserProgress(enrollment.progress || 0);
@@ -157,7 +172,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         return;
       }
       
-      // Extract teacher name properly
       let teacher = 'Teacher';
       if (classDetails.teacher_name) {
         teacher = classDetails.teacher_name;
@@ -167,10 +181,8 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         teacher = classDetails.teacher.user.name;
       }
       
-      console.log('🎓 Teacher name found:', teacher);
       setTeacherName(teacher);
       
-      // Update class data with teacher name
       const updatedClassData = {
         ...classDetails,
         teacher_name: teacher,
@@ -182,15 +194,10 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       setMissions(classMissions);
       
       const classStudents = await classService.getClassStudents(classId);
-      
-      // Enrich students with game progress data
       const enrichedStudents = await enrichStudentsWithProgress(classStudents);
       setStudents(enrichedStudents);
-      
-      // Calculate stats
       calculateStats(enrichedStudents, classMissions);
       
-      // Get user progress
       const enrollment = enrichedStudents.find(s => s.student_id === currentUserId);
       if (enrollment) {
         setUserProgress(enrollment.progress || 0);
@@ -281,25 +288,97 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     });
   };
 
-  // Load announcements for this class
+  // Load announcements from localStorage
   const loadAnnouncements = async () => {
     setLoadingAnnouncements(true);
     try {
-      const data = await classService.getClassAnnouncements(classId || passedClassData?.id);
-      console.log('Loaded announcements:', data);
+      const allAnnouncements = JSON.parse(localStorage.getItem('announcements') || '[]');
+      const classIdValue = classId || passedClassData?.id;
+      const className = classData?.name || passedClassData?.name;
       
-      // Enrich announcements with teacher names
-      const enrichedAnnouncements = (data || []).map(announcement => ({
-        ...announcement,
-        teacher_name: announcement.teacher_name || teacherName || 'Teacher'
-      }));
+      let loadedAnnouncements = allAnnouncements.filter(
+        a => String(a.class_id) === String(classIdValue)
+      );
       
-      setAnnouncements(enrichedAnnouncements);
+      if (className) {
+        const nameMatches = allAnnouncements.filter(
+          a => a.class_name === className && !loadedAnnouncements.some(existing => existing.id === a.id)
+        );
+        loadedAnnouncements = [...loadedAnnouncements, ...nameMatches];
+      }
+      
+      loadedAnnouncements = loadedAnnouncements.filter((a, index, self) => 
+        index === self.findIndex((t) => t.id === a.id)
+      );
+      
+      loadedAnnouncements.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      
+      setAnnouncements(loadedAnnouncements);
     } catch (error) {
       console.error('Error loading announcements:', error);
       setAnnouncements([]);
     } finally {
       setLoadingAnnouncements(false);
+    }
+  };
+
+  // Toggle selection of a single announcement
+  const toggleSelectAnnouncement = (announcementId) => {
+    const newSelected = new Set(selectedAnnouncements);
+    if (newSelected.has(announcementId)) {
+      newSelected.delete(announcementId);
+    } else {
+      newSelected.add(announcementId);
+    }
+    setSelectedAnnouncements(newSelected);
+    setSelectAll(newSelected.size === announcements.length && announcements.length > 0);
+  };
+
+  // Toggle select all announcements
+  const toggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedAnnouncements(new Set());
+      setSelectAll(false);
+    } else {
+      const allIds = new Set(announcements.map(a => a.id));
+      setSelectedAnnouncements(allIds);
+      setSelectAll(true);
+    }
+  };
+
+  // Delete selected announcements
+  const handleDeleteSelected = async () => {
+    if (selectedAnnouncements.size === 0) return;
+    
+    if (window.confirm(`Are you sure you want to delete ${selectedAnnouncements.size} announcement${selectedAnnouncements.size > 1 ? 's' : ''}? This action cannot be undone.`)) {
+      setDeletingAnnouncementId('bulk');
+      
+      try {
+        const allAnnouncements = JSON.parse(localStorage.getItem('announcements') || '[]');
+        const updatedAnnouncements = allAnnouncements.filter(a => !selectedAnnouncements.has(a.id));
+        localStorage.setItem('announcements', JSON.stringify(updatedAnnouncements));
+        
+        // Try to delete from Supabase for each selected announcement
+        for (const announcementId of selectedAnnouncements) {
+          try {
+            await supabase.from('announcements').delete().eq('id', announcementId);
+          } catch (supabaseError) {
+            // Ignore Supabase errors
+          }
+        }
+        
+        // Update state
+        setAnnouncements(prev => prev.filter(a => !selectedAnnouncements.has(a.id)));
+        setSelectedAnnouncements(new Set());
+        setSelectAll(false);
+        setIsSelectionMode(false);
+        
+      } catch (error) {
+        console.error('Error deleting announcements:', error);
+        alert('Failed to delete announcements. Please try again.');
+      } finally {
+        setDeletingAnnouncementId(null);
+      }
     }
   };
 
@@ -312,7 +391,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     return equationScore + battleScore + spaceScore;
   };
 
-  // Calculate overall game progress percentage across all three games
+  // Calculate overall game progress percentage
   const calculateOverallProgress = (gameProgress) => {
     if (!gameProgress) return 0;
     
@@ -497,7 +576,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </button>
       </div>
 
-      {/* Class Info with Teacher Name */}
+      {/* Class Info */}
       <div style={styles.classInfo}>
         <div style={styles.classIcon}>
           <span style={styles.classIconEmoji}>{getClassIcon(classData.name)}</span>
@@ -524,7 +603,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </div>
       </div>
 
-      {/* Stats Overview - Responsive Grid */}
+      {/* Stats Overview */}
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={styles.statIcon}><FiUsers size={24} color="#2563eb" /></div>
@@ -567,14 +646,20 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </div>
       </div>
 
-      {/* Tabs - Scrollable on mobile */}
+      {/* Tabs */}
       <div style={styles.tabsWrapper}>
         <div style={styles.tabs}>
           {['overview', 'announcements', 'missions', 'games', 'students'].map((tab) => (
             <button
               key={tab}
               style={{ ...styles.tab, ...(activeTab === tab ? styles.activeTab : {}) }}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                setActiveTab(tab);
+                if (tab !== 'announcements') {
+                  setIsSelectionMode(false);
+                  setSelectedAnnouncements(new Set());
+                }
+              }}
             >
               {tab === 'overview' && <FiBookOpen size={14} />}
               {tab === 'announcements' && <FiBell size={14} />}
@@ -590,9 +675,9 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </div>
       </div>
 
-      {/* Tab Content - Scrollable */}
+      {/* Tab Content */}
       <div style={styles.tabContent}>
-        {/* Overview Tab with Teacher Info */}
+        {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div>
             <div style={styles.overviewSection}>
@@ -645,48 +730,137 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
           </div>
         )}
 
-        {/* Announcements Tab with Teacher Name */}
+        {/* Announcements Tab with Selection and Bulk Delete */}
         {activeTab === 'announcements' && (
-          <div style={styles.scrollableContent}>
-            {loadingAnnouncements ? (
-              <div style={styles.loadingContainerSmall}>
-                <div style={styles.loadingSpinnerSmall}></div>
-                <p>Loading announcements...</p>
-              </div>
-            ) : announcements.length > 0 ? (
-              <div style={styles.announcementsList}>
-                {announcements.map((announcement) => (
-                  <div key={announcement.id} style={styles.announcementCard}>
-                    <div style={styles.announcementHeader}>
-                      <div style={styles.announcementIcon}>
-                        <FiMail size={20} color="#2563eb" />
-                      </div>
-                      <div style={styles.announcementTitleSection}>
-                        <h4 style={styles.announcementTitle}>{announcement.title}</h4>
-                        <div style={styles.announcementMeta}>
-                          <span style={styles.announcementTeacher}>
-                            <FiUser size={12} style={{ marginRight: '4px' }} />
-                            From: <strong>{announcement.teacher_name || teacherName}</strong>
-                          </span>
-                          <span style={styles.announcementDate}>
-                            {formatAnnouncementDate(announcement.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div style={styles.announcementBody}>
-                      <p style={styles.announcementMessage}>{announcement.message}</p>
-                    </div>
+          <div>
+            {/* Selection Mode Toggle and Bulk Delete Bar */}
+            {isTeacher && announcements.length > 0 && (
+              <div style={styles.selectionBar}>
+                {!isSelectionMode ? (
+                  <button 
+                    style={styles.selectButton}
+                    onClick={() => setIsSelectionMode(true)}
+                  >
+                    <FiCheckSquare size={16} />
+                    Select Announcements
+                  </button>
+                ) : (
+                  <div style={styles.bulkActions}>
+                    <button 
+                      style={styles.selectAllButton}
+                      onClick={toggleSelectAll}
+                    >
+                      {selectAll ? <FiCheckSquare size={16} /> : <FiSquare size={16} />}
+                      {selectAll ? 'Deselect All' : 'Select All'}
+                    </button>
+                    <button 
+                      style={styles.bulkDeleteButton}
+                      onClick={handleDeleteSelected}
+                      disabled={selectedAnnouncements.size === 0 || deletingAnnouncementId === 'bulk'}
+                    >
+                      {deletingAnnouncementId === 'bulk' ? (
+                        <div style={styles.deleteSpinnerSmall}></div>
+                      ) : (
+                        <FiTrash2 size={16} />
+                      )}
+                      Delete Selected ({selectedAnnouncements.size})
+                    </button>
+                    <button 
+                      style={styles.cancelSelectButton}
+                      onClick={() => {
+                        setIsSelectionMode(false);
+                        setSelectedAnnouncements(new Set());
+                        setSelectAll(false);
+                      }}
+                    >
+                      Cancel
+                    </button>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div style={styles.emptyState}>
-                <div style={styles.emptyIcon}>📢</div>
-                <h3>No Announcements Yet</h3>
-                <p>Check back later for updates from {teacherName}!</p>
+                )}
               </div>
             )}
+
+            {/* Announcements List */}
+            <div style={styles.scrollableContent}>
+              {loadingAnnouncements ? (
+                <div style={styles.loadingContainerSmall}>
+                  <div style={styles.loadingSpinnerSmall}></div>
+                  <p>Loading announcements...</p>
+                </div>
+              ) : announcements.length > 0 ? (
+                <div style={styles.announcementsList}>
+                  {announcements.map((announcement) => (
+                    <div 
+                      key={announcement.id} 
+                      style={{
+                        ...styles.announcementCard,
+                        ...(isSelectionMode && selectedAnnouncements.has(announcement.id) ? styles.announcementCardSelected : {})
+                      }}
+                      onClick={() => {
+                        if (isSelectionMode) {
+                          toggleSelectAnnouncement(announcement.id);
+                        }
+                      }}
+                    >
+                      <div style={styles.announcementHeader}>
+                        {/* Selection Checkbox */}
+                        {isSelectionMode && (
+                          <div style={styles.checkboxContainer}>
+                            {selectedAnnouncements.has(announcement.id) ? (
+                              <FiCheckSquare size={22} color="#2563eb" />
+                            ) : (
+                              <FiSquare size={22} color="#9ca3af" />
+                            )}
+                          </div>
+                        )}
+                        
+                        <div style={styles.announcementIcon}>
+                          <FiMail size={20} color="#2563eb" />
+                        </div>
+                        
+                        <div style={styles.announcementTitleSection}>
+                          <h4 style={styles.announcementTitle}>{announcement.title}</h4>
+                          <div style={styles.announcementMeta}>
+                            <span style={styles.announcementTeacher}>
+                              <FiUser size={12} style={{ marginRight: '4px' }} />
+                              From: <strong>{announcement.teacher_name || teacherName}</strong>
+                            </span>
+                            <span style={styles.announcementDate}>
+                              {formatAnnouncementDate(announcement.created_at)}
+                            </span>
+                          </div>
+                        </div>
+                        
+                        {/* Individual Delete Button (when not in selection mode) */}
+                        {!isSelectionMode && isTeacher && (
+                          <button
+                            style={styles.deleteButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (window.confirm('Delete this announcement?')) {
+                                handleDeleteSelected([announcement.id]);
+                              }
+                            }}
+                            title="Delete announcement"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+                      <div style={styles.announcementBody}>
+                        <p style={styles.announcementMessage}>{announcement.message}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={styles.emptyState}>
+                  <div style={styles.emptyIcon}>📢</div>
+                  <h3>No Announcements Yet</h3>
+                  <p>Check back later for updates from {teacherName}!</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -791,7 +965,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                         </div>
                         <p style={styles.studentEmail}>{enrollment.users?.email}</p>
                         
-                        {/* Overall Game Progress */}
                         <div style={styles.studentProgressWrapper}>
                           <div style={styles.studentProgressBar}>
                             <div style={{...styles.studentProgressFill, width: `${enrollment.users?.gameProgressPercent || 0}%`}} />
@@ -799,7 +972,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                           <span style={styles.studentProgressText}>{enrollment.users?.gameProgressPercent || 0}% Overall</span>
                         </div>
                         
-                        {/* Individual Game Progress */}
                         <div style={styles.gameProgressGrid}>
                           <div style={styles.gameProgressItem}>
                             <span style={styles.gameProgressIcon}>🧮</span>
@@ -925,9 +1097,6 @@ const styles = {
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    '@media (max-width: 640px)': {
-      padding: '12px 16px',
-    },
   },
   backButton: {
     display: 'flex',
@@ -942,16 +1111,8 @@ const styles = {
     fontWeight: '600',
     color: '#374151',
     transition: 'all 0.2s',
-    '@media (max-width: 640px)': {
-      padding: '6px 12px',
-      fontSize: '13px',
-    },
   },
-  backButtonText: {
-    '@media (max-width: 480px)': {
-      display: 'none',
-    },
-  },
+  backButtonText: {},
   shareButton: {
     display: 'flex',
     alignItems: 'center',
@@ -965,14 +1126,6 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     transition: 'all 0.2s',
-    '@media (max-width: 640px)': {
-      padding: '6px 12px',
-      fontSize: '12px',
-    },
-    '@media (max-width: 480px)': {
-      flex: 1,
-      justifyContent: 'center',
-    },
   },
   classInfo: {
     display: 'flex',
@@ -984,13 +1137,6 @@ const styles = {
     borderRadius: '20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     flexWrap: 'wrap',
-    '@media (max-width: 640px)': {
-      margin: '16px',
-      padding: '16px',
-      gap: '16px',
-      flexDirection: 'column',
-      textAlign: 'center',
-    },
   },
   classIcon: {
     width: '72px',
@@ -1001,42 +1147,25 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    '@media (max-width: 640px)': {
-      width: '60px',
-      height: '60px',
-    },
   },
   classIconEmoji: {
     fontSize: '36px',
-    '@media (max-width: 640px)': {
-      fontSize: '30px',
-    },
   },
   classDetails: {
     flex: 1,
     minWidth: '180px',
-    '@media (max-width: 640px)': {
-      width: '100%',
-    },
   },
   className: {
     fontSize: 'clamp(20px, 5vw, 28px)',
     fontWeight: '800',
     color: '#1f2937',
     marginBottom: '8px',
-    '@media (max-width: 640px)': {
-      textAlign: 'center',
-    },
   },
   classMeta: {
     display: 'flex',
     gap: '16px',
     flexWrap: 'wrap',
     marginBottom: '10px',
-    '@media (max-width: 640px)': {
-      gap: '12px',
-      justifyContent: 'center',
-    },
   },
   metaItem: {
     display: 'flex',
@@ -1045,9 +1174,6 @@ const styles = {
     fontSize: '13px',
     color: '#6b7280',
     fontWeight: '500',
-    '@media (max-width: 480px)': {
-      fontSize: '12px',
-    },
   },
   teacherNameHighlight: {
     color: '#2563eb',
@@ -1058,24 +1184,12 @@ const styles = {
     color: '#6b7280',
     lineHeight: 1.5,
     marginTop: '8px',
-    '@media (max-width: 640px)': {
-      fontSize: '13px',
-      textAlign: 'center',
-    },
   },
   statsGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: '16px',
     margin: '0 20px 20px 20px',
-    '@media (max-width: 640px)': {
-      margin: '0 16px 16px 16px',
-      gap: '12px',
-    },
-    '@media (max-width: 480px)': {
-      gridTemplateColumns: 'repeat(2, 1fr)',
-      gap: '10px',
-    },
   },
   statCard: {
     backgroundColor: 'white',
@@ -1085,10 +1199,6 @@ const styles = {
     alignItems: 'center',
     gap: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    '@media (max-width: 640px)': {
-      padding: '12px',
-      gap: '10px',
-    },
   },
   statIcon: {
     width: '44px',
@@ -1099,14 +1209,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    '@media (max-width: 640px)': {
-      width: '38px',
-      height: '38px',
-      '& svg': {
-        width: '20px',
-        height: '20px',
-      },
-    },
   },
   statInfo: {
     flex: 1,
@@ -1123,12 +1225,6 @@ const styles = {
     fontSize: '10px',
     color: '#6b7280',
     fontWeight: '500',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    '@media (max-width: 480px)': {
-      fontSize: '9px',
-    },
   },
   progressSection: {
     backgroundColor: 'white',
@@ -1136,10 +1232,6 @@ const styles = {
     padding: '18px',
     margin: '0 20px 20px 20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    '@media (max-width: 640px)': {
-      margin: '0 16px 16px 16px',
-      padding: '16px',
-    },
   },
   progressLabel: {
     display: 'flex',
@@ -1149,9 +1241,6 @@ const styles = {
     marginBottom: '12px',
     flexWrap: 'wrap',
     gap: '8px',
-    '@media (max-width: 480px)': {
-      fontSize: '13px',
-    },
   },
   progressPercent: {
     color: '#10b981',
@@ -1173,9 +1262,6 @@ const styles = {
     margin: '0 20px',
     overflowX: 'auto',
     WebkitOverflowScrolling: 'touch',
-    '@media (max-width: 640px)': {
-      margin: '0 16px',
-    },
   },
   tabs: {
     display: 'flex',
@@ -1196,21 +1282,8 @@ const styles = {
     color: '#6b7280',
     transition: 'all 0.2s ease',
     whiteSpace: 'nowrap',
-    '@media (max-width: 640px)': {
-      padding: '8px 12px',
-      fontSize: '12px',
-    },
-    '@media (max-width: 480px)': {
-      padding: '6px 10px',
-      gap: '4px',
-    },
   },
-  tabText: {
-    display: 'inline-block',
-    '@media (max-width: 480px)': {
-      display: 'none',
-    },
-  },
+  tabText: {},
   tabBadge: {
     backgroundColor: '#e5e7eb',
     color: '#6b7280',
@@ -1231,50 +1304,30 @@ const styles = {
     margin: '0 20px 20px 20px',
     padding: '24px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    '@media (max-width: 640px)': {
-      margin: '0 16px 16px 16px',
-      padding: '16px',
-    },
   },
   scrollableContent: {
     maxHeight: 'calc(100vh - 400px)',
     overflowY: 'auto',
     paddingRight: '8px',
-    '@media (max-width: 640px)': {
-      maxHeight: 'calc(100vh - 360px)',
-    },
   },
   overviewSection: {
     marginBottom: '28px',
-    '@media (max-width: 640px)': {
-      marginBottom: '20px',
-    },
   },
   sectionTitle: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: '16px',
-    '@media (max-width: 640px)': {
-      fontSize: '16px',
-      marginBottom: '12px',
-    },
   },
   overviewText: {
     fontSize: '14px',
     color: '#6b7280',
     lineHeight: 1.6,
-    '@media (max-width: 640px)': {
-      fontSize: '13px',
-    },
   },
   quickStats: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
     gap: '12px',
-    '@media (max-width: 640px)': {
-      gridTemplateColumns: '1fr',
-    },
   },
   quickStatItem: {
     display: 'flex',
@@ -1283,47 +1336,124 @@ const styles = {
     padding: '12px',
     backgroundColor: '#f9fafb',
     borderRadius: '12px',
-    '@media (max-width: 640px)': {
-      padding: '10px',
-    },
   },
   quickStatValue: {
     fontSize: '18px',
     fontWeight: '700',
     color: '#1f2937',
-    '@media (max-width: 640px)': {
-      fontSize: '16px',
-    },
   },
   quickStatLabel: {
     fontSize: '11px',
     color: '#6b7280',
   },
+  // Selection Bar Styles
+  selectionBar: {
+    marginBottom: '20px',
+    padding: '12px',
+    backgroundColor: '#f0fdf4',
+    borderRadius: '12px',
+    border: '1px solid #bbf7d0',
+  },
+  selectButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  bulkActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+  },
+  selectAllButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    backgroundColor: '#e5e7eb',
+    color: '#374151',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  bulkDeleteButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    backgroundColor: '#ef4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  cancelSelectButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 16px',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  deleteSpinnerSmall: {
+    width: '16px',
+    height: '16px',
+    border: '2px solid #e5e7eb',
+    borderTopColor: 'white',
+    borderRadius: '50%',
+    animation: 'spin 0.6s linear infinite',
+  },
   announcementsList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    '@media (max-width: 640px)': {
-      gap: '12px',
-    },
   },
   announcementCard: {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     padding: '16px',
     transition: 'all 0.2s ease',
-    '@media (max-width: 640px)': {
-      padding: '12px',
-    },
+    position: 'relative',
+    cursor: 'default',
+  },
+  announcementCardSelected: {
+    backgroundColor: '#eff6ff',
+    border: '2px solid #2563eb',
+    boxShadow: '0 4px 12px rgba(37,99,235,0.15)',
   },
   announcementHeader: {
     display: 'flex',
     gap: '12px',
     marginBottom: '12px',
     flexWrap: 'wrap',
-    '@media (max-width: 640px)': {
-      gap: '10px',
-    },
+    alignItems: 'flex-start',
+  },
+  checkboxContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   announcementIcon: {
     width: '36px',
@@ -1334,10 +1464,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    '@media (max-width: 640px)': {
-      width: '32px',
-      height: '32px',
-    },
   },
   announcementTitleSection: {
     flex: 1,
@@ -1348,9 +1474,6 @@ const styles = {
     fontWeight: '700',
     color: '#1f2937',
     marginBottom: '4px',
-    '@media (max-width: 640px)': {
-      fontSize: '14px',
-    },
   },
   announcementMeta: {
     display: 'flex',
@@ -1368,36 +1491,38 @@ const styles = {
     fontSize: '11px',
     color: '#9ca3af',
   },
+  deleteButton: {
+    background: '#fee2e2',
+    border: 'none',
+    cursor: 'pointer',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    color: '#ef4444',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   announcementBody: {
     paddingLeft: '48px',
-    '@media (max-width: 640px)': {
-      paddingLeft: '42px',
-    },
   },
   announcementMessage: {
     fontSize: '13px',
     color: '#4b5563',
     lineHeight: 1.5,
     whiteSpace: 'pre-wrap',
-    '@media (max-width: 640px)': {
-      fontSize: '12px',
-    },
   },
   missionsList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    '@media (max-width: 640px)': {
-      gap: '12px',
-    },
   },
   missionCard: {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     padding: '16px',
-    '@media (max-width: 640px)': {
-      padding: '14px',
-    },
   },
   missionHeader: {
     display: 'flex',
@@ -1411,9 +1536,6 @@ const styles = {
     fontSize: '16px',
     fontWeight: '700',
     color: '#1f2937',
-    '@media (max-width: 640px)': {
-      fontSize: '14px',
-    },
   },
   missionStatus: {
     padding: '3px 8px',
@@ -1453,18 +1575,11 @@ const styles = {
     fontSize: '12px',
     fontWeight: '600',
     transition: 'all 0.2s',
-    width: '100%',
-    '@media (min-width: 640px)': {
-      width: 'auto',
-    },
   },
   gamesGrid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
     gap: '16px',
-    '@media (max-width: 640px)': {
-      gridTemplateColumns: '1fr',
-    },
   },
   gameCard: {
     backgroundColor: '#f9fafb',
@@ -1473,16 +1588,10 @@ const styles = {
     cursor: 'pointer',
     transition: 'all 0.3s',
     textAlign: 'center',
-    '@media (max-width: 640px)': {
-      padding: '16px',
-    },
   },
   gameIcon: {
     fontSize: '40px',
     marginBottom: '10px',
-    '@media (max-width: 640px)': {
-      fontSize: '36px',
-    },
   },
   gameTitle: {
     fontSize: '16px',
@@ -1524,13 +1633,6 @@ const styles = {
     backgroundColor: '#f9fafb',
     borderRadius: '14px',
     flexWrap: 'wrap',
-    '@media (max-width: 640px)': {
-      padding: '12px',
-      gap: '10px',
-      flexDirection: 'column',
-      alignItems: 'center',
-      textAlign: 'center',
-    },
   },
   studentAvatar: {
     width: '44px',
@@ -1544,18 +1646,10 @@ const styles = {
     fontSize: '18px',
     fontWeight: '700',
     flexShrink: 0,
-    '@media (max-width: 640px)': {
-      width: '38px',
-      height: '38px',
-      fontSize: '16px',
-    },
   },
   studentInfo: {
     flex: 1,
     minWidth: '180px',
-    '@media (max-width: 640px)': {
-      width: '100%',
-    },
   },
   studentHeader: {
     display: 'flex',
@@ -1564,17 +1658,11 @@ const styles = {
     flexWrap: 'wrap',
     gap: '8px',
     marginBottom: '2px',
-    '@media (max-width: 640px)': {
-      justifyContent: 'center',
-    },
   },
   studentName: {
     fontSize: '15px',
     fontWeight: '700',
     color: '#1f2937',
-    '@media (max-width: 640px)': {
-      fontSize: '14px',
-    },
   },
   studentXPBadge: {
     fontSize: '11px',
@@ -1589,18 +1677,12 @@ const styles = {
     color: '#6b7280',
     marginBottom: '10px',
     wordBreak: 'break-all',
-    '@media (max-width: 640px)': {
-      fontSize: '10px',
-    },
   },
   studentProgressWrapper: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     marginBottom: '10px',
-    '@media (max-width: 640px)': {
-      justifyContent: 'center',
-    },
   },
   studentProgressBar: {
     flex: 1,
@@ -1630,9 +1712,6 @@ const styles = {
     alignItems: 'center',
     gap: '8px',
     flexWrap: 'wrap',
-    '@media (max-width: 640px)': {
-      justifyContent: 'center',
-    },
   },
   gameProgressIcon: {
     fontSize: '16px',
@@ -1673,20 +1752,14 @@ const styles = {
     padding: '40px 20px',
     backgroundColor: '#f9fafb',
     borderRadius: '16px',
-    '@media (max-width: 640px)': {
-      padding: '30px 16px',
-    },
   },
   emptyIcon: {
     fontSize: '48px',
     marginBottom: '12px',
-    '@media (max-width: 640px)': {
-      fontSize: '40px',
-    },
   },
 };
 
-// Add CSS animations and hover effects
+// Add CSS animations
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
   @keyframes spin {
@@ -1709,6 +1782,29 @@ styleSheet.textContent = `
     transform: translateY(-2px);
   }
   
+  .selectButton:hover {
+    background-color: #1d4ed8;
+    transform: translateY(-2px);
+  }
+  
+  .selectAllButton:hover {
+    background-color: #d1d5db;
+  }
+  
+  .bulkDeleteButton:hover {
+    background-color: #dc2626;
+    transform: scale(1.02);
+  }
+  
+  .cancelSelectButton:hover {
+    background-color: #e5e7eb;
+  }
+  
+  .deleteButton:hover {
+    background-color: #fecaca;
+    transform: scale(1.05);
+  }
+  
   .startButton:hover, .gameButton:hover {
     background-color: #1d4ed8;
     transform: translateY(-2px);
@@ -1728,7 +1824,6 @@ styleSheet.textContent = `
     color: #2563eb;
   }
   
-  /* Touch-friendly tap highlights for mobile */
   @media (max-width: 768px) {
     button, .gameCard, .tab, .announcementCard, .missionCard, .studentCard {
       -webkit-tap-highlight-color: rgba(0,0,0,0.05);
@@ -1739,12 +1834,11 @@ styleSheet.textContent = `
       transition: transform 0.05s ease;
     }
     
-    /* Minimum touch target size */
-    button, .tab, .startButton, .gameButton, .backButton, .shareButton {
+    button, .tab, .startButton, .gameButton, .backButton, .shareButton, .deleteButton, .selectButton, .selectAllButton, .bulkDeleteButton, .cancelSelectButton {
       min-height: 44px;
+      min-width: 44px;
     }
     
-    /* Better scrollbar for mobile */
     .scrollableContent {
       scrollbar-width: thin;
     }
@@ -1764,7 +1858,6 @@ styleSheet.textContent = `
     }
   }
   
-  /* iPad and tablet optimizations */
   @media (min-width: 768px) and (max-width: 1024px) {
     .statsGrid {
       grid-template-columns: repeat(2, 1fr);
@@ -1775,7 +1868,6 @@ styleSheet.textContent = `
     }
   }
   
-  /* Prevent zoom on input focus for mobile */
   @media (max-width: 768px) {
     input, select, textarea {
       font-size: 16px !important;
