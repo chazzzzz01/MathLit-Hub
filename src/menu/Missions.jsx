@@ -1,5 +1,5 @@
 // src/menu/Missions.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
-// FIX: Avatar made larger and positioned with more spacing from corners (not too close to edge)
+// FIX: Avatar made larger and text bubble text bigger with more spacing from corners
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import Mission2 from '../missions/mission2';
@@ -539,7 +539,7 @@ function Missions() {
         </div>
       </div>
 
-      {/* Floating Assistant - LARGER AVATAR with more spacing from corner */}
+      {/* Floating Assistant - LARGER AVATAR with bigger text and more spacing from corner */}
       <div style={styles.avatarContainer}>
         <div style={styles.bubbleContainer}>
           {showMessage ? (
@@ -556,7 +556,7 @@ function Missions() {
           )}
         </div>
 
-        {/* LARGER AVATAR */}
+        {/* LARGER AVATAR - SIGNIFICANTLY INCREASED SIZE */}
         <div style={styles.avatarWrapper}>
           <img
             src="/avatar_happy.jpg"
@@ -564,7 +564,7 @@ function Missions() {
             style={styles.avatarImage}
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
             }}
           />
         </div>
@@ -977,29 +977,30 @@ const styles = {
     borderRadius: '18px',
     boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
     animation: 'bubblePop 0.3s ease-out',
-    maxWidth: '200px',
+    maxWidth: '220px',
     position: 'relative',
     border: '2px solid #2563eb',
     '@media (min-width: 769px)': {
-      padding: '14px 18px',
-      borderRadius: '22px',
-      maxWidth: '260px',
+      padding: '14px 20px',
+      borderRadius: '24px',
+      maxWidth: '300px',
     },
     '@media (max-width: 480px)': {
-      padding: '6px 10px',
-      maxWidth: '150px',
+      padding: '8px 12px',
+      maxWidth: '170px',
     },
   },
   bubbleText: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#333',
     lineHeight: '1.4',
+    fontWeight: '500',
     '@media (min-width: 769px)': {
-      fontSize: '15px',
+      fontSize: '18px',
       lineHeight: '1.5',
     },
     '@media (max-width: 480px)': {
-      fontSize: '10px',
+      fontSize: '12px',
     },
   },
   closeBubble: {
@@ -1007,12 +1008,12 @@ const styles = {
     cursor: 'pointer',
     background: 'none',
     border: 'none',
-    fontSize: '11px',
+    fontSize: '12px',
     color: '#999',
     padding: '2px 4px',
     '@media (min-width: 769px)': {
       marginLeft: '12px',
-      fontSize: '14px',
+      fontSize: '16px',
     },
   },
   reopenBubble: {
@@ -1039,17 +1040,17 @@ const styles = {
       marginBottom: '15px',
     },
     '@media (max-width: 480px)': {
-      width: '32px',
-      height: '32px',
-      fontSize: '16px',
-      marginRight: '10px',
-      marginBottom: '8px',
+      width: '36px',
+      height: '36px',
+      fontSize: '18px',
+      marginRight: '12px',
+      marginBottom: '10px',
     },
   },
-  // LARGER AVATAR - INCREASED SIZE with good spacing
+  // LARGER AVATAR - SIGNIFICANTLY INCREASED SIZE with good spacing
   avatarWrapper: {
-    width: '110px',
-    height: '110px',
+    width: '120px',
+    height: '120px',
     borderRadius: '50%',
     overflow: 'hidden',
     animation: 'float 3s ease-in-out infinite',
@@ -1063,14 +1064,14 @@ const styles = {
       boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
     },
     '@media (min-width: 769px)': {
-      width: '140px',
-      height: '140px',
+      width: '160px',
+      height: '160px',
       borderWidth: '5px',
       boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
     },
     '@media (max-width: 480px)': {
-      width: '85px',
-      height: '85px',
+      width: '100px',
+      height: '100px',
       borderWidth: '3px',
     },
   },
@@ -1297,14 +1298,14 @@ styleSheet.innerHTML = `
       font-size: 13px !important;
     }
     .avatarWrapper {
-      width: 75px !important;
-      height: 75px !important;
+      width: 85px !important;
+      height: 85px !important;
     }
     .speechBubble {
-      max-width: 140px !important;
+      max-width: 150px !important;
     }
     .bubbleText {
-      font-size: 9px !important;
+      font-size: 11px !important;
     }
     .avatarContainer {
       bottom: 15px !important;

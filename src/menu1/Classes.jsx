@@ -4,9 +4,10 @@ import {
   FiUsers, FiBookOpen, FiTrendingUp, FiAward, 
   FiClock, FiCalendar, FiPlus, FiCopy, FiCheck,
   FiArrowLeft, FiMoreVertical, FiTrash2,
-  FiUserPlus
+  FiUserPlus, FiBell, FiSend, FiAlertCircle
 } from 'react-icons/fi';
 import { classService } from '../services/classService';
+import { supabase } from '../lib/supabase';
 
 function Classes() {
   const location = useLocation();
@@ -24,6 +25,15 @@ function Classes() {
   const [newMission, setNewMission] = useState({ title: '', dueDate: '', description: '' });
   const [loading, setLoading] = useState(true);
   const [classInfo, setClassInfo] = useState(null);
+  
+  // Announcement states
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [announcementTitle, setAnnouncementTitle] = useState('');
+  const [announcementMessage, setAnnouncementMessage] = useState('');
+  const [sendingAnnouncement, setSendingAnnouncement] = useState(false);
+  const [announcementSuccess, setAnnouncementSuccess] = useState('');
+  const [announcementError, setAnnouncementError] = useState('');
+  
   const [stats, setStats] = useState({
     totalStudents: 0,
     averageProgress: 0,
@@ -137,6 +147,106 @@ function Classes() {
     }
   };
 
+  const handleSendAnnouncement = async () => {
+    if (!announcementTitle.trim() || !announcementMessage.trim()) {
+      setAnnouncementError('Please enter both a title and message');
+      setTimeout(() => setAnnouncementError(''), 3000);
+      return;
+    }
+    
+    setSendingAnnouncement(true);
+    setAnnouncementError('');
+    
+    try {
+      const classIdToUse = classInfo?.id || classData?.id;
+      if (!classIdToUse) {
+        throw new Error('Class not found');
+      }
+      
+      // Get teacher ID from localStorage or user data
+      const teacherId = localStorage.getItem('userId') || 'teacher_001';
+      const teacherName = localStorage.getItem('userName') || classInfo?.teacher_name || 'Teacher';
+      
+      const announcementData = {
+        id: Date.now(),
+        class_id: classIdToUse,
+        class_name: classInfo?.name || classData?.name,
+        teacher_id: teacherId,
+        teacher_name: teacherName,
+        title: announcementTitle.trim(),
+        message: announcementMessage.trim(),
+        created_at: new Date().toISOString()
+      };
+      
+      console.log('Sending announcement:', announcementData);
+      
+      // Try Supabase first
+      const { error: insertError } = await supabase
+        .from('announcements')
+        .insert({
+          class_id: classIdToUse,
+          teacher_id: teacherId,
+          teacher_name: teacherName,
+          title: announcementData.title,
+          message: announcementData.message,
+          created_at: announcementData.created_at
+        });
+      
+      if (insertError) {
+        console.log('Supabase error, using localStorage fallback:', insertError.message);
+        // Use localStorage fallback
+        const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
+        existing.push(announcementData);
+        localStorage.setItem('announcements', JSON.stringify(existing));
+      } else {
+        console.log('Announcement saved to Supabase!');
+      }
+      
+      setAnnouncementTitle('');
+      setAnnouncementMessage('');
+      setShowAnnouncementModal(false);
+      setAnnouncementSuccess(`✅ Announcement sent to "${classInfo?.name || classData?.name}"!`);
+      setTimeout(() => setAnnouncementSuccess(''), 3000);
+      
+    } catch (error) {
+      console.error('Error sending announcement:', error);
+      
+      // Fallback to localStorage
+      try {
+        const classIdToUse = classInfo?.id || classData?.id;
+        if (classIdToUse) {
+          const fallbackData = {
+            id: Date.now(),
+            class_id: classIdToUse,
+            class_name: classInfo?.name || classData?.name,
+            teacher_id: 'teacher_001',
+            teacher_name: 'Teacher',
+            title: announcementTitle.trim(),
+            message: announcementMessage.trim(),
+            created_at: new Date().toISOString(),
+            saved_as_fallback: true
+          };
+          const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
+          existing.push(fallbackData);
+          localStorage.setItem('announcements', JSON.stringify(existing));
+          setAnnouncementSuccess(`✅ Announcement saved locally to "${classInfo?.name || classData?.name}"!`);
+          setTimeout(() => setAnnouncementSuccess(''), 3000);
+          setAnnouncementTitle('');
+          setAnnouncementMessage('');
+          setShowAnnouncementModal(false);
+          return;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+      
+      setAnnouncementError(error.message || 'Failed to send announcement');
+      setTimeout(() => setAnnouncementError(''), 4000);
+    } finally {
+      setSendingAnnouncement(false);
+    }
+  };
+
   if (loading) {
     return (
       <div style={styles.loadingContainer}>
@@ -158,6 +268,59 @@ function Classes() {
   return (
     <div style={styles.container}>
       <div style={styles.contentWrapper}>
+        {/* Success/Error Toasts */}
+        {announcementSuccess && (
+          <div style={styles.successToast}>
+            <FiCheck size={16} />
+            <span>{announcementSuccess}</span>
+          </div>
+        )}
+        
+        {announcementError && (
+          <div style={styles.errorToast}>
+            <FiAlertCircle size={16} />
+            <span>{announcementError}</span>
+          </div>
+        )}
+
+        {/* Announcement Modal */}
+        {showAnnouncementModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowAnnouncementModal(false)}>
+            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h3 style={styles.modalTitle}><FiBell size={18} /> Send Announcement to {displayClass.name}</h3>
+                <button onClick={() => setShowAnnouncementModal(false)} style={styles.modalClose}>×</button>
+              </div>
+              <div style={styles.modalBody}>
+                <input 
+                  type="text" 
+                  placeholder="Announcement Title" 
+                  value={announcementTitle} 
+                  onChange={(e) => setAnnouncementTitle(e.target.value)} 
+                  style={styles.formInput} 
+                />
+                <textarea 
+                  placeholder="Announcement Message" 
+                  value={announcementMessage} 
+                  onChange={(e) => setAnnouncementMessage(e.target.value)} 
+                  rows={5} 
+                  style={styles.formTextarea} 
+                />
+                <div style={styles.classInfoBadge}>
+                  <FiUsers size={14} />
+                  <span>Sending to: <strong>{displayClass.name}</strong> ({stats.totalStudents} students)</span>
+                </div>
+              </div>
+              <div style={styles.modalFooter}>
+                <button onClick={() => setShowAnnouncementModal(false)} style={styles.cancelButton}>Cancel</button>
+                <button onClick={handleSendAnnouncement} disabled={sendingAnnouncement} style={styles.sendButton}>
+                  {sendingAnnouncement ? 'Sending...' : <><FiSend size={14} /> Send Announcement</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div style={styles.header}>
           <button style={styles.backButton} onClick={() => navigate('/teacherhub/home')}>
@@ -191,13 +354,13 @@ function Classes() {
 
         {/* Tabs */}
         <div style={styles.tabs}>
-          {['overview', 'students', 'missions', 'analytics'].map((tab) => (
+          {['overview', 'students', 'missions', 'analytics', 'announcements'].map((tab) => (
             <button
               key={tab}
               style={{ ...styles.tab, ...(activeTab === tab ? styles.activeTab : {}) }}
               onClick={() => setActiveTab(tab)}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'announcements' ? <><FiBell size={14} style={{ marginRight: '6px' }} /> Send Announcement</> : (tab.charAt(0).toUpperCase() + tab.slice(1))}
               {tab === 'students' && ` (${stats.totalStudents})`}
               {tab === 'missions' && ` (${missions.length})`}
             </button>
@@ -419,6 +582,71 @@ function Classes() {
               </div>
             </div>
           )}
+
+          {/* Announcements Tab - Send Announcement Feature */}
+          {activeTab === 'announcements' && (
+            <div>
+              <div style={styles.announcementContainer}>
+                <div style={styles.announcementHeader}>
+                  <FiBell size={32} color="#2563eb" />
+                  <h3 style={styles.sectionTitle}>Send Announcement to {displayClass.name}</h3>
+                </div>
+                <p style={styles.announcementSubtext}>
+                  Send important updates, reminders, or motivational messages to all students in this class.
+                </p>
+                
+                <div style={styles.announcementForm}>
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Announcement Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Mission 2 Update, Reminder: Quiz Tomorrow, Congratulations!"
+                      value={announcementTitle}
+                      onChange={(e) => setAnnouncementTitle(e.target.value)}
+                      style={styles.formInput}
+                    />
+                  </div>
+                  
+                  <div style={styles.formGroup}>
+                    <label style={styles.formLabel}>Message</label>
+                    <textarea
+                      placeholder="Write your announcement message here..."
+                      value={announcementMessage}
+                      onChange={(e) => setAnnouncementMessage(e.target.value)}
+                      rows={6}
+                      style={styles.formTextarea}
+                    />
+                  </div>
+                  
+                  <div style={styles.classInfoBadgeLarge}>
+                    <FiUsers size={18} />
+                    <span>This announcement will be sent to <strong>{stats.totalStudents}</strong> student(s) in <strong>{displayClass.name}</strong></span>
+                  </div>
+                  
+                  <button 
+                    onClick={handleSendAnnouncement} 
+                    disabled={sendingAnnouncement}
+                    style={styles.sendAnnouncementButton}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = '#1d4ed8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = '#2563eb';
+                    }}
+                  >
+                    {sendingAnnouncement ? (
+                      'Sending...'
+                    ) : (
+                      <>
+                        <FiSend size={18} />
+                        Send Announcement to Class
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -552,6 +780,7 @@ const styles = {
     gap: '4px',
     marginBottom: '28px',
     borderBottom: '2px solid #e5e7eb',
+    flexWrap: 'wrap',
   },
   tab: {
     padding: '14px 24px',
@@ -562,6 +791,8 @@ const styles = {
     fontWeight: '600',
     color: '#6b7280',
     transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
   },
   activeTab: {
     color: '#2563eb',
@@ -850,18 +1081,57 @@ const styles = {
     justifyContent: 'center',
     zIndex: 1000,
   },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    width: '90%',
+    maxWidth: '550px',
+    maxHeight: '85vh',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #e5e7eb',
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#1f2937',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: 0,
+  },
+  modalClose: {
+    background: 'none',
+    border: 'none',
+    fontSize: '28px',
+    cursor: 'pointer',
+    color: '#9ca3af',
+    padding: 0,
+    lineHeight: 1,
+  },
+  modalBody: {
+    padding: '24px',
+    overflowY: 'auto',
+    maxHeight: 'calc(85vh - 140px)',
+  },
+  modalFooter: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    padding: '16px 24px',
+    borderTop: '1px solid #e5e7eb',
+  },
   modal: {
     backgroundColor: 'white',
     borderRadius: '20px',
     padding: '36px',
     width: '90%',
     maxWidth: '520px',
-  },
-  modalTitle: {
-    fontSize: '26px',
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: '18px',
   },
   modalText: {
     fontSize: '14px',
@@ -902,6 +1172,153 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '600',
   },
+  // Announcement specific styles
+  announcementContainer: {
+    backgroundColor: 'white',
+    borderRadius: '20px',
+    padding: '32px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  },
+  announcementHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    marginBottom: '16px',
+  },
+  announcementSubtext: {
+    fontSize: '15px',
+    color: '#6b7280',
+    marginBottom: '32px',
+    lineHeight: '1.6',
+  },
+  announcementForm: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px',
+  },
+  formGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  formLabel: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+  },
+  formInput: {
+    width: '100%',
+    padding: '12px 14px',
+    fontSize: '14px',
+    border: '1px solid #d1d5db',
+    borderRadius: '10px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s ease',
+  },
+  formTextarea: {
+    width: '100%',
+    padding: '12px 14px',
+    fontSize: '14px',
+    border: '1px solid #d1d5db',
+    borderRadius: '10px',
+    outline: 'none',
+    boxSizing: 'border-box',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    transition: 'border-color 0.2s ease',
+  },
+  classInfoBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 14px',
+    backgroundColor: '#eff6ff',
+    borderRadius: '10px',
+    fontSize: '13px',
+    color: '#1e40af',
+    marginTop: '8px',
+  },
+  classInfoBadgeLarge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px',
+    backgroundColor: '#f0fdf4',
+    borderRadius: '12px',
+    fontSize: '14px',
+    color: '#166534',
+    border: '1px solid #bbf7d0',
+  },
+  sendAnnouncementButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '14px 28px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    marginTop: '8px',
+  },
+  sendButton: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 20px',
+    backgroundColor: '#2563eb',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    padding: '10px 20px',
+    backgroundColor: '#f3f4f6',
+    color: '#374151',
+    border: 'none',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+  },
+  successToast: {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px 20px',
+    backgroundColor: '#10b981',
+    color: 'white',
+    borderRadius: '10px',
+    fontSize: '14px',
+    zIndex: 2000,
+    animation: 'slideInRight 0.3s ease',
+  },
+  errorToast: {
+    position: 'fixed',
+    bottom: '20px',
+    right: '20px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '12px 20px',
+    backgroundColor: '#ef4444',
+    color: 'white',
+    borderRadius: '10px',
+    fontSize: '14px',
+    zIndex: 2000,
+    animation: 'slideInRight 0.3s ease',
+  },
 };
 
 const styleSheet = document.createElement("style");
@@ -909,6 +1326,27 @@ styleSheet.textContent = `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  input:focus, textarea:focus {
+    border-color: #2563eb;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  button:hover {
+    opacity: 0.9;
+  }
+  button:active {
+    transform: scale(0.98);
   }
 `;
 document.head.appendChild(styleSheet);

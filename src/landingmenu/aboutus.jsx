@@ -34,17 +34,7 @@ const AboutUs = () => {
         </p>
       </div>
 
-      {/* Mission Section */}
-      <section style={styles.section}>
-        <div style={styles.sectionContent}>
-          <h2 style={styles.sectionTitle}>Our Mission</h2>
-          <p style={styles.sectionText}>
-            At MathLit Hub, our mission is to enhance students' mathematical literacy in finding the equation of a line by providing accessible, engaging, and effective digital learning experiences. The platform aims to support learners in understanding key concepts such as slope, intercepts, and linear relationships through interactive lessons, collaborative activities, and real-life applications. We believe that every student can develop strong problem-solving skills in mathematics when guided by meaningful tasks, appropriate tools, and a supportive learning environment.
-          </p>
-        </div>
-      </section>
-
-      {/* Vision Section */}
+      {/* Vision Section - NOW FIRST */}
       <section style={styles.sectionAlt}>
         <div style={styles.sectionContent}>
           <h2 style={styles.sectionTitle}>Our Vision</h2>
@@ -54,7 +44,17 @@ const AboutUs = () => {
         </div>
       </section>
 
-      {/* Learning Objectives Section - NEW */}
+      {/* Mission Section - NOW SECOND */}
+      <section style={styles.section}>
+        <div style={styles.sectionContent}>
+          <h2 style={styles.sectionTitle}>Our Mission</h2>
+          <p style={styles.sectionText}>
+            At MathLit Hub, our mission is to enhance students' mathematical literacy in finding the equation of a line by providing accessible, engaging, and effective digital learning experiences. The platform aims to support learners in understanding key concepts such as slope, intercepts, and linear relationships through interactive lessons, collaborative activities, and real-life applications. We believe that every student can develop strong problem-solving skills in mathematics when guided by meaningful tasks, appropriate tools, and a supportive learning environment.
+          </p>
+        </div>
+      </section>
+
+      {/* Learning Objectives Section */}
       <section style={styles.learningObjectivesSection}>
         <div style={styles.sectionContent}>
           <h2 style={styles.sectionTitle}>Learning Objectives</h2>
@@ -346,7 +346,8 @@ const styles = {
     color: '#FFFFFF',
     fontWeight: '700',
     marginBottom: '20px',
-    letterSpacing: '-0.02em'
+    letterSpacing: '-0.02em',
+    textAlign: 'center'
   },
   subtitle: {
     fontSize: 'clamp(16px, 4vw, 18px)',
@@ -354,7 +355,8 @@ const styles = {
     opacity: '0.95',
     maxWidth: '700px',
     margin: '0 auto',
-    lineHeight: '1.6'
+    lineHeight: '1.6',
+    textAlign: 'justify'
   },
   section: {
     padding: 'clamp(60px, 10vh, 80px) 20px',
@@ -397,7 +399,7 @@ const styles = {
     lineHeight: '1.8',
     maxWidth: '800px',
     margin: '0 auto',
-    textAlign: 'center'
+    textAlign: 'justify'
   },
   // Learning Objectives Styles
   objectivesGrid: {
@@ -443,7 +445,7 @@ const styles = {
     fontSize: 'clamp(14px, 3.5vw, 16px)',
     color: '#4B5563',
     lineHeight: '1.7',
-    textAlign: 'center'
+    textAlign: 'justify'
   },
   offeringsGrid: {
     display: 'grid',
@@ -475,7 +477,8 @@ const styles = {
   offerText: {
     fontSize: 'clamp(14px, 3.5vw, 16px)',
     color: '#6B7280',
-    lineHeight: '1.6'
+    lineHeight: '1.6',
+    textAlign: 'justify'
   },
   researchersGrid: {
     display: 'grid',
@@ -559,7 +562,7 @@ const styles = {
     fontSize: 'clamp(14px, 3.5vw, 15px)',
     color: '#6B7280',
     lineHeight: '1.7',
-    textAlign: 'left'
+    textAlign: 'justify'
   },
   ctaSection: {
     padding: 'clamp(60px, 10vh, 80px) 20px',
@@ -578,7 +581,8 @@ const styles = {
     opacity: '0.95',
     marginBottom: '30px',
     maxWidth: '600px',
-    margin: '0 auto 30px auto'
+    margin: '0 auto 30px auto',
+    textAlign: 'center'
   },
   ctaButtons: {
     display: 'flex',

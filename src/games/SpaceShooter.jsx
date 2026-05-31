@@ -1,9 +1,10 @@
 // src/games/SpaceShooter.jsx - FULLY RESPONSIVE with MUSIC & SOUND EFFECTS
+// MOBILE OPTIMIZED - Larger text, left/right buttons on left, shoot button on right
+// Canvas fills available space, all elements visible without scrolling
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaArrowRight, FaCrosshairs, FaVolumeUp, FaVolumeMute, FaMusic } from 'react-icons/fa';
 
-// Background Music using HTML5 Audio with spec2.mp3 (same as EquationEscapeRoom)
 class BackgroundMusic {
   constructor() {
     this.audio = null;
@@ -61,6 +62,7 @@ class BackgroundMusic {
 const SpaceShooter = () => {
   const navigate = useNavigate();
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
 
   const [gameState, setGameState] = useState('menu');
   const [score, setScore] = useState(0);
@@ -72,7 +74,7 @@ const SpaceShooter = () => {
   const [wrongShots, setWrongShots] = useState(0);
   const [correctShots, setCorrectShots] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 800 });
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 800 });
   
   const [gameStartTime, setGameStartTime] = useState(null);
   const [gameResultSent, setGameResultSent] = useState(false);
@@ -84,13 +86,11 @@ const SpaceShooter = () => {
   const [correctAnswers, setCorrectAnswers] = useState(0);
   const [wrongAnswers, setWrongAnswers] = useState(0);
   
-  // Music states (same as EquationEscapeRoom)
   const [isMusicMuted, setIsMusicMuted] = useState(false);
   const [isSoundEffectsMuted, setIsSoundEffectsMuted] = useState(false);
   const [musicVolume, setMusicVolume] = useState(0.3);
   const [showMusicNote, setShowMusicNote] = useState(false);
   
-  // Background music instance
   const backgroundMusic = useRef(null);
   const sfxAudioContext = useRef(null);
 
@@ -112,7 +112,6 @@ const SpaceShooter = () => {
 
   const xpSoFar = React.useMemo(() => (correctAnswers * 10) - (wrongAnswers * 5), [correctAnswers, wrongAnswers]);
 
-  // Load saved preferences
   useEffect(() => {
     const savedMusicMute = localStorage.getItem('spaceShooterMusicMuted');
     const savedSfxMute = localStorage.getItem('spaceShooterSfxMuted');
@@ -127,13 +126,11 @@ const SpaceShooter = () => {
     }
   }, []);
 
-  // Initialize Background Music
   useEffect(() => {
     backgroundMusic.current = new BackgroundMusic();
     backgroundMusic.current.setMuted(isMusicMuted);
     backgroundMusic.current.setVolume(musicVolume);
     
-    // Initialize SFX Audio Context
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       sfxAudioContext.current = new AudioCtx();
@@ -151,11 +148,9 @@ const SpaceShooter = () => {
     };
   }, []);
 
-  // Handle music playback based on game state
   useEffect(() => {
     if (backgroundMusic.current) {
       backgroundMusic.current.setMuted(isMusicMuted);
-      
       if (gameState === 'playing' && !showLevelAnnouncement && !isMusicMuted) {
         backgroundMusic.current.startMusic();
       } else {
@@ -164,20 +159,17 @@ const SpaceShooter = () => {
     }
   }, [gameState, showLevelAnnouncement, isMusicMuted]);
 
-  // Update volume when changed
   useEffect(() => {
     if (backgroundMusic.current) {
       backgroundMusic.current.setVolume(musicVolume);
     }
   }, [musicVolume]);
 
-  // Toggle music function
   const toggleMusic = () => {
     const newMuteState = !isMusicMuted;
     setIsMusicMuted(newMuteState);
     localStorage.setItem('spaceShooterMusicMuted', newMuteState);
     if (backgroundMusic.current) backgroundMusic.current.setMuted(newMuteState);
-    
     setShowMusicNote(true);
     setTimeout(() => setShowMusicNote(false), 1000);
   };
@@ -195,21 +187,17 @@ const SpaceShooter = () => {
     localStorage.setItem('spaceShooterMusicVolume', newVolume);
   };
 
-  // Sound effect functions using Web Audio API
   const playShootSound = useCallback(() => {
     if (isSoundEffectsMuted || !sfxAudioContext.current) return;
     try {
       const ctx = sfxAudioContext.current;
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       oscillator.connect(gain);
       gain.connect(ctx.destination);
-      
       oscillator.type = 'square';
       oscillator.frequency.value = 880;
       gain.gain.value = 0.1;
-      
       oscillator.start();
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
       oscillator.stop(ctx.currentTime + 0.3);
@@ -224,14 +212,11 @@ const SpaceShooter = () => {
       const ctx = sfxAudioContext.current;
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       oscillator.connect(gain);
       gain.connect(ctx.destination);
-      
       oscillator.type = 'sawtooth';
       oscillator.frequency.value = 200;
       gain.gain.value = 0.15;
-      
       oscillator.start();
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.5);
       oscillator.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.5);
@@ -249,14 +234,11 @@ const SpaceShooter = () => {
       notes.forEach((freq, index) => {
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
-        
         oscillator.connect(gain);
         gain.connect(ctx.destination);
-        
         oscillator.type = 'sine';
         oscillator.frequency.value = freq;
         gain.gain.value = 0.1;
-        
         oscillator.start(ctx.currentTime + index * 0.1);
         gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + index * 0.1 + 0.3);
         oscillator.stop(ctx.currentTime + index * 0.1 + 0.3);
@@ -274,14 +256,11 @@ const SpaceShooter = () => {
       notes.forEach((freq, index) => {
         const oscillator = ctx.createOscillator();
         const gain = ctx.createGain();
-        
         oscillator.connect(gain);
         gain.connect(ctx.destination);
-        
         oscillator.type = 'sawtooth';
         oscillator.frequency.value = freq;
         gain.gain.value = 0.15;
-        
         oscillator.start(ctx.currentTime + index * 0.15);
         gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + index * 0.15 + 0.4);
         oscillator.stop(ctx.currentTime + index * 0.15 + 0.4);
@@ -297,14 +276,11 @@ const SpaceShooter = () => {
       const ctx = sfxAudioContext.current;
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       oscillator.connect(gain);
       gain.connect(ctx.destination);
-      
       oscillator.type = 'sine';
       oscillator.frequency.value = 523.25;
       gain.gain.value = 0.12;
-      
       oscillator.start();
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.2);
       oscillator.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2);
@@ -320,14 +296,11 @@ const SpaceShooter = () => {
       const ctx = sfxAudioContext.current;
       const oscillator = ctx.createOscillator();
       const gain = ctx.createGain();
-      
       oscillator.connect(gain);
       gain.connect(ctx.destination);
-      
       oscillator.type = 'triangle';
       oscillator.frequency.value = 174.61;
       gain.gain.value = 0.12;
-      
       oscillator.start();
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
       oscillator.frequency.exponentialRampToValueAtTime(130.81, ctx.currentTime + 0.3);
@@ -401,28 +374,50 @@ const SpaceShooter = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
+  // Fit canvas to mobile screen
   useEffect(() => {
-    const checkMobile = () => {
+    const updateCanvasSize = () => {
       const isMobileDevice = window.innerWidth <= 768;
       setIsMobile(isMobileDevice);
       
-      const container = canvasRef.current?.parentElement;
-      if (container) {
-        const maxWidth = Math.min(800, window.innerWidth - 40);
-        const scale = maxWidth / 800;
-        setCanvasDimensions({
-          width: maxWidth,
-          height: 800 * scale
-        });
-        if (canvasRef.current) {
-          canvasRef.current.style.width = `${maxWidth}px`;
-          canvasRef.current.style.height = `${800 * scale}px`;
+      const viewportHeight = window.innerHeight;
+      const topOffset = isMobileDevice ? 50 : 55;
+      const bottomOffset = isMobileDevice ? 85 : 20;
+      const availableHeight = viewportHeight - topOffset - bottomOffset;
+      
+      let canvasWidth, canvasHeight;
+      
+      if (isMobileDevice) {
+        canvasHeight = Math.min(availableHeight, window.innerWidth - 16);
+        canvasWidth = canvasHeight;
+        
+        if (canvasWidth > window.innerWidth - 16) {
+          canvasWidth = window.innerWidth - 16;
+          canvasHeight = canvasWidth;
         }
+      } else {
+        canvasHeight = Math.min(800, availableHeight);
+        canvasWidth = canvasHeight;
+      }
+      
+      setCanvasSize({
+        width: canvasWidth,
+        height: canvasHeight
+      });
+      
+      if (canvasRef.current) {
+        canvasRef.current.style.width = `${canvasWidth}px`;
+        canvasRef.current.style.height = `${canvasHeight}px`;
       }
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    
+    updateCanvasSize();
+    window.addEventListener('resize', updateCanvasSize);
+    window.addEventListener('orientationchange', updateCanvasSize);
+    return () => {
+      window.removeEventListener('resize', updateCanvasSize);
+      window.removeEventListener('orientationchange', updateCanvasSize);
+    };
   }, []);
 
   const questions = [
@@ -442,7 +437,7 @@ const SpaceShooter = () => {
 
   const calculateEnemyDimensions = useCallback((text) => {
     const ctx = document.createElement('canvas').getContext('2d');
-    ctx.font = `bold 14px "Courier New", monospace`;
+    ctx.font = `bold 15px "Courier New", monospace`;
     
     let displayText = text;
     if (displayText && displayText.includes('. ')) {
@@ -450,10 +445,10 @@ const SpaceShooter = () => {
     }
     
     const textWidth = ctx.measureText(displayText).width;
-    const width = Math.min(220, Math.max(110, textWidth + 30));
+    const width = Math.min(250, Math.max(140, textWidth + 35));
     let height = 70;
-    if (textWidth > 140) height = 85;
-    if (textWidth > 180) height = 100;
+    if (textWidth > 160) height = 85;
+    if (textWidth > 210) height = 100;
     
     return { width, height };
   }, []);
@@ -503,7 +498,7 @@ const SpaceShooter = () => {
 
   const advanceToNextLevel = useCallback(() => {
     playLevelUpSound();
-    setLevel(prev => { const newLevel = prev + 1; setHighestLevel(h => Math.max(h, newLevel)); gameRef.current.currentSpeedMultiplier = 1.0; gameRef.current.spawnDelay = Math.max(60, 120 - (newLevel - 1) * 8); setLevelAnnouncement(`LEVEL ${newLevel}`); setShowLevelAnnouncement(true); gameRef.current.waitingForSpace = true; gameRef.current.gameActive = false; setCurrentQuestion(getRandomQuestion()); gameRef.current.enemies = []; gameRef.current.bullets = []; const enemyCount = Math.min(5, 3 + Math.floor(newLevel / 3)); for (let i = 0; i < enemyCount; i++) { const e = createEnemy(); if (e) { e.y = -60 - (i * 50); gameRef.current.enemies.push(e); } } setFeedback({ message: `🔥 LEVEL UP! Level ${newLevel} 🔥`, type: 'success' }); return newLevel; });
+    setLevel(prev => { const newLevel = prev + 1; setHighestLevel(h => Math.max(h, newLevel)); gameRef.current.currentSpeedMultiplier = 1.0; gameRef.current.spawnDelay = Math.max(60, 120 - (newLevel - 1) * 8); setLevelAnnouncement(`LEVEL ${newLevel}`); setShowLevelAnnouncement(true); gameRef.current.waitingForSpace = true; gameRef.current.gameActive = false; setCurrentQuestion(getRandomQuestion()); gameRef.current.enemies = []; gameRef.current.bullets = []; const enemyCount = Math.min(4, 2 + Math.floor(newLevel / 3)); for (let i = 0; i < enemyCount; i++) { const e = createEnemy(); if (e) { e.y = -60 - (i * 50); gameRef.current.enemies.push(e); } } setFeedback({ message: `🔥 LEVEL UP! Level ${newLevel} 🔥`, type: 'success' }); return newLevel; });
     setCorrectShots(0);
   }, [getRandomQuestion, createEnemy, playLevelUpSound]);
 
@@ -569,7 +564,7 @@ const SpaceShooter = () => {
     if (game.keys['Space']) shoot();
     game.bullets = game.bullets.filter(b => { b.y -= b.speed; return b.y > -20; });
     game.spawnTimer++;
-    const maxEnemies = Math.min(6, 4 + Math.floor(level / 2));
+    const maxEnemies = Math.min(5, 3 + Math.floor(level / 2));
     if (game.spawnTimer > (game.spawnDelay || 120) && game.enemies.length < maxEnemies) { const newEnemy = createEnemy(); if (newEnemy) { newEnemy.y = -60; newEnemy.x = Math.random() * (800 - newEnemy.width - 10); game.enemies.push(newEnemy); game.spawnTimer = 0; } }
     game.enemies.forEach(e => { 
       e.x += e.horizontalSpeed * e.direction; 
@@ -630,29 +625,59 @@ const SpaceShooter = () => {
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
+    const scale = canvasSize.width / 800;
+    
+    // Background
     const gradient = ctx.createLinearGradient(0, 0, 0, 800);
-    gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`); gradient.addColorStop(1, '#000000');
-    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 800, 800);
+    gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`);
+    gradient.addColorStop(1, '#000000');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 800, 800);
+    
+    // Stars
     ctx.fillStyle = 'white';
-    for (let i = 0; i < 200 + Math.floor(level * 5); i++) ctx.fillRect((i * 131) % 800, (i * 253) % 800, 1.5, 1.5);
+    for (let i = 0; i < 150; i++) {
+      ctx.fillRect((i * 131) % 800, (i * 253) % 800, 1.5, 1.5);
+    }
+    
+    // Player ship
     ctx.fillStyle = '#ff6600';
-    ctx.beginPath(); ctx.moveTo(game.player.x + 5, game.player.y + 15); ctx.lineTo(game.player.x + 15, game.player.y + 10); ctx.lineTo(game.player.x + 15, game.player.y + 20); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(game.player.x + 5, game.player.y + 15);
+    ctx.lineTo(game.player.x + 15, game.player.y + 10);
+    ctx.lineTo(game.player.x + 15, game.player.y + 20);
+    ctx.fill();
     ctx.fillStyle = '#00ffff';
-    ctx.beginPath(); ctx.moveTo(game.player.x + 20, game.player.y); ctx.lineTo(game.player.x + 5, game.player.y + 20); ctx.lineTo(game.player.x + 20, game.player.y + 15); ctx.lineTo(game.player.x + 35, game.player.y + 20); ctx.fill();
-    ctx.fillStyle = '#0099ff'; ctx.fillRect(game.player.x + 15, game.player.y + 12, 10, 15);
-    ctx.fillStyle = '#ff4400'; ctx.fillRect(game.player.x + 32, game.player.y + 27, 6, 10);
+    ctx.beginPath();
+    ctx.moveTo(game.player.x + 20, game.player.y);
+    ctx.lineTo(game.player.x + 5, game.player.y + 20);
+    ctx.lineTo(game.player.x + 20, game.player.y + 15);
+    ctx.lineTo(game.player.x + 35, game.player.y + 20);
+    ctx.fill();
+    ctx.fillStyle = '#0099ff';
+    ctx.fillRect(game.player.x + 15, game.player.y + 12, 10, 15);
+    ctx.fillStyle = '#ff4400';
+    ctx.fillRect(game.player.x + 32, game.player.y + 27, 6, 10);
+    
+    // Bullets
     ctx.fillStyle = '#ffff00';
     game.bullets.forEach(b => ctx.fillRect(b.x, b.y, b.width, b.height));
-    game.particles.forEach(p => { ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`; ctx.fillRect(p.x, p.y, 4, 4); });
     
+    // Particles
+    game.particles.forEach(p => {
+      ctx.fillStyle = `rgba(255, 100, 0, ${p.life / 30})`;
+      ctx.fillRect(p.x, p.y, 3, 3);
+    });
+    
+    // Enemies
     game.enemies.forEach(e => {
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(e.x, e.y, e.width, e.height);
       ctx.fillStyle = '#16213e';
       ctx.fillRect(e.x + 3, e.y + 3, e.width - 6, e.height - 6);
       ctx.fillStyle = '#ff3333';
-      ctx.fillRect(e.x + 10, e.y + 12, 12, 8);
-      ctx.fillRect(e.x + e.width - 22, e.y + 12, 12, 8);
+      ctx.fillRect(e.x + 8, e.y + 10, 10, 7);
+      ctx.fillRect(e.x + e.width - 18, e.y + 10, 10, 7);
       
       ctx.fillStyle = '#e0e0e0';
       
@@ -661,101 +686,95 @@ const SpaceShooter = () => {
         displayText = displayText.substring(displayText.indexOf('. ') + 2);
       }
       
-      let fontSize = 14;
+      let fontSize = Math.max(13, Math.min(18, 15 * scale));
       ctx.font = `bold ${fontSize}px "Courier New", monospace`;
       let textWidth = ctx.measureText(displayText || "?").width;
       
-      while (textWidth > e.width - 16 && fontSize > 11) {
+      while (textWidth > e.width - 16 && fontSize > 10) {
         fontSize--;
         ctx.font = `bold ${fontSize}px "Courier New", monospace`;
         textWidth = ctx.measureText(displayText || "?").width;
       }
       
-      let line1 = displayText;
-      let line2 = "";
-      if (textWidth > e.width - 16 && fontSize <= 11) {
-        const words = displayText.split(' ');
-        line1 = "";
-        line2 = "";
-        let currentLine = "";
-        for (let i = 0; i < words.length; i++) {
-          const testLine = currentLine + (currentLine ? " " : "") + words[i];
-          const testWidth = ctx.measureText(testLine).width;
-          if (testWidth > e.width - 16 && currentLine !== "") {
-            line1 = currentLine;
-            line2 = words.slice(i).join(' ');
-            break;
-          }
-          currentLine = testLine;
-        }
-        if (line1 === "") {
-          const midPoint = Math.floor(displayText.length / 2);
-          line1 = displayText.substring(0, midPoint);
-          line2 = displayText.substring(midPoint);
-        }
-        fontSize = 12;
-        ctx.font = `bold ${fontSize}px "Courier New", monospace`;
-      }
+      const textX = e.x + (e.width / 2) - (textWidth / 2);
+      const textY = e.y + (e.height / 2) + 6;
       
-      if (line2) {
-        const line1Width = ctx.measureText(line1).width;
-        const line2Width = ctx.measureText(line2).width;
-        const line1X = e.x + (e.width / 2) - (line1Width / 2);
-        const line2X = e.x + (e.width / 2) - (line2Width / 2);
-        const line1Y = e.y + (e.height / 2) - 10;
-        const line2Y = e.y + (e.height / 2) + 10;
-        
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 4;
-        ctx.fillText(line1, line1X, line1Y);
-        ctx.fillText(line2, line2X, line2Y);
-        ctx.shadowBlur = 0;
-      } else {
-        const textX = e.x + (e.width / 2) - (textWidth / 2);
-        const textY = e.y + (e.height / 2) + 6;
-        
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur = 4;
-        ctx.fillText(displayText || "?", textX, textY);
-        ctx.shadowBlur = 0;
-      }
+      ctx.shadowColor = 'rgba(0,0,0,0.8)';
+      ctx.shadowBlur = 3;
+      ctx.fillText(displayText || "?", textX, textY);
+      ctx.shadowBlur = 0;
       
       ctx.strokeStyle = '#ffaa44';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
     });
     
-    if (feedback.message && gameState === 'playing') { 
-      ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336'; 
-      ctx.font = `bold ${Math.min(22, Math.max(16, 22 * (canvasDimensions.width / 800)))}px Arial`; 
-      ctx.fillText(feedback.message, 180, 120); 
-      setTimeout(() => setFeedback({ message: '', type: '' }), 1500); 
+    // Feedback
+    if (feedback.message && gameState === 'playing') {
+      ctx.fillStyle = feedback.type === 'success' ? '#4caf50' : '#f44336';
+      ctx.font = `bold ${Math.max(14, Math.min(22, 16 * scale))}px Arial`;
+      const msgX = 400 - ctx.measureText(feedback.message).width / 2;
+      ctx.fillText(feedback.message, msgX, 90);
+      setTimeout(() => setFeedback({ message: '', type: '' }), 1500);
     }
+    
+    // Level announcement
     if (showLevelAnnouncement && gameState === 'playing') {
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; ctx.fillRect(0, 0, 800, 800);
-      ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(50, Math.max(35, 50 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(levelAnnouncement, 280, 380);
-      ctx.fillStyle = '#ffffff'; ctx.font = `${Math.min(28, Math.max(20, 28 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Press SPACE to start!', 260, 460);
-      ctx.fillStyle = '#88ff88'; ctx.font = `${Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('Shoot the correct answer for each question!', 220, 520);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+      ctx.fillRect(0, 0, 800, 800);
+      ctx.fillStyle = '#ffd700';
+      ctx.font = `bold ${Math.max(32, Math.min(55, 38 * scale))}px Arial`;
+      const levelX = 400 - ctx.measureText(levelAnnouncement).width / 2;
+      ctx.fillText(levelAnnouncement, levelX, 380);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.max(16, Math.min(26, 19 * scale))}px Arial`;
+      const spaceX = 400 - ctx.measureText('Press SPACE to start!').width / 2;
+      ctx.fillText('Press SPACE to start!', spaceX, 460);
+      ctx.fillStyle = '#88ff88';
+      ctx.font = `${Math.max(13, Math.min(20, 15 * scale))}px Arial`;
+      const shootX = 400 - ctx.measureText('Shoot the correct answer!').width / 2;
+      ctx.fillText('Shoot the correct answer!', shootX, 520);
     }
-    const titleFont = Math.min(20, Math.max(14, 20 * (canvasDimensions.width / 800)));
-    ctx.fillStyle = '#ffffff'; ctx.font = `bold ${titleFont}px Arial`; ctx.fillText(`Score: ${score}`, 20, 40);
-    ctx.fillText(`Mistakes: ${wrongShots}/3`, 20, 75);
-    ctx.fillStyle = '#ffd700'; ctx.font = `bold ${Math.min(28, Math.max(20, 28 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`LEVEL ${level}`, 20, 125);
-    ctx.fillStyle = '#aaffaa'; ctx.font = `bold ${Math.min(18, Math.max(13, 18 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`⭐ XP: ${xpSoFar} (+${correctAnswers * 10}/-${wrongAnswers * 5})`, 20, 155);
+    
+    // UI Stats - larger text for mobile
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.max(14, Math.min(22, 16 * scale))}px Arial`;
+    ctx.fillText(`Score: ${score}`, 8, 30);
+    ctx.fillText(`Mistakes: ${wrongShots}/3`, 8, 58);
+    ctx.fillStyle = '#ffd700';
+    ctx.font = `bold ${Math.max(18, Math.min(28, 20 * scale))}px Arial`;
+    ctx.fillText(`LVL ${level}`, 8, 92);
+    ctx.fillStyle = '#aaffaa';
+    ctx.font = `bold ${Math.max(11, Math.min(17, 13 * scale))}px Arial`;
+    ctx.fillText(`XP: ${xpSoFar}`, 8, 115);
+    
+    // Speed indicator
     ctx.fillStyle = game.currentSpeedMultiplier > 2 ? '#ff4444' : (game.currentSpeedMultiplier > 1.5 ? '#ffaa44' : '#88ff88');
-    ctx.fillText(`SPEED: ${game.currentSpeedMultiplier.toFixed(1)}x`, 20, 185);
-    const requiredCorrect = 5 + Math.floor(level / 2); const progress = (correctShots / requiredCorrect) * 100;
-    ctx.fillStyle = '#666666'; ctx.fillRect(20, 210, 150, 12);
-    ctx.fillStyle = '#4caf50'; ctx.fillRect(20, 210, (progress / 100) * 150, 12);
-    ctx.fillStyle = '#cccccc'; ctx.font = `${Math.min(15, Math.max(11, 15 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`${correctShots}/${requiredCorrect} to level up`, 20, 205);
-    if (totalShots > 0) { ctx.fillStyle = '#88ff88'; ctx.fillText(`Accuracy: ${Math.round((totalCorrect / totalShots) * 100)}% (${totalCorrect}/${totalShots})`, 20, 240); }
-    ctx.fillStyle = '#ffaa88'; ctx.font = `${Math.min(13, Math.max(9, 13 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText(`+10 XP/correct, -5 XP/wrong`, 20, 260);
-    ctx.fillText(`✅ ${correctAnswers} | ❌ ${wrongAnswers}`, 20, 278);
+    ctx.fillText(`⚡${game.currentSpeedMultiplier.toFixed(1)}x`, 8, 138);
+    
+    // Progress bar
+    const requiredCorrect = 5 + Math.floor(level / 2);
+    const progress = (correctShots / requiredCorrect) * 100;
+    ctx.fillStyle = '#666666';
+    ctx.fillRect(8, 152, 110, 8);
+    ctx.fillStyle = '#4caf50';
+    ctx.fillRect(8, 152, (progress / 100) * 110, 8);
+    ctx.fillStyle = '#cccccc';
+    ctx.font = `${Math.max(10, Math.min(15, 12 * scale))}px Arial`;
+    ctx.fillText(`${correctShots}/${requiredCorrect}`, 8, 149);
+    
+    // Accuracy
+    if (totalShots > 0) {
+      ctx.fillStyle = '#88ff88';
+      ctx.fillText(`Acc: ${Math.round((totalCorrect / totalShots) * 100)}%`, 8, 175);
+    }
+    
+    // Question at top - larger and centered
     if (currentQuestion && !showLevelAnnouncement && game.gameActive && gameState === 'playing') {
-      ctx.fillStyle = '#ffd700'; 
-      ctx.font = `bold ${Math.min(22, Math.max(17, 22 * (canvasDimensions.width / 800)))}px Arial`;
+      ctx.fillStyle = '#ffd700';
+      ctx.font = `bold ${Math.max(13, Math.min(19, 15 * scale))}px Arial`;
       let qText = currentQuestion.text;
-      const maxWidth = 560;
+      const maxWidth = Math.min(500, 650 * scale);
       const words = qText.split(' ');
       let lines = [];
       let currentLine = '';
@@ -772,141 +791,154 @@ const SpaceShooter = () => {
       }
       lines.push(currentLine);
       
-      let yOffset = 35;
+      let yOffset = 28;
       for (let i = 0; i < lines.length; i++) {
-        ctx.fillText(`${lines[i]}`, 200, yOffset);
-        yOffset += 26;
+        const lineX = 400 - ctx.measureText(lines[i]).width / 2;
+        ctx.fillText(lines[i], lineX, yOffset);
+        yOffset += 22;
       }
       
-      ctx.fillStyle = '#88ff88'; 
-      ctx.font = `bold ${Math.min(16, Math.max(12, 16 * (canvasDimensions.width / 800)))}px Arial`; 
-      ctx.fillText('Shoot the correct answer!', 240, yOffset + 8);
+      ctx.fillStyle = '#88ff88';
+      ctx.font = `bold ${Math.max(11, Math.min(17, 13 * scale))}px Arial`;
+      const shootX = 400 - ctx.measureText('▼ SHOOT CORRECT ANSWER ▼').width / 2;
+      ctx.fillText('▼ SHOOT CORRECT ANSWER ▼', shootX, yOffset + 10);
     }
-    if (!showLevelAnnouncement && game.gameActive && !isMobile && gameState === 'playing') { ctx.fillStyle = '#888888'; ctx.font = `${Math.min(14, Math.max(10, 14 * (canvasDimensions.width / 800)))}px Arial`; ctx.fillText('← → Move', 20, 770); ctx.fillText('SPACE Shoot', 20, 790); }
-    if (!showLevelAnnouncement && game.gameActive && gameState === 'playing') { ctx.fillStyle = '#ff8888'; ctx.fillText(`Enemies: ${game.enemies.length}`, 700, 40); }
-    if (gameState === 'playing' && !showLevelAnnouncement) { ctx.fillStyle = '#aaaaaa'; const mins = Math.floor(timeSpent / 60); const secs = timeSpent % 60; ctx.fillText(`Time: ${mins}:${secs.toString().padStart(2, '0')}`, 700, 75); }
-  }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, isMobile, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, correctAnswers, wrongAnswers, canvasDimensions]);
+    
+    // Enemy count and timer
+    if (!showLevelAnnouncement && game.gameActive && gameState === 'playing') {
+      ctx.fillStyle = '#ff8888';
+      ctx.font = `bold ${Math.max(12, Math.min(18, 14 * scale))}px Arial`;
+      ctx.fillText(`👾 ${game.enemies.length}`, 740, 30);
+    }
+    if (gameState === 'playing' && !showLevelAnnouncement) {
+      ctx.fillStyle = '#aaaaaa';
+      const mins = Math.floor(timeSpent / 60);
+      const secs = timeSpent % 60;
+      ctx.fillText(`⏱ ${mins}:${secs.toString().padStart(2, '0')}`, 735, 58);
+    }
+  }, [score, currentQuestion, feedback, showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, canvasSize]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     let animationId;
-    const loop = () => { if (gameState === 'playing') updateGame(); if (ctx) drawGame(ctx); animationId = requestAnimationFrame(loop); };
+    const loop = () => {
+      if (gameState === 'playing') updateGame();
+      if (ctx) drawGame(ctx);
+      animationId = requestAnimationFrame(loop);
+    };
     loop();
     return () => cancelAnimationFrame(animationId);
   }, [gameState, updateGame, drawGame]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => { 
-      if (e.code === 'Space') { 
-        e.preventDefault(); 
-        gameRef.current.keys['Space'] = true; 
-      } else if (e.key === 'ArrowLeft') { 
-        e.preventDefault(); 
-        gameRef.current.keys['ArrowLeft'] = true; 
-      } else if (e.key === 'ArrowRight') { 
-        e.preventDefault(); 
-        gameRef.current.keys['ArrowRight'] = true; 
-      } 
+    const handleKeyDown = (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        gameRef.current.keys['Space'] = true;
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        gameRef.current.keys['ArrowLeft'] = true;
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        gameRef.current.keys['ArrowRight'] = true;
+      }
     };
-    const handleKeyUp = (e) => { 
-      if (e.code === 'Space') gameRef.current.keys['Space'] = false; 
-      else if (e.key === 'ArrowLeft') gameRef.current.keys['ArrowLeft'] = false; 
-      else if (e.key === 'ArrowRight') gameRef.current.keys['ArrowRight'] = false; 
+    const handleKeyUp = (e) => {
+      if (e.code === 'Space') gameRef.current.keys['Space'] = false;
+      else if (e.key === 'ArrowLeft') gameRef.current.keys['ArrowLeft'] = false;
+      else if (e.key === 'ArrowRight') gameRef.current.keys['ArrowRight'] = false;
     };
-    window.addEventListener('keydown', handleKeyDown); 
+    window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    return () => { 
-      window.removeEventListener('keydown', handleKeyDown); 
-      window.removeEventListener('keyup', handleKeyUp); 
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
 
   const totalXPEarned = (correctAnswers * 10) - (wrongAnswers * 5);
 
   return (
-    <div style={styles.container} onClick={resumeAudio}>
-      {/* Music Controls - Same as EquationEscapeRoom */}
+    <div style={styles.container} onClick={resumeAudio} ref={containerRef}>
+      {/* Music Controls */}
       <div style={styles.musicControls}>
-        <button onClick={toggleMusic} style={styles.musicButton} title={isMusicMuted ? "Unmute Music" : "Mute Music"}>
+        <button onClick={toggleMusic} style={styles.musicButton}>
           {isMusicMuted ? <FaVolumeMute /> : <FaMusic />}
         </button>
-        <button onClick={toggleSoundEffects} style={styles.musicButton} title={isSoundEffectsMuted ? "Unmute Sound Effects" : "Mute Sound Effects"}>
+        <button onClick={toggleSoundEffects} style={styles.musicButton}>
           {isSoundEffectsMuted ? <FaVolumeMute /> : <FaVolumeUp />}
         </button>
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
-          value={musicVolume}
-          onChange={handleMusicVolumeChange}
-          style={styles.volumeSlider}
-          title="Music Volume"
-        />
+        <input type="range" min="0" max="1" step="0.01" value={musicVolume} onChange={handleMusicVolumeChange} style={styles.volumeSlider} />
       </div>
       
       {showMusicNote && <div style={styles.musicNoteAnimation}>🎵</div>}
 
       <div style={styles.topBar}>
-        <button onClick={handleBackToGames} style={styles.backButton}><FaArrowLeft style={styles.backIcon} /> Back</button>
+        <button onClick={handleBackToGames} style={styles.backButton}>
+          <FaArrowLeft style={styles.backIcon} /> Back
+        </button>
       </div>
+      
       <div style={styles.gameWrapper}>
-        <canvas 
-          ref={canvasRef} 
-          width={800} 
-          height={800} 
+        <canvas
+          ref={canvasRef}
+          width={800}
+          height={800}
           style={{
             ...styles.canvas,
-            width: '100%',
-            height: 'auto',
-            maxWidth: '100%'
-          }} 
+            width: `${canvasSize.width}px`,
+            height: `${canvasSize.height}px`,
+            touchAction: 'none',
+            display: 'block'
+          }}
         />
+        
         {gameState === 'menu' && (
-          <div style={styles.menuOverlay}>
+          <div style={{...styles.menuOverlay, width: canvasSize.width, height: canvasSize.height}}>
             <div style={styles.menuContent}>
-              <h1 style={styles.gameTitle}>🚀 Equation Shooter 🚀</h1>
+              <h1 style={styles.gameTitle}>🚀 Equation Shooter</h1>
               <p style={styles.gameSubtitle}>Shoot the correct answer!</p>
               <div style={styles.features}>
-                <p><strong>How to Play:</strong></p>
-                <p>🎯 Read the question at the top</p>
-                <p>💡 Each enemy has an answer choice</p>
-                <p>🔫 Shoot the CORRECT answer!</p>
-                <p>⚠️ Wrong answer = -10 points + mistake</p>
+                <p>🎯 Read the question</p>
+                <p>🔫 Shoot CORRECT answer!</p>
+                <p>⚠️ 3 mistakes = Game Over!</p>
                 <p>⭐ +10 XP/correct, -5 XP/wrong</p>
-                <p>💀 3 mistakes = Game Over!</p>
-                <p>⚡ Each correct = speed increase!</p>
-                <p>🎵 Background music: spec2.mp3</p>
               </div>
               <button onClick={startGame} style={styles.startButton}>Start Game</button>
             </div>
           </div>
         )}
+        
         {gameState === 'gameOver' && (
-          <div style={styles.gameOverOverlay}>
+          <div style={{...styles.gameOverOverlay, width: canvasSize.width, height: canvasSize.height}}>
             <div style={styles.gameOverContent}>
-              <h2 style={styles.gameOverTitle}>💀 Game Over 💀</h2>
+              <h2 style={styles.gameOverTitle}>💀 Game Over</h2>
               <p style={styles.finalScore}>Score: {score}</p>
               <p>Level {highestLevel}</p>
-              <p>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</p>
-              <p>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</p>
+              <p>✅ {correctAnswers} (+{correctAnswers * 10} XP)</p>
+              <p>❌ {wrongAnswers} (-{wrongAnswers * 5} XP)</p>
               <p>⭐ XP: {totalXPEarned}</p>
-              <p>Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}%</p>
-              <p>Time: {Math.floor(timeSpent / 60)}:{String(timeSpent % 60).padStart(2, '0')}</p>
               <button onClick={startGame} style={styles.retryButton}>Play Again</button>
             </div>
           </div>
         )}
       </div>
+      
       {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
         <div style={styles.mobileControls}>
           <div style={styles.leftControls}>
-            <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}><FaArrowLeft size={28} /></button>
-            <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}><FaArrowRight size={28} /></button>
+            <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}>
+              <FaArrowLeft size={30} />
+            </button>
+            <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}>
+              <FaArrowRight size={30} />
+            </button>
           </div>
           <div style={styles.rightControls}>
-            <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}><FaCrosshairs size={28} /></button>
+            <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={{...styles.mobileButton, ...styles.shootButton}}>
+              <FaCrosshairs size={30} />
+            </button>
           </div>
         </div>
       )}
@@ -915,308 +947,241 @@ const SpaceShooter = () => {
 };
 
 const styles = {
-  container: { 
-    width: '100%', 
-    height: '100%',
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
-    padding: '12px', 
-    boxSizing: 'border-box', 
-    display: 'flex', 
-    flexDirection: 'column', 
-    alignItems: 'center', 
-    justifyContent: 'flex-start',
+  container: {
+    width: '100%',
+    height: '100vh',
+    background: 'linear-gradient(135deg, #1a1a3e 0%, #0a0a2a 100%)',
+    margin: 0,
+    padding: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
     position: 'relative',
-    overflow: 'auto'
+    overflow: 'hidden'
   },
-  musicControls: { 
-    position: 'fixed', 
-    top: '12px', 
-    right: '12px', 
-    display: 'flex', 
-    gap: '8px', 
-    alignItems: 'center', 
-    zIndex: 1001, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    padding: '6px 12px', 
-    borderRadius: '20px', 
-    backdropFilter: 'blur(5px)', 
-    '@media (min-width: 769px)': { top: '20px', right: '20px', padding: '8px 16px', gap: '12px' } 
+  musicControls: {
+    position: 'fixed',
+    top: '8px',
+    right: '8px',
+    display: 'flex',
+    gap: '6px',
+    alignItems: 'center',
+    zIndex: 1001,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: '5px 8px',
+    borderRadius: '25px',
   },
-  musicButton: { 
-    backgroundColor: '#4a6fa5', 
-    color: 'white', 
-    border: 'none', 
-    width: '32px', 
-    height: '32px', 
-    borderRadius: '50%', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    fontSize: '14px', 
-    transition: 'all 0.3s', 
-    '&:hover': { transform: 'scale(1.05)' }, 
-    '@media (min-width: 769px)': { width: '40px', height: '40px', fontSize: '18px' } 
+  musicButton: {
+    backgroundColor: '#4a6fa5',
+    color: 'white',
+    border: 'none',
+    width: '34px',
+    height: '34px',
+    borderRadius: '50%',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '15px',
   },
-  volumeSlider: { 
-    width: '60px', 
-    height: '3px', 
-    cursor: 'pointer', 
-    backgroundColor: '#667eea', 
-    borderRadius: '3px', 
-    '@media (min-width: 769px)': { width: '80px' } 
+  volumeSlider: {
+    width: '65px',
+    height: '3px',
+    cursor: 'pointer',
+    backgroundColor: '#667eea',
+    borderRadius: '3px',
   },
-  musicNoteAnimation: { 
-    position: 'fixed', 
-    top: '50%', 
-    left: '50%', 
-    transform: 'translate(-50%, -50%)', 
-    fontSize: '60px', 
-    animation: 'musicNote 1s ease-out', 
-    pointerEvents: 'none', 
-    zIndex: 2000, 
-    '@media (min-width: 769px)': { fontSize: '100px' } 
+  musicNoteAnimation: {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    fontSize: '50px',
+    animation: 'musicNote 1s ease-out',
+    pointerEvents: 'none',
+    zIndex: 2000,
   },
   topBar: {
     position: 'fixed',
-    top: '10px',
-    left: '10px',
-    display: 'flex',
-    alignItems: 'center',
+    top: '8px',
+    left: '8px',
     zIndex: 1000,
   },
-  backButton: { 
-    backgroundColor: 'rgba(0,0,0,0.85)', 
-    color: 'white', 
-    border: '2px solid rgba(255,255,255,0.3)', 
-    padding: '10px 16px', 
-    borderRadius: '8px', 
-    cursor: 'pointer', 
-    display: 'flex', 
-    alignItems: 'center', 
-    gap: '8px', 
-    fontSize: '14px', 
-    fontWeight: 'bold', 
-    '@media (max-width: 768px)': { 
-      padding: '8px 12px', 
-      fontSize: '12px'
-    }
+  backButton: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    color: 'white',
+    border: '1px solid rgba(255,255,255,0.3)',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '13px',
+    fontWeight: 'bold',
   },
-  backIcon: { 
-    fontSize: '14px',
-    '@media (max-width: 768px)': { fontSize: '12px' }
+  backIcon: {
+    fontSize: '13px',
   },
-  gameWrapper: { 
-    position: 'relative', 
+  gameWrapper: {
+    position: 'relative',
     display: 'flex',
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     width: '100%',
-    maxWidth: '800px',
-    margin: '60px auto 0 auto',
-    boxShadow: '0 10px 40px rgba(0,0,0,0.3)', 
-    borderRadius: '10px', 
-    overflow: 'hidden',
-    '@media (max-width: 768px)': { 
-      marginTop: '50px',
-      marginBottom: '0',
-      width: 'calc(100% - 16px)',
-      borderRadius: '8px'
-    }
   },
-  canvas: { 
-    display: 'block', 
-    border: '3px solid rgba(255,255,255,0.2)', 
-    borderRadius: '10px', 
+  canvas: {
+    display: 'block',
+    border: '2px solid rgba(255,255,255,0.2)',
+    borderRadius: '10px',
     touchAction: 'none',
     backgroundColor: '#000',
-    '@media (max-width: 768px)': {
-      border: '2px solid rgba(255,255,255,0.2)',
-      borderRadius: '8px'
-    }
+    boxShadow: '0 5px 20px rgba(0,0,0,0.3)',
   },
-  menuOverlay: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    background: 'rgba(0,0,0,0.95)', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    color: 'white', 
-    zIndex: 10, 
-    overflow: 'auto'
+  menuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    background: 'rgba(0,0,0,0.95)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '10px',
+    zIndex: 10,
   },
-  menuContent: { 
-    display: 'flex', 
-    flexDirection: 'column', 
-    alignItems: 'center', 
-    gap: '15px', 
-    padding: '20px', 
-    textAlign: 'center', 
-    width: '100%', 
-    maxWidth: '500px',
-    '@media (max-width: 768px)': {
-      gap: '12px',
-      padding: '15px',
-      maxWidth: '90%'
-    }
+  menuContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '15px',
+    textAlign: 'center',
+    width: '85%',
+    maxWidth: '280px',
   },
-  gameTitle: { 
-    fontSize: '28px', 
-    textAlign: 'center', 
-    color: '#ffd700', 
-    '@media (min-width: 769px)': { fontSize: '42px' },
-    '@media (max-width: 768px)': { fontSize: '24px' }
+  gameTitle: {
+    fontSize: '22px',
+    textAlign: 'center',
+    color: '#ffd700',
+    margin: 0,
   },
-  gameSubtitle: { 
-    fontSize: '16px', 
-    textAlign: 'center', 
-    '@media (min-width: 769px)': { fontSize: '20px' },
-    '@media (max-width: 768px)': { fontSize: '14px' }
+  gameSubtitle: {
+    fontSize: '13px',
+    textAlign: 'center',
+    margin: 0,
   },
-  features: { 
-    backgroundColor: 'rgba(0,0,0,0.7)', 
-    padding: '15px', 
-    borderRadius: '10px', 
-    marginTop: '10px', 
-    textAlign: 'left', 
-    lineHeight: '1.8', 
-    width: '100%', 
-    fontSize: '13px', 
-    border: '1px solid rgba(255,255,255,0.2)', 
-    maxHeight: '300px', 
-    overflow: 'auto', 
-    '@media (min-width: 769px)': { padding: '20px', fontSize: '18px', maxHeight: '400px' },
-    '@media (max-width: 768px)': { padding: '12px', fontSize: '12px', maxHeight: '250px' }
+  features: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: '10px',
+    borderRadius: '10px',
+    textAlign: 'left',
+    width: '100%',
+    fontSize: '11px',
+    border: '1px solid rgba(255,255,255,0.2)',
   },
-  startButton: { 
-    padding: '14px 35px', 
-    fontSize: '18px', 
-    fontWeight: 'bold', 
-    background: 'linear-gradient(135deg, #4CAF50, #45a049)', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '50px', 
-    cursor: 'pointer', 
-    minWidth: '180px', 
-    '@media (min-width: 769px)': { padding: '16px 45px', fontSize: '22px', minWidth: '220px' },
-    '@media (max-width: 768px)': { padding: '12px 25px', fontSize: '16px', minWidth: '150px' }
+  startButton: {
+    padding: '8px 20px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #4CAF50, #45a049)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '40px',
+    cursor: 'pointer',
+    minWidth: '130px',
   },
-  gameOverOverlay: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    background: 'rgba(0,0,0,0.95)', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    color: 'white', 
-    textAlign: 'center', 
-    padding: '15px', 
-    zIndex: 10
+  gameOverOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    background: 'rgba(0,0,0,0.95)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '10px',
+    zIndex: 10,
   },
-  gameOverContent: { 
-    display: 'flex', 
-    flexDirection: 'column', 
-    alignItems: 'center', 
-    gap: '12px', 
-    padding: '20px',
-    '@media (max-width: 768px)': {
-      gap: '8px',
-      padding: '15px'
-    }
+  gameOverContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '15px',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: '12px',
+    minWidth: '180px',
+    textAlign: 'center',
   },
-  gameOverTitle: { 
-    fontSize: '28px', 
-    color: '#ff6b6b', 
-    '@media (min-width: 769px)': { fontSize: '48px' },
-    '@media (max-width: 768px)': { fontSize: '24px' }
+  gameOverTitle: {
+    fontSize: '22px',
+    color: '#ff6b6b',
+    margin: 0,
   },
-  finalScore: { 
-    fontSize: '18px', 
-    margin: '5px 0', 
-    '@media (min-width: 769px)': { fontSize: '28px', margin: '8px 0' },
-    '@media (max-width: 768px)': { fontSize: '16px' }
+  finalScore: {
+    fontSize: '16px',
+    margin: '3px 0',
+    fontWeight: 'bold',
   },
-  retryButton: { 
-    padding: '12px 30px', 
-    fontSize: '16px', 
-    fontWeight: 'bold', 
-    background: 'linear-gradient(135deg, #2196F3, #1976D2)', 
-    color: 'white', 
-    border: 'none', 
-    borderRadius: '50px', 
-    cursor: 'pointer', 
-    minWidth: '160px', 
-    '@media (min-width: 769px)': { padding: '14px 40px', fontSize: '20px', minWidth: '180px' },
-    '@media (max-width: 768px)': { padding: '10px 22px', fontSize: '14px', minWidth: '130px' }
+  retryButton: {
+    padding: '6px 16px',
+    fontSize: '13px',
+    fontWeight: 'bold',
+    background: 'linear-gradient(135deg, #2196F3, #1976D2)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '40px',
+    cursor: 'pointer',
+    marginTop: '5px',
   },
-  mobileControls: { 
-    position: 'fixed', 
-    bottom: '15px', 
-    left: 0, 
-    right: 0, 
-    display: 'flex', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    padding: '12px 25px', 
-    backgroundColor: 'rgba(0,0,0,0.85)', 
-    zIndex: 100, 
+  mobileControls: {
+    position: 'fixed',
+    bottom: '15px',
+    left: 0,
+    right: 0,
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 20px',
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    zIndex: 100,
     borderTop: '1px solid rgba(255,255,255,0.2)',
-    '@media (max-width: 768px)': {
-      bottom: '10px',
-      padding: '10px 20px'
-    }
   },
-  leftControls: { 
-    display: 'flex', 
+  leftControls: {
+    display: 'flex',
     gap: '25px',
-    '@media (max-width: 768px)': {
-      gap: '20px'
-    }
   },
-  rightControls: { 
-    display: 'flex' 
+  rightControls: {
+    display: 'flex',
   },
-  mobileButton: { 
-    backgroundColor: 'rgba(255,255,255,0.2)', 
-    border: '2px solid rgba(255,255,255,0.6)', 
-    borderRadius: '60px', 
-    width: '65px', 
-    height: '65px', 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    color: 'white', 
-    cursor: 'pointer', 
-    '@media (min-width: 769px)': { width: '75px', height: '75px' },
-    '@media (max-width: 768px)': { width: '55px', height: '55px' }
+  mobileButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    border: '2px solid rgba(255,255,255,0.6)',
+    borderRadius: '60px',
+    width: '65px',
+    height: '65px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'white',
+    cursor: 'pointer',
   },
-  shootButton: { 
-    backgroundColor: 'rgba(255,80,80,0.8)', 
-    borderColor: '#ffaa44' 
+  shootButton: {
+    backgroundColor: 'rgba(255,80,80,0.85)',
+    borderColor: '#ffaa55',
   }
 };
 
-// Add keyframe animation for music note
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  button:hover:enabled { transform: scale(1.05); } 
-  button:active { transform: scale(0.95); } 
-  @keyframes musicNote { 
-    0% { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 1; } 
-    100% { transform: translate(-50%, -150%) scale(1.5) rotate(20deg); opacity: 0; } 
+  button:hover:enabled { transform: scale(1.05); }
+  button:active { transform: scale(0.95); }
+  @keyframes musicNote {
+    0% { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 1; }
+    100% { transform: translate(-50%, -150%) scale(1.5) rotate(20deg); opacity: 0; }
   }
-  @media (max-width: 480px) { .mobileButton { width: 48px !important; height: 48px !important; } .leftControls { gap: 15px !important; } }
-  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; } 
-  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; cursor: pointer; } 
-  @media (min-width: 769px) { input[type="range"]::-webkit-slider-thumb { width: 16px; height: 16px; } }
+  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; }
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; cursor: pointer; }
 `;
 document.head.appendChild(styleSheet);
 
