@@ -1,4 +1,5 @@
 // src/missions/mission3.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
+// FIX: Avatar on left below Prev button, text justified, larger readable text, no scrolling
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -16,66 +17,80 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showRewardClaimed, setShowRewardClaimed] = useState(false);
   const [isAlreadyCompleted, setIsAlreadyCompleted] = useState(false);
+  const [showCheckPopup, setShowCheckPopup] = useState(false);
+  const [pendingAnswer, setPendingAnswer] = useState(null);
+  const [pendingStepIndex, setPendingStepIndex] = useState(null);
+  const [wrongFeedback, setWrongFeedback] = useState({});
 
   const MISSION_ID = 3;
   const MISSION_XP = 400;
 
   const questions = [
     {
+      title: "Question 1: Point-Slope Form",
       question: "What is the formula of the point-slope form of a linear equation?",
       options: ["y = mx + b", "y - y₁ = m(x - x₁)", "y = x + b", "y₁ - y = m(x₁ - x)"],
       correct: 1,
       explanation: "Point-slope form uses a known slope m and a point (x₁, y₁): y - y₁ = m(x - x₁)."
     },
     {
+      title: "Question 2: Slope Meaning",
       question: "What does the slope represent?",
       options: ["The y-intercept", "The highest point", "The rate of change", "The x-intercept"],
       correct: 2,
       explanation: "Slope tells how steep the line is or how y changes with respect to x."
     },
     {
+      title: "Question 3: Equation with Slope 3",
       question: "What is the equation of a line with slope 3 passing through (2, -1)?",
       options: ["y - 1 = 3(x + 2)", "y + 1 = 3(x + 2)", "y - 1 = 3(x - 2)", "y + 1 = 3(x - 2)"],
       correct: 3,
       explanation: "Substitute m=3, x₁=2, y₁=-1: y - (-1) = 3(x - 2) → y + 1 = 3(x - 2)"
     },
     {
+      title: "Question 4: Equation with Slope -4",
       question: "Find the equation of the line with slope -4 passing through (0, 5).",
       options: ["y - 5 = -4(x - 0)", "y + 5 = -4(x - 0)", "y - 5 = 4(x - 0)", "y + 5 = 4(x - 0)"],
       correct: 0,
       explanation: "Substitute m=-4, x₁=0, y₁=5: y - 5 = -4(x - 0)"
     },
     {
+      title: "Question 5: Identify Slope",
       question: "In the equation y - 2 = 5(x - 1), what is the slope?",
       options: ["2", "1", "-5", "5"],
       correct: 3,
       explanation: "The slope is the coefficient of (x - x₁), which is 5."
     },
     {
+      title: "Question 6: Positive vs Negative Slope",
       question: "How do the graphs of y - 3 = 2(x - 4) and y - 3 = -2(x - 4) differ?",
       options: ["Same line", "One increases, one decreases", "Both horizontal", "Overlap exactly"],
       correct: 1,
       explanation: "Positive slope rises from left to right; negative slope falls from left to right."
     },
     {
+      title: "Question 7: Verify Equation",
       question: "Is the equation y - 5 = 3(x + 2) correct for slope 3 and point (-2, 5)?",
       options: ["No, slope wrong", "Yes, follows formula", "No, point incorrect", "Yes, but only after simplifying"],
       correct: 1,
       explanation: "x + 2 is the same as x - (-2), so it is correct for point (-2, 5)."
     },
     {
+      title: "Question 8: Correct Equation",
       question: "Which is the correct equation for slope 1 and point (3, 2)?",
       options: ["y + 2 = 1(x - 3)", "y - 3 = 1(x - 2)", "y - 2 = 1(x - 3)", "y + 3 = 1(x + 2)"],
       correct: 2,
       explanation: "Substitute correctly: y - y₁ = m(x - x₁) → y - 2 = 1(x - 3)"
     },
     {
+      title: "Question 9: Identify Point-Slope Form",
       question: "Which is a correct example of a point-slope equation?",
       options: ["y = 4x + 2", "y - 4 = 2(x - 1)", "y = x - 5", "y = 3x"],
       correct: 1,
       explanation: "y - 4 = 2(x - 1) is in point-slope form: y - y₁ = m(x - x₁)."
     },
     {
+      title: "Question 10: Real World Application",
       question: "Which situation can be modeled using point-slope form?",
       options: ["Circle's radius changing", "Constant value not changing", "Random pattern", "Decreasing temperature at constant rate"],
       correct: 3,
@@ -84,27 +99,36 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   ];
 
   const steps = [
-    { title: "📐 SLOPE AND A POINT MISSION", content: "Welcome to the Slope and a Point mission! Learn how to find the equation of a line using a given slope and a point.", description: "The point-slope form is: y - y₁ = m(x - x₁). Let's master this concept!", type: "info" },
+    { 
+      title: "📐 SLOPE AND A POINT MISSION", 
+      content: "Welcome to the Slope and a Point mission! Learn how to find the equation of a line using a given slope and a point.", 
+      description: "The point-slope form is: y - y₁ = m(x - x₁). Let's master this concept!", 
+      type: "info" 
+    },
     {
       title: "Lesson: Slope and a Point",
       content: (
-        <div>
-          <p style={respStyles.paragraph}><strong>m</strong> and <strong>(x₁, y₁)</strong></p>
-          <div style={respStyles.imageContainer}>
-            <img src="/image.png" alt="Slope and Point Graph" style={respStyles.lessonImage}
-              onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Ctext x='250' y='150' text-anchor='middle' fill='%23666' font-size='16'%3ESlope = -2, Point (1, 5)%3C/text%3E%3C/svg%3E"; }} />
-            <p style={respStyles.imageCaption}>Figure 1: Line with slope -2 passing through point (1, 5)</p>
+        <div style={{wordBreak: 'break-word', textAlign: 'left'}}>
+          <p style={{marginBottom: '10px', fontSize: 'clamp(12px, 4vw, 16px)', textAlign: 'justify'}}>
+            <strong>Slope (m)</strong> and <strong>a point (x₁, y₁)</strong> can be used to find the equation of a line using the <strong>Point-Slope Form</strong>.
+          </p>
+          <div style={{textAlign: 'center', margin: '10px 0', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '10px'}}>
+            <img src="/image.png" alt="Slope and Point Graph" style={{maxWidth: '100%', height: 'auto', borderRadius: '8px'}}
+              onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Cline x1='100' y1='200' x2='400' y2='50' stroke='%2310b981' stroke-width='3'/%3E%3Ccircle cx='120' cy='190' r='6' fill='%23ef4444'/%3E%3Ctext x='110' y='180' font-size='12' fill='%23ef4444'%3E(1,5)%3C/text%3E%3Ctext x='250' y='280' text-anchor='middle' fill='%23666' font-size='14'%3ESlope = -2, Point (1, 5)%3C/text%3E%3C/svg%3E"; }} />
+            <p style={{fontSize: 'clamp(10px, 3vw, 12px)', color: '#6b7280', marginTop: '6px', fontStyle: 'italic', textAlign: 'center'}}>Figure 1: Line with slope -2 passing through point (1, 5)</p>
           </div>
-          <div style={respStyles.exampleBox}>
-            <h4 style={respStyles.exampleTitle}>📐 Example:</h4>
-            <p>Write the equation of a line with slope <strong>-2</strong> through point <strong>(1, 5)</strong>.</p>
-            <div style={respStyles.solutionBox}>
-              <p><strong>Solution:</strong> Use <strong>Point-slope Form</strong>: y - y₁ = m(x - x₁)</p>
-              <p><strong>Step 1.</strong> m = -2, x₁ = 1, y₁ = 5</p>
-              <p><strong>Step 2.</strong> Substitute: y - 5 = -2(x - 1)</p>
-              <p><strong>Step 3.</strong> Distribute: y - 5 = -2x + 2</p>
-              <p><strong>Step 4.</strong> Add 5: y = -2x + 7</p>
-              <div style={respStyles.resultBoxSmall}>y = -2x + 7 &nbsp;or&nbsp; 2x + y = 7</div>
+          <div style={{backgroundColor: '#f0f9ff', padding: 'clamp(8px, 3vw, 12px)', borderRadius: '10px', marginTop: '12px', textAlign: 'left'}}>
+            <h4 style={{color: '#0369a1', marginBottom: '10px', fontSize: 'clamp(14px, 4vw, 16px)', textAlign: 'left'}}>📐 Example:</h4>
+            <p style={{fontSize: 'clamp(11px, 3.5vw, 14px)', textAlign: 'justify'}}>Write the equation of a line with slope <strong>-2</strong> through point <strong>(1, 5)</strong>.</p>
+            <div style={{backgroundColor: '#fefce8', padding: 'clamp(8px, 3vw, 10px)', borderRadius: '8px', marginTop: '8px', textAlign: 'left'}}>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 14px)', textAlign: 'justify'}}><strong>Solution:</strong> Use <strong>Point-slope Form</strong>: y - y₁ = m(x - x₁)</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 1.</strong> m = -2, x₁ = 1, y₁ = 5</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 2.</strong> Substitute: y - 5 = -2(x - 1)</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 3.</strong> Distribute: y - 5 = -2x + 2</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 4.</strong> Add 5: y = -2x + 7</p>
+              <div style={{backgroundColor: '#dcfce7', padding: '8px', borderRadius: '6px', marginTop: '8px', textAlign: 'center', fontWeight: 'bold', fontSize: 'clamp(12px, 4vw, 14px)'}}>
+                y = -2x + 7 &nbsp;&nbsp;or&nbsp;&nbsp; 2x + y = 7
+              </div>
             </div>
           </div>
         </div>
@@ -114,12 +138,19 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   ];
 
   for (let i = 0; i < questions.length; i++) {
-    steps.push({ ...questions[i], title: `Question ${i + 1}`, type: "quiz" });
+    steps.push({ ...questions[i], type: "quiz" });
   }
-  steps.push({ title: "Mission Complete! 🎉", content: "Congratulations! You've mastered the Slope and a Point mission!", result: "You now know how to find equations using slope and a point!", note: "The point-slope form is a powerful tool!", type: "complete" });
+  
+  steps.push({ 
+    title: "Mission Complete! 🎉", 
+    content: "Congratulations! You've mastered the Slope and a Point mission!", 
+    result: "Point-Slope Form: y - y₁ = m(x - x₁)", 
+    note: "The point-slope form is a powerful tool for finding linear equations!", 
+    type: "complete" 
+  });
 
   const avatarMessages = {
-    happy: ["📐 Excellent!", "✨ Perfect!", "🌟 Great job!", "💫 You're an expert!", "📏 Slope is rising!", "🏆 Amazing!"],
+    happy: ["📐 Excellent!", "✨ Perfect!", "🌟 Great job!", "💫 You're an expert!", "📏 Slope is rising!", "🏆 Amazing!", "🎉 +400 XP awaits!"],
     wrong: ["🤔 Oops! Review point-slope form!", "💡 Almost there! y - y₁ = m(x - x₁)", "📚 Not quite right.", "✨ Don't give up!", "🎯 Keep trying!", "💪 Every mistake teaches us!"],
     info: ["💡 Remember: y - y₁ = m(x - x₁)!", "📐 Positive slope rises, negative falls!", "🔢 Slope m tells steepness!", "✨ Practice substituting values!"]
   };
@@ -130,20 +161,40 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     const checkCompletion = async () => {
       if (user?.dbId) {
         const { data } = await supabase.from('mission_progress').select('status').eq('mission_id', MISSION_ID).eq('student_id', user.dbId).maybeSingle();
-        if (data?.status === 'completed') { setIsAlreadyCompleted(true); setShowRewardClaimed(true); setCurrentStep(steps.length - 1); }
+        if (data?.status === 'completed') { 
+          setIsAlreadyCompleted(true); 
+          setShowRewardClaimed(true); 
+          setCurrentStep(steps.length - 1); 
+        }
       }
     };
     checkCompletion();
   }, [user?.dbId]);
 
   const handleResetMission = () => setShowResetConfirm(true);
-  const confirmReset = () => {
-    setCurrentStep(0); setAnswers({}); setShowConfetti(false); setFeedbackAvatar(null);
-    setCanProceed(true); setShowAvatarMessage(true); setShowResetConfirm(false);
-    setShowRewardClaimed(false); setIsAlreadyCompleted(false);
-    setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! 💪");
-    setTimeout(() => setShowAvatarMessage(false), 3000);
+  
+  const confirmReset = async () => {
+    try {
+      if (user?.dbId) {
+        await supabase.from('mission_progress').delete().eq('mission_id', MISSION_ID).eq('student_id', user.dbId);
+      }
+      setCurrentStep(0); 
+      setAnswers({}); 
+      setWrongFeedback({});
+      setShowConfetti(false); 
+      setFeedbackAvatar(null);
+      setCanProceed(true); 
+      setShowAvatarMessage(true); 
+      setShowResetConfirm(false);
+      setShowRewardClaimed(false); 
+      setIsAlreadyCompleted(false);
+      setCurrentAvatarMessage("🔄 Mission reset! Let's start fresh! 💪");
+      setTimeout(() => setShowAvatarMessage(false), 3000);
+    } catch (error) {
+      console.error('Error resetting mission:', error);
+    }
   };
+  
   const cancelReset = () => {
     setShowResetConfirm(false);
     setCurrentAvatarMessage("👍 Great choice! Let's continue!");
@@ -151,29 +202,67 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     setTimeout(() => setShowAvatarMessage(false), 2000);
   };
 
-  const handleAnswer = (stepIndex, answerIndex) => {
+  const handleSelectAnswer = (stepIndex, answerIndex) => {
+    setPendingAnswer(answerIndex);
+    setPendingStepIndex(stepIndex);
+    setShowCheckPopup(true);
+    setCurrentAvatarMessage("🔍 Review your answer before confirming!");
+    setShowAvatarMessage(true);
+    setTimeout(() => setShowAvatarMessage(false), 2000);
+  };
+
+  const confirmAnswer = () => {
+    const stepIndex = pendingStepIndex;
+    const answerIndex = pendingAnswer;
     const step = steps[stepIndex];
     const isCorrect = answerIndex === step.correct;
-    setCurrentAvatarMessage(getRandomMessage(isCorrect ? 'happy' : 'wrong'));
-    setFeedbackAvatar(isCorrect ? 'happy' : 'wrong');
-    setCanProceed(isCorrect);
+    
+    if (isCorrect) {
+      setCurrentAvatarMessage(getRandomMessage('happy'));
+      setFeedbackAvatar('happy');
+      setCanProceed(true);
+      setAnswers({ ...answers, [stepIndex]: { selected: answerIndex, isCorrect: true } });
+      setWrongFeedback({ ...wrongFeedback, [stepIndex]: null });
+    } else {
+      setCurrentAvatarMessage(getRandomMessage('wrong'));
+      setFeedbackAvatar('wrong');
+      setCanProceed(false);
+      setWrongFeedback({ ...wrongFeedback, [stepIndex]: "❌ Incorrect! Try again!" });
+      const newAnswers = { ...answers };
+      delete newAnswers[stepIndex];
+      setAnswers(newAnswers);
+    }
+    
+    setShowCheckPopup(false);
+    setPendingAnswer(null);
+    setPendingStepIndex(null);
     setShowAvatarMessage(true);
-    setAnswers({ ...answers, [stepIndex]: { selected: answerIndex, isCorrect } });
     setTimeout(() => setFeedbackAvatar(null), 3000);
+  };
+
+  const cancelAnswer = () => {
+    setShowCheckPopup(false);
+    setPendingAnswer(null);
+    setPendingStepIndex(null);
+    setCurrentAvatarMessage("📝 Take your time! Choose the correct answer.");
+    setShowAvatarMessage(true);
+    setTimeout(() => setShowAvatarMessage(false), 2000);
   };
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       if (steps[currentStep].type === 'quiz') {
         if (!answers[currentStep]) {
-          setCurrentAvatarMessage("🤔 Please select an answer first!");
-          setFeedbackAvatar('wrong'); setShowAvatarMessage(true);
+          setCurrentAvatarMessage("🤔 Please select a correct answer first!");
+          setFeedbackAvatar('wrong');
+          setShowAvatarMessage(true);
           setTimeout(() => setFeedbackAvatar(null), 2000);
           return;
         }
         if (!canProceed) {
-          setCurrentAvatarMessage("📚 You need to answer correctly to continue!");
-          setFeedbackAvatar('wrong'); setShowAvatarMessage(true);
+          setCurrentAvatarMessage("📚 You need to answer correctly to continue! Try again!");
+          setFeedbackAvatar('wrong');
+          setShowAvatarMessage(true);
           setTimeout(() => setFeedbackAvatar(null), 2000);
           return;
         }
@@ -237,59 +326,115 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
     }
     setShowRewardClaimed(true);
     setIsAlreadyCompleted(true);
-    setTimeout(() => setShowConfetti(false), 2000);
+    setTimeout(() => setShowConfetti(false), 3000);
   };
 
   const renderStepContent = () => {
     const step = steps[currentStep];
     const currentAnswer = answers[currentStep];
-    if (step.type === "info") return (
-      <div style={respStyles.infoContent}>
-        <p style={respStyles.contentText}>{step.content}</p>
-        <p style={respStyles.descriptionText}>{step.description}</p>
-        <div style={respStyles.formulaBoxSmall}><p style={respStyles.formulaText}>Point-Slope Form: y - y₁ = m(x - x₁)</p></div>
-      </div>
-    );
-    if (step.type === "lesson") return <div style={respStyles.lessonContent}>{step.content}</div>;
-    if (step.type === "quiz") return (
-      <div style={respStyles.quizContent}>
-        <div style={respStyles.questionNumber}>Question {currentStep - 1} of {questions.length}</div>
-        <p style={respStyles.questionText}>{step.question}</p>
-        <div style={respStyles.optionsContainer}>
-          {step.options.map((option, idx) => (
-            <label key={idx} style={{ ...respStyles.optionLabel, ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? respStyles.correctOption : {}), ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? respStyles.wrongOption : {}) }}>
-              <input type="radio" name={`q-${currentStep}`} value={idx} checked={currentAnswer && currentAnswer.selected === idx} onChange={() => handleAnswer(currentStep, idx)} style={respStyles.radio} />
-              <span style={respStyles.optionText}>{option}</span>
-            </label>
-          ))}
-        </div>
-        {currentAnswer && (
-          <div style={currentAnswer.isCorrect ? respStyles.correctFeedback : respStyles.incorrectFeedback}>
-            {currentAnswer.isCorrect ? `✅ Correct! ${step.explanation}` : `❌ Incorrect. ${step.explanation}`}
+    const wrongMsg = wrongFeedback[currentStep];
+
+    switch (step.type) {
+      case "info":
+        return (
+          <div style={{textAlign: 'left'}}>
+            <p style={{fontSize: 'clamp(13px, 4vw, 16px)', lineHeight: '1.4', textAlign: 'justify'}}>{step.content}</p>
+            <p style={{fontSize: 'clamp(12px, 3.5vw, 15px)', marginTop: '8px', textAlign: 'justify'}}>{step.description}</p>
+            <div style={{backgroundColor: '#f3f4f6', padding: '10px', borderRadius: '10px', textAlign: 'center', marginTop: '12px'}}>
+              <p style={{fontSize: 'clamp(12px, 4vw, 14px)', fontFamily: 'monospace', fontWeight: 'bold', color: '#10b981'}}>
+                Point-Slope Form: y - y₁ = m(x - x₁)
+              </p>
+            </div>
+            <div style={{display:'flex', gap:'12px', justifyContent:'center', margin:'12px 0'}}>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>📐</span>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>📏</span>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>✨</span>
+            </div>
+            <div style={{background:'#fef3c7', padding:'10px', borderRadius:'10px', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'6px', fontSize:'clamp(11px, 3.5vw, 14px)', textAlign: 'left'}}>
+              <span>🏆 Complete all questions to earn</span>
+              <span style={{fontWeight:'bold', color:'#d97706'}}>+{MISSION_XP} XP!</span>
+            </div>
           </div>
-        )}
-      </div>
-    );
-    if (step.type === "complete") return (
-      <div style={respStyles.completeContent}>
-        {!showRewardClaimed ? (
-          <>
-            <p style={respStyles.completeText}>{step.content}</p>
-            <div style={respStyles.resultBoxSmall}><span>📐</span><span>{step.result}</span></div>
-            <p style={respStyles.noteText}>{step.note}</p>
-            <div style={respStyles.rewardBoxSmall}><span>🏆</span><span>+{MISSION_XP} XP Reward!</span></div>
-            <button style={respStyles.claimButton} onClick={handleComplete} disabled={isCompleting}>{isCompleting ? "Claiming..." : "🎁 Claim Your Reward"}</button>
-          </>
-        ) : (
-          <>
-            <div style={respStyles.claimedBox}><span>✅</span><p style={respStyles.claimedText}>Mission Completed! +{MISSION_XP} XP!</p></div>
-            <div style={respStyles.resultBoxSmall}><span>📐</span><span>{step.result}</span></div>
-            <button style={respStyles.missionsListButton} onClick={goToMissionsList}>📋 Back to All Missions</button>
-          </>
-        )}
-      </div>
-    );
-    return null;
+        );
+      case "lesson":
+        return <div style={{wordBreak: 'break-word', textAlign: 'left'}}>{step.content}</div>;
+      case "quiz":
+        return (
+          <div style={{textAlign: 'left'}}>
+            <div style={{fontSize:'clamp(11px, 3.5vw, 13px)', color:'#10b981', fontWeight:'bold', textAlign: 'left'}}>Question {currentStep - 1} of {questions.length}</div>
+            <p style={{fontWeight:'bold', margin:'10px 0', fontSize:'clamp(14px, 4.5vw, 18px)', textAlign: 'justify'}}>{step.question}</p>
+            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
+              {step.options.map((option, idx) => (
+                <label key={idx} style={{
+                  display:'flex', alignItems:'center', padding:'clamp(6px, 2vw, 10px)', border:'1px solid #e5e7eb', borderRadius:'10px',
+                  fontSize:'clamp(11px, 3.5vw, 14px)', textAlign: 'left',
+                  ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? {backgroundColor:'#d1fae5', borderColor:'#10b981'} : {}),
+                  ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? {backgroundColor:'#fee2e2', borderColor:'#ef4444'} : {})
+                }}>
+                  <input type="radio" name={`q-${currentStep}`} value={idx}
+                    checked={currentAnswer && currentAnswer.selected === idx}
+                    onChange={() => !currentAnswer && handleSelectAnswer(currentStep, idx)}
+                    disabled={currentAnswer !== undefined}
+                    style={{marginRight:'10px', width:'clamp(14px, 4vw, 16px)', height:'clamp(14px, 4vw, 16px)'}} />
+                  <span>{option}</span>
+                </label>
+              ))}
+            </div>
+            {wrongMsg && !currentAnswer && (
+              <div style={{padding:'8px', backgroundColor:'#fee2e2', color:'#dc2626', borderRadius:'8px', marginTop:'10px', fontSize:'clamp(11px, 3.5vw, 13px)', textAlign: 'center'}}>
+                {wrongMsg}
+              </div>
+            )}
+            {currentAnswer && currentAnswer.isCorrect && (
+              <div style={{padding:'8px', backgroundColor:'#d1fae5', color:'#065f46', borderRadius:'8px', marginTop:'10px', fontSize:'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}>
+                ✅ Correct! {step.explanation}
+              </div>
+            )}
+            {currentAnswer && !currentAnswer.isCorrect && (
+              <div style={{padding:'8px', backgroundColor:'#fee2e2', color:'#991b1b', borderRadius:'8px', marginTop:'10px', fontSize:'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}>
+                ❌ Incorrect. {step.explanation}
+              </div>
+            )}
+          </div>
+        );
+      case "complete":
+        return (
+          <div style={{textAlign: 'left'}}>
+            {!showRewardClaimed ? (
+              <>
+                <p style={{fontSize:'clamp(14px, 4.5vw, 18px)', textAlign: 'justify'}}>{step.content}</p>
+                <div style={{background:'#ede9fe', padding:'12px', borderRadius:'12px', margin:'12px 0', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', flexWrap:'wrap'}}>
+                  <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>📐</span>
+                  <span style={{fontWeight:'bold', fontSize:'clamp(14px, 4vw, 18px)'}}>{step.result}</span>
+                </div>
+                <p style={{fontSize:'clamp(11px, 3.5vw, 13px)', fontStyle:'italic', textAlign: 'justify'}}>{step.note}</p>
+                <div style={{background:'#fef3c7', padding:'12px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'14px'}}>
+                  <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>🏆</span>
+                  <span style={{fontWeight:'bold', fontSize:'clamp(14px, 4vw, 16px)'}}>+{MISSION_XP} XP Reward!</span>
+                </div>
+                <button style={{width:'100%', padding:'clamp(10px, 3vw, 14px)', backgroundColor:'#10b981', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', fontSize:'clamp(14px, 4vw, 16px)', textAlign: 'center'}} onClick={handleComplete} disabled={isCompleting}>
+                  {isCompleting ? "Completing..." : "🎁 Claim Your Reward"}
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{backgroundColor:'#d1fae5', padding:'12px', borderRadius:'12px', marginBottom:'12px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', flexWrap:'wrap'}}>
+                  <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>✅</span>
+                  <p style={{fontSize:'clamp(12px, 4vw, 14px)', fontWeight:'bold', color:'#065f46', margin:0, textAlign: 'center'}}>Mission Completed! +{MISSION_XP} XP!</p>
+                </div>
+                <div style={{background:'#ede9fe', padding:'12px', borderRadius:'12px', margin:'12px 0', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', flexWrap:'wrap'}}>
+                  <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>📐</span>
+                  <span style={{fontWeight:'bold', fontSize:'clamp(14px, 4vw, 18px)'}}>{step.result}</span>
+                </div>
+                <button style={{width:'100%', padding:'clamp(10px, 3vw, 14px)', backgroundColor:'#6b7280', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', fontSize:'clamp(14px, 4vw, 16px)', textAlign: 'center'}} onClick={goToMissionsList}>
+                  📋 Back to All Missions
+                </button>
+              </>
+            )}
+          </div>
+        );
+      default: return null;
+    }
   };
 
   const getAvatarImage = () => {
@@ -307,121 +452,143 @@ function Mission3({ user, userData, updateUserData, onComplete }) {
   }
 
   return (
-    <div style={respStyles.container}>
-      {showConfetti && <div style={respStyles.confettiOverlay}><div style={respStyles.confettiMessage}>🎉 +{MISSION_XP} XP! 🎉<br />Slope and a Point Mastered! 📐</div></div>}
-      {showResetConfirm && (
-        <div style={respStyles.modalOverlay}>
-          <div style={respStyles.modalContent}>
-            <h3 style={respStyles.modalTitle}>🔄 Reset Mission?</h3>
-            <p style={respStyles.modalText}>Reset this mission? All progress will be lost.</p>
-            <div style={respStyles.modalButtons}>
-              <button style={respStyles.confirmResetBtn} onClick={confirmReset}>Yes, Reset</button>
-              <button style={respStyles.cancelResetBtn} onClick={cancelReset}>Cancel</button>
+    <div style={{
+      padding: '8px',
+      minHeight: '100vh',
+      backgroundColor: '#f3f4f6',
+      boxSizing: 'border-box',
+      width: '100%',
+      overflowX: 'hidden'
+    }}>
+      {/* Check Answer Confirmation Popup */}
+      {showCheckPopup && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:3000}}>
+          <div style={{backgroundColor:'white', borderRadius:'20px', padding:'20px', textAlign:'center', maxWidth:'300px', width:'85%'}}>
+            <div style={{fontSize:'48px'}}>🔍</div>
+            <h3 style={{fontSize:'20px', margin:'10px 0'}}>Check your answer?</h3>
+            <p style={{fontSize:'14px', marginBottom:'20px'}}>Are you sure you want to check if this answer is correct?</p>
+            <div style={{display:'flex', gap:'12px', justifyContent:'center', flexDirection:'column'}}>
+              <button style={{backgroundColor:'#10b981', color:'white', padding:'12px', borderRadius:'10px', border:'none', fontWeight:'bold', fontSize:'14px'}} onClick={confirmAnswer}>Yes, Check Answer</button>
+              <button style={{backgroundColor:'#6b7280', color:'white', padding:'12px', borderRadius:'10px', border:'none', fontWeight:'bold', fontSize:'14px'}} onClick={cancelAnswer}>No, Let me review</button>
             </div>
           </div>
         </div>
       )}
-      <div style={respStyles.headerRow}>{!showRewardClaimed && <button style={respStyles.resetButton} onClick={handleResetMission}>🔄 Reset</button>}</div>
-      <div style={respStyles.progressBar}><div style={{ ...respStyles.progressFill, width: `${progressPercentage}%` }} /></div>
-      {steps[currentStep].type === 'quiz' && !showRewardClaimed && <div style={respStyles.questionProgress}>📐 Mastered: {questionsCompleted}/{questions.length}</div>}
-      <div style={respStyles.card}>
-        <h2 style={respStyles.title}>{steps[currentStep].title}</h2>
-        <div style={respStyles.scrollableContent}>{renderStepContent()}</div>
+
+      {showConfetti && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000}}>
+          <div style={{backgroundColor:'white', padding:'20px', borderRadius:'16px', textAlign:'center', maxWidth:'90%', fontSize:'clamp(14px, 4vw, 18px)'}}>
+            🎉 +{MISSION_XP} XP! 🎉<br />Slope and a Point Mastered! 📐
+          </div>
+        </div>
+      )}
+
+      {showResetConfirm && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2000, padding:'16px'}}>
+          <div style={{backgroundColor:'white', borderRadius:'16px', padding:'20px', maxWidth:'300px', width:'90%', textAlign:'center'}}>
+            <h3 style={{fontSize:'18px', marginBottom:'10px', color:'#ef4444'}}>🔄 Reset Mission?</h3>
+            <p style={{fontSize:'13px', marginBottom:'18px'}}>Reset this mission? All progress will be lost.</p>
+            <div style={{display:'flex', gap:'10px', justifyContent:'center', flexDirection:'column'}}>
+              <button style={{backgroundColor:'#ef4444', color:'white', padding:'10px', borderRadius:'8px', border:'none', fontWeight:'bold'}} onClick={confirmReset}>Yes, Reset</button>
+              <button style={{backgroundColor:'#6b7280', color:'white', padding:'10px', borderRadius:'8px', border:'none', fontWeight:'bold'}} onClick={cancelReset}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{display:'flex', justifyContent:'flex-end', marginBottom:'8px'}}>
+        {!showRewardClaimed && (
+          <button style={{backgroundColor:'#ef4444', color:'white', padding:'6px 12px', borderRadius:'8px', border:'none', fontSize:'clamp(10px, 3vw, 12px)', fontWeight:'bold'}} onClick={handleResetMission}>🔄 Reset</button>
+        )}
+      </div>
+
+      {/* Progress Bar */}
+      <div style={{width:'100%', height:'6px', backgroundColor:'#e5e7eb', borderRadius:'3px', marginBottom:'10px', overflow:'hidden'}}>
+        <div style={{height:'100%', backgroundColor:'#10b981', width:`${progressPercentage}%`, transition:'width 0.3s'}} />
+      </div>
+
+      {/* XP Preview for quiz steps */}
+      {steps[currentStep].type === 'quiz' && !showRewardClaimed && (
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', fontSize:'clamp(10px, 3vw, 12px)', fontWeight:'bold', color:'#10b981', background:'#d1fae5', padding:'6px 10px', borderRadius:'10px', textAlign: 'left'}}>
+          <span>📐 Mastered: {questionsCompleted}/{questions.length}</span>
+          <span style={{color:'#d97706'}}>✨ +{MISSION_XP} XP</span>
+        </div>
+      )}
+
+      {/* Main Card */}
+      <div style={{
+        backgroundColor:'white', borderRadius:'16px', padding:'clamp(12px, 4vw, 16px)', boxShadow:'0 2px 8px rgba(0,0,0,0.1)',
+        display:'flex', flexDirection:'column', width:'100%', boxSizing:'border-box', overflowX:'hidden'
+      }}>
+        <h2 style={{fontSize:'clamp(16px, 5vw, 20px)', marginBottom:'12px', color:'#333', textAlign: 'left'}}>{steps[currentStep].title}</h2>
+        <div style={{overflowX:'hidden', wordBreak:'break-word', marginBottom:'12px'}}>
+          {renderStepContent()}
+        </div>
+        
+        {/* Navigation Buttons */}
         {currentStep < steps.length - 1 && steps[currentStep].type !== 'complete' && !showRewardClaimed && (
-          <div style={respStyles.buttonContainer}>
-            {currentStep > 0 && <button style={respStyles.prevButton} onClick={handlePrevious}>← Prev</button>}
-            <button style={{ ...respStyles.nextButton, ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? respStyles.disabledButton : {}) }} onClick={handleNext} disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}>Next →</button>
+          <div style={{display:'flex', justifyContent:'space-between', gap:'10px', marginTop:'10px'}}>
+            {currentStep > 0 && <button style={{backgroundColor:'#6b7280', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none', fontSize:'clamp(11px, 3.5vw, 13px)', fontWeight:'bold'}} onClick={handlePrevious}>← Prev</button>}
+            <button style={{
+              backgroundColor:'#10b981', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none', fontSize:'clamp(11px, 3.5vw, 13px)', fontWeight:'bold',
+              ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? {backgroundColor:'#9ca3af', opacity:0.6} : {})
+            }} onClick={handleNext} disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}>
+              Next →
+            </button>
           </div>
         )}
-        <div style={respStyles.stepIndicator}>{steps[currentStep].type === 'quiz' && !showRewardClaimed ? `Q${currentStep - 1}/${questions.length}` : `Step ${currentStep + 1}/${steps.length}`}</div>
-      </div>
-      <div style={respStyles.avatarContainer}>
-        <div style={respStyles.bubbleContainer}>
-          {showAvatarMessage && currentAvatarMessage && (
-            <div style={respStyles.speechBubble}><span style={respStyles.bubbleText}>{currentAvatarMessage}</span><button onClick={() => setShowAvatarMessage(false)} style={respStyles.closeBubble}>✕</button></div>
-          )}
-          {!showAvatarMessage && <button onClick={() => { setShowAvatarMessage(true); setCurrentAvatarMessage(getRandomMessage('info')); }} style={respStyles.reopenBubble}>💬</button>}
+        
+        <div style={{textAlign:'center', marginTop:'10px', fontSize:'clamp(9px, 3vw, 11px)', color:'#999'}}>
+          {steps[currentStep].type === 'quiz' && !showRewardClaimed ? `Q${currentStep - 1}/${questions.length}` : `Step ${currentStep + 1}/${steps.length}`}
         </div>
-        <div style={respStyles.avatarWrapper}><img src={getAvatarImage()} alt="Assistant" style={respStyles.avatarImage} onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"; }} /></div>
+
+        {/* Avatar Section - Below buttons, left aligned (same as mission2) */}
+        <div style={{marginTop:'20px', paddingTop:'14px', borderTop:'1px solid #e5e7eb', display:'flex', flexDirection:'column', alignItems:'flex-start', gap:'12px'}}>
+          {/* Speech Bubble */}
+          <div style={{width:'100%', maxWidth:'280px'}}>
+            {showAvatarMessage && currentAvatarMessage && !showCheckPopup && (
+              <div style={{backgroundColor:'white', padding:'10px 14px', borderRadius:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.1)', border:'2px solid #10b981', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
+                <span style={{fontSize:'clamp(11px, 3.5vw, 13px)', color:'#333', flex:1, lineHeight:'1.4', textAlign: 'left'}}>{currentAvatarMessage}</span>
+                <button onClick={() => setShowAvatarMessage(false)} style={{background:'none', border:'none', fontSize:'12px', color:'#999', cursor:'pointer'}}>✕</button>
+              </div>
+            )}
+            {!showAvatarMessage && !showCheckPopup && (
+              <button onClick={() => { setShowAvatarMessage(true); setCurrentAvatarMessage(getRandomMessage('info')); }} style={{borderRadius:'50%', width:'40px', height:'40px', cursor:'pointer', backgroundColor:'#10b981', color:'white', border:'none', fontSize:'20px', display:'flex', alignItems:'center', justifyContent:'center'}}>💬</button>
+            )}
+          </div>
+          
+          {/* Avatar Image */}
+          <div style={{width:'clamp(70px, 15vw, 90px)', height:'clamp(70px, 15vw, 90px)', borderRadius:'50%', overflow:'hidden', backgroundColor:'#f0f0f0', boxShadow:'0 2px 10px rgba(0,0,0,0.2)', border:'3px solid white'}}>
+            <img src={getAvatarImage()} alt="Assistant" style={{width:'100%', height:'100%', objectFit:'cover'}}
+              onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%2310b981'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"; }} />
+          </div>
+        </div>
       </div>
+
+      {/* Global styles for text wrapping and no horizontal scroll */}
+      <style>{`
+        * {
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        body, div, p, h1, h2, h3, h4, span, button, label {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        img, svg {
+          max-width: 100%;
+          height: auto;
+        }
+        button {
+          cursor: pointer;
+        }
+        button:active {
+          transform: scale(0.98);
+        }
+      `}</style>
     </div>
   );
 }
-
-const respStyles = {
-  container: { padding: '10px', minHeight: '100vh', backgroundColor: '#f3f4f6', position: 'relative', boxSizing: 'border-box', width: '100%', '@media (min-width: 769px)': { padding: '20px' } },
-  headerRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' },
-  resetButton: { backgroundColor: '#ef4444', color: 'white', padding: '6px 12px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', minHeight: '36px' },
-  progressBar: { width: '100%', height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', marginBottom: '8px', overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#10b981', transition: 'width 0.3s ease' },
-  questionProgress: { textAlign: 'center', marginBottom: '10px', fontSize: '10px', fontWeight: 'bold', color: '#10b981' },
-  card: { backgroundColor: 'white', borderRadius: '12px', padding: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 160px)', overflow: 'hidden', '@media (min-width: 769px)': { padding: '25px', maxHeight: 'calc(100vh - 200px)' } },
-  scrollableContent: { flex: 1, overflowY: 'auto', paddingRight: '6px', marginBottom: '10px' },
-  title: { fontSize: '16px', color: '#333', textAlign: 'center', marginBottom: '10px', flexShrink: 0 },
-  infoContent: { textAlign: 'center', padding: '8px' },
-  contentText: { fontSize: '13px', color: '#666', lineHeight: '1.4', marginBottom: '8px' },
-  descriptionText: { fontSize: '12px', color: '#555', lineHeight: '1.4', marginBottom: '8px' },
-  formulaBoxSmall: { backgroundColor: '#f3f4f6', padding: '10px', borderRadius: '8px', textAlign: 'center', marginTop: '10px' },
-  formulaText: { fontSize: '12px', fontFamily: 'monospace', color: '#10b981', fontWeight: 'bold' },
-  lessonContent: { padding: '8px', lineHeight: '1.5', fontSize: '12px' },
-  quizContent: { padding: '4px' },
-  questionNumber: { fontSize: '11px', color: '#10b981', fontWeight: 'bold', marginBottom: '10px', textAlign: 'center' },
-  questionText: { fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '12px', textAlign: 'center' },
-  optionsContainer: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' },
-  optionLabel: { display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer' },
-  correctOption: { backgroundColor: '#d1fae5', borderColor: '#10b981' },
-  wrongOption: { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
-  radio: { marginRight: '8px', cursor: 'pointer', width: '16px', height: '16px' },
-  optionText: { fontSize: '11px', color: '#333' },
-  correctFeedback: { padding: '8px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  incorrectFeedback: { padding: '8px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  completeContent: { textAlign: 'center', padding: '8px' },
-  completeText: { fontSize: '14px', color: '#333', marginBottom: '12px' },
-  resultBoxSmall: { backgroundColor: '#ede9fe', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
-  noteText: { fontSize: '11px', color: '#666', marginBottom: '12px', fontStyle: 'italic' },
-  rewardBoxSmall: { backgroundColor: '#fef3c7', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-  claimButton: { backgroundColor: '#10b981', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%', minHeight: '44px' },
-  claimedBox: { backgroundColor: '#d1fae5', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' },
-  claimedText: { fontSize: '12px', fontWeight: 'bold', color: '#065f46', margin: 0 },
-  missionsListButton: { backgroundColor: '#6b7280', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%', minHeight: '44px' },
-  buttonContainer: { display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', flexShrink: 0 },
-  prevButton: { backgroundColor: '#6b7280', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
-  nextButton: { backgroundColor: '#10b981', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
-  disabledButton: { backgroundColor: '#9ca3af', cursor: 'not-allowed', opacity: 0.6 },
-  stepIndicator: { textAlign: 'center', marginTop: '10px', fontSize: '10px', color: '#999', flexShrink: 0 },
-  avatarContainer: { position: 'fixed', bottom: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 100 },
-  bubbleContainer: { marginBottom: '6px', marginRight: '4px' },
-  speechBubble: { backgroundColor: 'white', padding: '6px 10px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.15)', maxWidth: '160px', border: '2px solid #10b981' },
-  bubbleText: { fontSize: '9px', color: '#333', lineHeight: '1.3' },
-  closeBubble: { marginLeft: '6px', cursor: 'pointer', background: 'none', border: 'none', fontSize: '9px', color: '#999' },
-  reopenBubble: { borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', backgroundColor: '#10b981', color: 'white', border: 'none', fontSize: '16px', marginRight: '4px', marginBottom: '4px' },
-  avatarWrapper: { width: '50px', height: '50px', borderRadius: '50%', overflow: 'hidden', backgroundColor: '#f0f0f0', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', border: '2px solid white', '@media (min-width: 769px)': { width: '70px', height: '70px' } },
-  avatarImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  confettiOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  confettiMessage: { backgroundColor: 'white', padding: '20px', borderRadius: '16px', fontSize: '16px', textAlign: 'center', maxWidth: '80%' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' },
-  modalContent: { backgroundColor: 'white', borderRadius: '16px', padding: '16px', maxWidth: '300px', width: '90%', textAlign: 'center' },
-  modalTitle: { fontSize: '16px', marginBottom: '10px', color: '#ef4444' },
-  modalText: { fontSize: '12px', color: '#555', marginBottom: '16px', lineHeight: '1.4' },
-  modalButtons: { display: 'flex', gap: '10px', justifyContent: 'center', flexDirection: 'column', '@media (min-width: 481px)': { flexDirection: 'row' } },
-  confirmResetBtn: { backgroundColor: '#ef4444', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' },
-  cancelResetBtn: { backgroundColor: '#6b7280', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' },
-  paragraph: { marginBottom: '10px', fontSize: '12px', color: '#555' },
-  imageContainer: { textAlign: 'center', margin: '10px 0', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '10px' },
-  lessonImage: { maxWidth: '100%', height: 'auto', borderRadius: '8px' },
-  imageCaption: { fontSize: '10px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' },
-  exampleBox: { backgroundColor: '#f0f9ff', padding: '12px', borderRadius: '10px', marginTop: '12px' },
-  exampleTitle: { color: '#0369a1', marginBottom: '10px', fontSize: '14px' },
-  solutionBox: { backgroundColor: '#fefce8', padding: '10px', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  resultBoxSmall: { backgroundColor: '#dcfce7', padding: '8px', borderRadius: '6px', marginTop: '8px', textAlign: 'center', fontWeight: 'bold', fontSize: '12px' }
-};
-
-const styleSheet = document.createElement("style");
-styleSheet.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
-button:active { transform: scale(0.98); }
-@media (max-width: 480px) { button, .optionLabel { min-height: 40px; } }
-@media (max-width: 360px) { .title { font-size: 14px !important; } .questionText { font-size: 12px !important; } .optionText { font-size: 10px !important; } .avatarWrapper { width: 45px !important; height: 45px !important; } }`;
-if (!document.querySelector('#mission3-responsive-styles')) { styleSheet.id = 'mission3-responsive-styles'; document.head.appendChild(styleSheet); }
 
 export default Mission3;

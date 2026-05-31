@@ -260,6 +260,29 @@ export const classService = {
     }
   },
 
+  // ========== HELPER: Get student by student ID ==========
+  async getStudentById(studentId) {
+    try {
+      if (!studentId) return null;
+      
+      const { data, error } = await supabase
+        .from('students')
+        .select('*')
+        .eq('id', studentId)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error getting student by ID:', error);
+        return null;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Error in getStudentById:', error);
+      return null;
+    }
+  },
+
   // ========== HELPER: Get teacher by auth user ID ==========
   async getTeacherByUserId(authUserId) {
     try {
@@ -385,6 +408,102 @@ export const classService = {
     }
   },
 
+  // ========== CHECK IF USER HAS ANY CLASSES (UNLOCKS GAMES) ==========
+  async hasAnyClass(authUserId) {
+    try {
+      if (!authUserId) return false;
+      
+      console.log('🔍 Checking if user has any classes:', authUserId);
+      
+      const student = await this.getStudentByUserId(authUserId);
+      if (!student) {
+        console.log('No student record found');
+        return false;
+      }
+      
+      const { count, error } = await supabase
+        .from('class_students')
+        .select('*', { count: 'exact', head: true })
+        .eq('student_id', student.id);
+      
+      if (error) {
+        console.error('Error checking classes:', error);
+        return false;
+      }
+      
+      const hasClasses = count > 0;
+      console.log(`User has ${count} class(es):`, hasClasses);
+      
+      // Update localStorage for other components to read
+      if (typeof window !== 'undefined') {
+        if (hasClasses) {
+          localStorage.setItem('hasActiveClass', 'true');
+        } else {
+          localStorage.setItem('hasActiveClass', 'false');
+        }
+      }
+      
+      return hasClasses;
+    } catch (error) {
+      console.error('Error in hasAnyClass:', error);
+      return false;
+    }
+  },
+
+  // ========== GET USER CLASS STATUS WITH DETAILS (FOR UNLOCKING) ==========
+  async getUserClassStatus(authUserId) {
+    try {
+      if (!authUserId) {
+        return { hasClass: false, classCount: 0, classes: [] };
+      }
+      
+      console.log('📊 Getting user class status for:', authUserId);
+      
+      const classes = await this.getStudentClasses(authUserId);
+      const hasClass = classes.length > 0;
+      
+      console.log(`User has ${classes.length} class(es):`, hasClass);
+      
+      // Update localStorage for persistence
+      if (typeof window !== 'undefined') {
+        if (hasClass) {
+          localStorage.setItem('hasActiveClass', 'true');
+          localStorage.setItem('activeClassCount', classes.length.toString());
+          localStorage.setItem('activeClassId', classes[0]?.class_id || '');
+          localStorage.setItem('activeClassName', classes[0]?.class?.name || '');
+        } else {
+          localStorage.setItem('hasActiveClass', 'false');
+          localStorage.removeItem('activeClassCount');
+          localStorage.removeItem('activeClassId');
+          localStorage.removeItem('activeClassName');
+        }
+      }
+      
+      // Dispatch event for other components (Games, Missions)
+      if (typeof window !== 'undefined') {
+        const event = new CustomEvent('classStatusChanged', {
+          detail: {
+            hasActiveClass: hasClass,
+            classCount: classes.length,
+            timestamp: Date.now(),
+            classes: classes.map(c => ({ id: c.class_id, name: c.class?.name }))
+          }
+        });
+        window.dispatchEvent(event);
+        console.log('📢 Dispatched classStatusChanged event with status:', hasClass);
+      }
+      
+      return {
+        hasClass: hasClass,
+        classCount: classes.length,
+        classes: classes
+      };
+    } catch (error) {
+      console.error('Error in getUserClassStatus:', error);
+      return { hasClass: false, classCount: 0, classes: [] };
+    }
+  },
+
   // ========== CLASS MANAGEMENT ==========
 
   async createClass(classData, teacherAuthUserId) {
@@ -406,7 +525,6 @@ export const classService = {
 
       if (existingClass) throw new Error('Class code already exists');
 
-      // FIXED: Removed 'description' field - only insert fields that exist in the table
       const insertData = {
         name: classData.name,
         code: classData.code.toUpperCase(),
@@ -416,11 +534,8 @@ export const classService = {
         updated_at: new Date().toISOString()
       };
       
-      // Only add description if the column exists (check optional)
       if (classData.description && typeof classData.description === 'string') {
-        // If you want to add description later, add the column to your table
         console.log('Note: Description field will be added when you run the SQL migration');
-        // insertData.description = classData.description; // Uncomment after adding column
       }
       
       console.log('📝 Creating class with data:', insertData);
@@ -826,6 +941,29 @@ export const classService = {
       }
 
       await this.updateStudentCount(classData.id);
+      
+      // IMPORTANT: Dispatch event to unlock games and missions immediately
+      if (typeof window !== 'undefined') {
+        // Update localStorage
+        localStorage.setItem('hasActiveClass', 'true');
+        localStorage.setItem('activeClassCount', '1');
+        localStorage.setItem('activeClassId', classData.id.toString());
+        localStorage.setItem('activeClassName', classData.name);
+        
+        // Dispatch event for other components (Games, Missions)
+        const event = new CustomEvent('classStatusChanged', {
+          detail: {
+            hasActiveClass: true,
+            classCount: 1,
+            classId: classData.id,
+            className: classData.name,
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(event);
+        
+        console.log('📢 Dispatched classStatusChanged event - GAMES AND MISSIONS SHOULD UNLOCK NOW');
+      }
 
       return {
         success: true,
@@ -983,11 +1121,9 @@ export const classService = {
       if (!classId) throw new Error('Class ID is required');
       if (!teacherAuthUserId) throw new Error('Teacher authorization required');
       
-      // Verify the teacher owns this class
       const teacher = await this.getTeacherByUserId(teacherAuthUserId);
       if (!teacher) throw new Error('Teacher not found');
       
-      // Get class to verify ownership
       const { data: classData, error: classError } = await supabase
         .from('classes')
         .select('teacher_id')
@@ -1073,7 +1209,6 @@ export const classService = {
       
       console.log(`✅ Class ${classId} and all related data deleted successfully`);
       
-      // Dispatch event to notify other components
       if (typeof window !== 'undefined') {
         const event = new CustomEvent('classDeleted', { 
           detail: { classId, timestamp: Date.now() }
@@ -1117,21 +1252,148 @@ export const classService = {
     }
   },
 
-  async removeStudentFromClass(classId, studentId) {
+  // ========== REMOVE STUDENT FROM CLASS (UPDATES UNLOCK STATUS) ==========
+  async removeStudentFromClass(classId, authUserId) {
     try {
-      const { error } = await supabase
+      if (!classId) {
+        console.error('removeStudentFromClass: Missing classId');
+        return { success: false, message: 'Class ID is required' };
+      }
+      
+      if (!authUserId) {
+        console.error('removeStudentFromClass: Missing authUserId');
+        return { success: false, message: 'User ID is required' };
+      }
+      
+      console.log('🔍 Attempting to remove student:', { classId, authUserId });
+      
+      const student = await this.getStudentByUserId(authUserId);
+      if (!student) {
+        console.error('removeStudentFromClass: Student not found for user:', authUserId);
+        return { success: false, message: 'Student record not found' };
+      }
+      
+      console.log('✅ Found student record:', student.id);
+      
+      const { data: existingEnrollment, error: checkError } = await supabase
+        .from('class_students')
+        .select('id')
+        .eq('class_id', classId)
+        .eq('student_id', student.id)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error('Error checking enrollment:', checkError);
+        return { success: false, message: 'Error checking enrollment status' };
+      }
+      
+      if (!existingEnrollment) {
+        console.log('No enrollment found, already removed');
+        return { success: true, message: 'Already removed from class' };
+      }
+      
+      console.log('✅ Found enrollment record:', existingEnrollment.id);
+      
+      const { error: deleteError } = await supabase
         .from('class_students')
         .delete()
         .eq('class_id', classId)
-        .eq('student_id', studentId);
+        .eq('student_id', student.id);
       
-      if (error) throw error;
+      if (deleteError) {
+        console.error('Error deleting enrollment:', deleteError);
+        return { success: false, message: `Failed to remove from class: ${deleteError.message}` };
+      }
+      
+      console.log('✅ Successfully deleted enrollment record');
+      
+      const { error: pointsError } = await supabase
+        .from('student_points')
+        .delete()
+        .eq('class_id', classId)
+        .eq('student_id', student.id);
+      
+      if (pointsError) {
+        console.warn('Warning: Could not delete student points:', pointsError);
+      } else {
+        console.log('✅ Deleted student points');
+      }
+      
+      const { error: teamError } = await supabase
+        .from('team_assignments')
+        .delete()
+        .eq('class_id', classId)
+        .eq('student_id', student.id);
+      
+      if (teamError) {
+        console.warn('Warning: Could not delete team assignments:', teamError);
+      } else {
+        console.log('✅ Deleted team assignments');
+      }
+      
+      const { error: readyError } = await supabase
+        .from('student_ready_status')
+        .delete()
+        .eq('class_id', classId)
+        .eq('student_id', student.id);
+      
+      if (readyError) {
+        console.warn('Warning: Could not delete ready status:', readyError);
+      } else {
+        console.log('✅ Deleted ready status');
+      }
+      
       await this.updateStudentCount(classId);
       
-      return { success: true, message: 'Successfully removed from class' };
+      // IMPORTANT: Check remaining classes and update unlock status
+      const remainingClasses = await this.getStudentClasses(authUserId);
+      const hasRemainingClasses = remainingClasses.length > 0;
+      
+      console.log(`Remaining classes after removal: ${remainingClasses.length}`);
+      
+      // Update localStorage based on remaining classes
+      if (typeof window !== 'undefined') {
+        if (hasRemainingClasses) {
+          localStorage.setItem('hasActiveClass', 'true');
+          localStorage.setItem('activeClassCount', remainingClasses.length.toString());
+          localStorage.setItem('activeClassId', remainingClasses[0]?.class_id || '');
+          localStorage.setItem('activeClassName', remainingClasses[0]?.class?.name || '');
+        } else {
+          localStorage.setItem('hasActiveClass', 'false');
+          localStorage.removeItem('activeClassCount');
+          localStorage.removeItem('activeClassId');
+          localStorage.removeItem('activeClassName');
+        }
+        
+        // Dispatch event for other components (Games, Missions)
+        const event = new CustomEvent('classStatusChanged', {
+          detail: {
+            hasActiveClass: hasRemainingClasses,
+            classCount: remainingClasses.length,
+            timestamp: Date.now()
+          }
+        });
+        window.dispatchEvent(event);
+        
+        console.log('📢 Dispatched classStatusChanged event - GAMES AND MISSIONS UPDATE STATUS');
+      }
+      
+      console.log('🎉 Student successfully removed from class');
+      
+      return { 
+        success: true, 
+        message: 'Successfully removed from class',
+        classId: classId,
+        studentId: student.id,
+        hasRemainingClasses: hasRemainingClasses
+      };
+      
     } catch (error) {
       console.error('Error in removeStudentFromClass:', error);
-      return { success: false, message: error.message || 'Failed to remove from class' };
+      return { 
+        success: false, 
+        message: error.message || 'Failed to remove from class' 
+      };
     }
   },
 

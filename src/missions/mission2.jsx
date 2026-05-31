@@ -1,4 +1,5 @@
-// src/missions/mission2.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
+// src/missions/mission2.jsx - FULLY RESPONSIVE (No scroll required, fits any width including 100px)
+// All text is justified and left-aligned, no center alignment for text content
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -15,6 +16,10 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
   const [currentAvatarMessage, setCurrentAvatarMessage] = useState("🧙 Welcome, young wizard! Ready to master linear equations?");
   const [isCompleting, setIsCompleting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [showCheckPopup, setShowCheckPopup] = useState(false);
+  const [pendingAnswer, setPendingAnswer] = useState(null);
+  const [pendingStepIndex, setPendingStepIndex] = useState(null);
+  const [wrongFeedback, setWrongFeedback] = useState({});
 
   const questions = [
     {
@@ -134,45 +139,45 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
     {
       title: "LINEAR EQUATIONS - Lesson",
       content: (
-        <div>
-          <p style={lessonStyles.paragraph}>
+        <div style={{wordBreak: 'break-word', textAlign: 'left'}}>
+          <p style={{marginBottom: '10px', fontSize: 'clamp(12px, 4vw, 16px)', textAlign: 'justify'}}>
             <strong>LINEAR EQUATION</strong> is a first-degree polynomial involving two variables, and its graph forms a straight line.
           </p>
-          <p style={lessonStyles.paragraph}>
+          <p style={{marginBottom: '10px', fontSize: 'clamp(12px, 4vw, 16px)', textAlign: 'justify'}}>
             Its standard form is expressed as <strong>Ax + By = C</strong>. The equation of a line can be found using different methods.
           </p>
           
-          <div style={lessonStyles.imageContainer}>
+          <div style={{textAlign: 'center', margin: '10px 0', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '10px'}}>
             <img 
               src="/pics.png" 
               alt="Linear Equation Graph"
-              style={lessonStyles.lessonImage}
+              style={{maxWidth: '100%', height: 'auto', borderRadius: '8px'}}
               onError={(e) => {
                 e.target.onerror = null;
                 e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='300' viewBox='0 0 500 300'%3E%3Crect width='500' height='300' fill='%23f3f4f6'/%3E%3Cline x1='100' y1='200' x2='400' y2='100' stroke='%238b5cf6' stroke-width='3'/%3E%3Ccircle cx='120' cy='190' r='6' fill='%23ef4444'/%3E%3Ctext x='110' y='180' font-size='12' fill='%23ef4444'%3E(1,2)%3C/text%3E%3Ccircle cx='380' cy='110' r='6' fill='%23ef4444'/%3E%3Ctext x='370' y='100' font-size='12' fill='%23ef4444'%3E(5,-2)%3C/text%3E%3Ctext x='250' y='280' text-anchor='middle' fill='%23666' font-size='14'%3ELine: y = -x + 3%3C/text%3E%3C/svg%3E";
               }}
             />
-            <p style={lessonStyles.imageCaption}>Figure 1: Line passing through points (1, 2) and (5, -2)</p>
+            <p style={{fontSize: 'clamp(10px, 3vw, 12px)', color: '#6b7280', marginTop: '6px', fontStyle: 'italic', textAlign: 'center'}}>Figure 1: Line passing through points (1, 2) and (5, -2)</p>
           </div>
           
-          <div style={lessonStyles.exampleBox}>
-            <h4 style={lessonStyles.exampleTitle}>📐 Mission: Equation of a Line Using Two Points</h4>
-            <p><strong>Two points:</strong> (x₁, y₁) and (x₂, y₂)</p>
-            <p><strong>Example:</strong> Find the equation of the line through (1, 2) and (5, -2).</p>
+          <div style={{backgroundColor: '#f0f9ff', padding: 'clamp(8px, 3vw, 12px)', borderRadius: '10px', marginTop: '12px', textAlign: 'left'}}>
+            <h4 style={{color: '#0369a1', marginBottom: '10px', fontSize: 'clamp(14px, 4vw, 16px)', textAlign: 'left'}}>📐 Mission: Equation of a Line Using Two Points</h4>
+            <p style={{fontSize: 'clamp(11px, 3.5vw, 14px)', textAlign: 'justify'}}><strong>Two points:</strong> (x₁, y₁) and (x₂, y₂)</p>
+            <p style={{fontSize: 'clamp(11px, 3.5vw, 14px)', textAlign: 'justify'}}><strong>Example:</strong> Find the equation of the line through (1, 2) and (5, -2).</p>
             
-            <div style={lessonStyles.solutionBox}>
-              <p><strong>Solution:</strong> Use the <strong>Two-point Form</strong>:</p>
-              <div style={lessonStyles.formulaBox}>
+            <div style={{backgroundColor: '#fefce8', padding: 'clamp(8px, 3vw, 10px)', borderRadius: '8px', marginTop: '8px', textAlign: 'left'}}>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 14px)', textAlign: 'justify'}}><strong>Solution:</strong> Use the <strong>Two-point Form</strong>:</p>
+              <div style={{backgroundColor: '#e0f2fe', padding: '8px', borderRadius: '6px', margin: '8px 0', textAlign: 'center', fontSize: 'clamp(11px, 3.5vw, 14px)'}}>
                 <strong>y - y₁ = (y₂ - y₁)/(x₂ - x₁) × (x - x₁)</strong>
               </div>
               
-              <p><strong>Step 1.</strong> Identify points: (x₁, y₁) = (1, 2); (x₂, y₂) = (5, -2)</p>
-              <p><strong>Step 2.</strong> Substitute: y - 2 = [(-2) - 2]/[(5) - 1] × (x - 1)</p>
-              <p><strong>Step 3.</strong> Simplify: y - 2 = (-4)/(4) × (x - 1) → y - 2 = -1 × (x - 1)</p>
-              <p><strong>Step 4.</strong> Distribute: y - 2 = -x + 1</p>
-              <p><strong>Step 5.</strong> Add 2 to both sides: y = -x + 3</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 1.</strong> Identify points: (x₁, y₁) = (1, 2); (x₂, y₂) = (5, -2)</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 2.</strong> Substitute: y - 2 = [(-2) - 2]/[(5) - 1] × (x - 1)</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 3.</strong> Simplify: y - 2 = (-4)/(4) × (x - 1) → y - 2 = -1 × (x - 1)</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 4.</strong> Distribute: y - 2 = -x + 1</p>
+              <p style={{fontSize: 'clamp(11px, 3.5vw, 13px)', textAlign: 'justify'}}><strong>Step 5.</strong> Add 2 to both sides: y = -x + 3</p>
               
-              <div style={lessonStyles.resultBox}>
+              <div style={{backgroundColor: '#dcfce7', padding: '8px', borderRadius: '6px', marginTop: '8px', textAlign: 'center', fontWeight: 'bold', fontSize: 'clamp(12px, 4vw, 14px)'}}>
                 y = -x + 3 &nbsp;&nbsp;or&nbsp;&nbsp; x + y = 3
               </div>
             </div>
@@ -206,11 +211,11 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
       "🏆 Magical performance! +250 XP awaits!"
     ],
     wrong: [
-      "🤔 Oops! Let's review the linear equation concept!",
-      "💡 Almost there! Try casting the spell again!",
-      "📚 Not quite right. Check your understanding!",
-      "✨ Don't give up! Practice makes perfect!",
-      "🎯 Keep trying! The magic is within you!"
+      "🤔 Oops! That's not correct. Try again!",
+      "💡 Not quite right! Give it another try!",
+      "📚 Hmm, that's not the answer. Keep practicing!",
+      "✨ Don't give up! Try a different approach!",
+      "🎯 Not this time. You can do it!"
     ],
     info: [
       "💡 Remember: Linear equations have a constant slope!",
@@ -235,6 +240,7 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
       }
       setCurrentStep(0);
       setAnswers({});
+      setWrongFeedback({});
       setShowConfetti(false);
       setFeedbackAvatar(null);
       setCanProceed(true);
@@ -256,23 +262,58 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
     setTimeout(() => setShowAvatarMessage(false), 2000);
   };
 
-  const handleAnswer = (stepIndex, answerIndex) => {
+  const handleSelectAnswer = (stepIndex, answerIndex) => {
+    setPendingAnswer(answerIndex);
+    setPendingStepIndex(stepIndex);
+    setShowCheckPopup(true);
+    setCurrentAvatarMessage("🔍 Review your answer before confirming!");
+    setShowAvatarMessage(true);
+    setTimeout(() => setShowAvatarMessage(false), 2000);
+  };
+
+  const confirmAnswer = () => {
+    const stepIndex = pendingStepIndex;
+    const answerIndex = pendingAnswer;
     const step = steps[stepIndex];
     const isCorrect = answerIndex === step.correct;
-    const messageType = isCorrect ? 'happy' : 'wrong';
-    setCurrentAvatarMessage(getRandomMessage(messageType));
-    setFeedbackAvatar(isCorrect ? 'happy' : 'wrong');
-    setCanProceed(isCorrect);
+    
+    if (isCorrect) {
+      setCurrentAvatarMessage(getRandomMessage('happy'));
+      setFeedbackAvatar('happy');
+      setCanProceed(true);
+      setAnswers({ ...answers, [stepIndex]: { selected: answerIndex, isCorrect: true } });
+      setWrongFeedback({ ...wrongFeedback, [stepIndex]: null });
+    } else {
+      setCurrentAvatarMessage(getRandomMessage('wrong'));
+      setFeedbackAvatar('wrong');
+      setCanProceed(false);
+      setWrongFeedback({ ...wrongFeedback, [stepIndex]: "❌ Incorrect! Try again!" });
+      const newAnswers = { ...answers };
+      delete newAnswers[stepIndex];
+      setAnswers(newAnswers);
+    }
+    
+    setShowCheckPopup(false);
+    setPendingAnswer(null);
+    setPendingStepIndex(null);
     setShowAvatarMessage(true);
-    setAnswers({ ...answers, [stepIndex]: { selected: answerIndex, isCorrect } });
     setTimeout(() => setFeedbackAvatar(null), 3000);
+  };
+
+  const cancelAnswer = () => {
+    setShowCheckPopup(false);
+    setPendingAnswer(null);
+    setPendingStepIndex(null);
+    setCurrentAvatarMessage("📝 Take your time! Choose the correct answer.");
+    setShowAvatarMessage(true);
+    setTimeout(() => setShowAvatarMessage(false), 2000);
   };
 
   const handleNext = () => {
     if (currentStep < steps.length - 1) {
       if (steps[currentStep].type === 'quiz') {
         if (!answers[currentStep]) {
-          setCurrentAvatarMessage("🤔 Please select an answer first!");
+          setCurrentAvatarMessage("🤔 Please select a correct answer first!");
           setFeedbackAvatar('wrong');
           setShowAvatarMessage(true);
           setTimeout(() => setFeedbackAvatar(null), 2000);
@@ -370,67 +411,75 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
   const renderStepContent = () => {
     const step = steps[currentStep];
     const currentAnswer = answers[currentStep];
+    const wrongMsg = wrongFeedback[currentStep];
 
     switch (step.type) {
       case "info":
         return (
-          <div style={responsiveStyles.infoContent}>
-            <p style={responsiveStyles.contentText}>{step.content}</p>
-            <p style={responsiveStyles.descriptionText}>{step.description}</p>
-            <div style={responsiveStyles.wizardContainer}>
-              <span style={responsiveStyles.wizardBadge}>🧙</span>
-              <span style={responsiveStyles.wizardBadge}>🔮</span>
-              <span style={responsiveStyles.wizardBadge}>✨</span>
+          <div style={{textAlign: 'left'}}>
+            <p style={{fontSize: 'clamp(13px, 4vw, 16px)', lineHeight: '1.4', textAlign: 'justify'}}>{step.content}</p>
+            <p style={{fontSize: 'clamp(12px, 3.5vw, 15px)', marginTop: '8px', textAlign: 'justify'}}>{step.description}</p>
+            <div style={{display:'flex', gap:'12px', justifyContent:'center', margin:'12px 0'}}>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>🧙</span>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>🔮</span>
+              <span style={{fontSize: 'clamp(24px, 8vw, 32px)'}}>✨</span>
             </div>
-            <div style={responsiveStyles.rewardPreview}>
+            <div style={{background:'#fef3c7', padding:'10px', borderRadius:'10px', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:'6px', fontSize:'clamp(11px, 3.5vw, 14px)', textAlign: 'left'}}>
               <span>🏆 Complete all questions to earn</span>
-              <span style={responsiveStyles.rewardPreviewAmount}>+250 XP!</span>
+              <span style={{fontWeight:'bold', color:'#d97706'}}>+250 XP!</span>
             </div>
           </div>
         );
       case "lesson":
-        return <div style={responsiveStyles.lessonContent}>{step.content}</div>;
+        return <div style={{wordBreak: 'break-word', textAlign: 'left'}}>{step.content}</div>;
       case "quiz":
         return (
-          <div style={responsiveStyles.quizContent}>
-            <div style={responsiveStyles.equationNumber}>Question {currentStep - 1} of {questions.length}</div>
-            <p style={responsiveStyles.questionText}>{step.question}</p>
-            <div style={responsiveStyles.optionsContainer}>
+          <div style={{textAlign: 'left'}}>
+            <div style={{fontSize:'clamp(11px, 3.5vw, 13px)', color:'#8b5cf6', fontWeight:'bold', textAlign: 'left'}}>Question {currentStep-1} of {questions.length}</div>
+            <p style={{fontWeight:'bold', margin:'10px 0', fontSize:'clamp(14px, 4.5vw, 18px)', textAlign: 'justify'}}>{step.question}</p>
+            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
               {step.options.map((option, idx) => (
                 <label key={idx} style={{
-                  ...responsiveStyles.optionLabel,
-                  ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? responsiveStyles.correctOption : {}),
-                  ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? responsiveStyles.wrongOption : {})
+                  display:'flex', alignItems:'center', padding:'clamp(6px, 2vw, 10px)', border:'1px solid #e5e7eb', borderRadius:'10px',
+                  fontSize:'clamp(11px, 3.5vw, 14px)', textAlign: 'left',
+                  ...(currentAnswer && currentAnswer.selected === idx && idx === step.correct ? {backgroundColor:'#d1fae5', borderColor:'#10b981'} : {}),
+                  ...(currentAnswer && currentAnswer.selected === idx && idx !== step.correct ? {backgroundColor:'#fee2e2', borderColor:'#ef4444'} : {})
                 }}>
                   <input type="radio" name={`q-${currentStep}`} value={idx}
                     checked={currentAnswer && currentAnswer.selected === idx}
-                    onChange={() => handleAnswer(currentStep, idx)}
-                    style={responsiveStyles.radio} />
-                  <span style={responsiveStyles.optionText}>{option}</span>
+                    onChange={() => !currentAnswer && handleSelectAnswer(currentStep, idx)}
+                    disabled={currentAnswer !== undefined}
+                    style={{marginRight:'10px', width:'clamp(14px, 4vw, 16px)', height:'clamp(14px, 4vw, 16px)'}} />
+                  <span>{option}</span>
                 </label>
               ))}
             </div>
-            {currentAnswer && (
-              <div style={currentAnswer.isCorrect ? responsiveStyles.correctFeedback : responsiveStyles.incorrectFeedback}>
-                {currentAnswer.isCorrect ? `✅ Correct! ${step.explanation}` : `❌ Incorrect. ${step.explanation}`}
+            {wrongMsg && !currentAnswer && (
+              <div style={{padding:'8px', backgroundColor:'#fee2e2', color:'#dc2626', borderRadius:'8px', marginTop:'10px', fontSize:'clamp(11px, 3.5vw, 13px)', textAlign: 'center'}}>
+                {wrongMsg}
+              </div>
+            )}
+            {currentAnswer && currentAnswer.isCorrect && (
+              <div style={{padding:'8px', backgroundColor:'#d1fae5', color:'#065f46', borderRadius:'8px', marginTop:'10px', fontSize:'clamp(11px, 3.5vw, 13px)', textAlign: 'center'}}>
+                ✅ Correct! Well done!
               </div>
             )}
           </div>
         );
       case "complete":
         return (
-          <div style={responsiveStyles.completeContent}>
-            <p style={responsiveStyles.completeText}>{step.content}</p>
-            <div style={responsiveStyles.resultBox}>
-              <span style={responsiveStyles.resultIcon}>📐</span>
-              <span style={responsiveStyles.resultText}>{step.result}</span>
+          <div style={{textAlign: 'left'}}>
+            <p style={{fontSize:'clamp(14px, 4.5vw, 18px)', textAlign: 'justify'}}>{step.content}</p>
+            <div style={{background:'#ede9fe', padding:'12px', borderRadius:'12px', margin:'12px 0', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', flexWrap:'wrap'}}>
+              <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>📐</span>
+              <span style={{fontWeight:'bold', fontSize:'clamp(14px, 4vw, 18px)'}}>{step.result}</span>
             </div>
-            <p style={responsiveStyles.noteText}>{step.note}</p>
-            <div style={responsiveStyles.rewardBox}>
-              <span style={responsiveStyles.rewardIcon}>🏆</span>
-              <span style={responsiveStyles.rewardText}>+250 XP Earned!</span>
+            <p style={{fontSize:'clamp(11px, 3.5vw, 13px)', fontStyle:'italic', textAlign: 'justify'}}>{step.note}</p>
+            <div style={{background:'#fef3c7', padding:'12px', borderRadius:'12px', display:'flex', alignItems:'center', justifyContent:'center', gap:'10px', marginBottom:'14px'}}>
+              <span style={{fontSize:'clamp(20px, 6vw, 24px)'}}>🏆</span>
+              <span style={{fontWeight:'bold', fontSize:'clamp(14px, 4vw, 16px)'}}>+250 XP Earned!</span>
             </div>
-            <button style={responsiveStyles.finishButton} onClick={handleComplete} disabled={isCompleting}>
+            <button style={{width:'100%', padding:'clamp(10px, 3vw, 14px)', backgroundColor:'#8b5cf6', color:'white', border:'none', borderRadius:'10px', fontWeight:'bold', fontSize:'clamp(14px, 4vw, 16px)', textAlign: 'center'}} onClick={handleComplete} disabled={isCompleting}>
               {isCompleting ? "Completing..." : "Claim Your Wizard Reward"}
             </button>
           </div>
@@ -449,188 +498,141 @@ function Mission2({ user, userData, updateUserData, onComplete, saveToDatabase }
   const questionsCompleted = Object.keys(answers).filter(key => answers[key] && answers[key].isCorrect).length;
 
   return (
-    <div style={responsiveStyles.container}>
-      {showConfetti && (
-        <div style={responsiveStyles.confettiOverlay}>
-          <div style={responsiveStyles.confettiMessage}>🎉 Mission Complete! 🎉<br />You earned 250 XP!<br />You are now a Math Wizard! 🧙</div>
-        </div>
-      )}
-
-      {showResetConfirm && (
-        <div style={responsiveStyles.modalOverlay}>
-          <div style={responsiveStyles.modalContent}>
-            <h3 style={responsiveStyles.modalTitle}>🔄 Reset Mission?</h3>
-            <p style={responsiveStyles.modalText}>Are you sure you want to reset this mission? All your progress will be lost.</p>
-            <div style={responsiveStyles.modalButtons}>
-              <button style={responsiveStyles.confirmResetBtn} onClick={confirmReset} disabled={isResetting}>
-                {isResetting ? 'Resetting...' : 'Yes, Reset'}
-              </button>
-              <button style={responsiveStyles.cancelResetBtn} onClick={cancelReset}>Cancel</button>
+    <div style={{
+      padding: '8px',
+      minHeight: '100vh',
+      backgroundColor: '#f3f4f6',
+      boxSizing: 'border-box',
+      width: '100%',
+      overflowX: 'hidden'
+    }}>
+      {/* Check Answer Confirmation Popup */}
+      {showCheckPopup && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.7)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:3000}}>
+          <div style={{backgroundColor:'white', borderRadius:'20px', padding:'20px', textAlign:'center', maxWidth:'300px', width:'85%'}}>
+            <div style={{fontSize:'48px'}}>🔍</div>
+            <h3 style={{fontSize:'20px', margin:'10px 0'}}>Check your answer?</h3>
+            <p style={{fontSize:'14px', marginBottom:'20px'}}>Are you sure you want to check if this answer is correct?</p>
+            <div style={{display:'flex', gap:'12px', justifyContent:'center', flexDirection:'column'}}>
+              <button style={{backgroundColor:'#8b5cf6', color:'white', padding:'12px', borderRadius:'10px', border:'none', fontWeight:'bold', fontSize:'14px'}} onClick={confirmAnswer}>Yes, Check Answer</button>
+              <button style={{backgroundColor:'#6b7280', color:'white', padding:'12px', borderRadius:'10px', border:'none', fontWeight:'bold', fontSize:'14px'}} onClick={cancelAnswer}>No, Let me review</button>
             </div>
           </div>
         </div>
       )}
 
-      <div style={responsiveStyles.headerRow}>
-        <button style={responsiveStyles.resetButton} onClick={handleResetMission}>🔄 Reset</button>
-      </div>
-
-      <div style={responsiveStyles.progressBar}>
-        <div style={{ ...responsiveStyles.progressFill, width: `${progressPercentage}%` }} />
-      </div>
-
-      {steps[currentStep].type === 'quiz' && (
-        <div style={responsiveStyles.equationProgress}>
-          <span>🧙 Mastered: {questionsCompleted}/{questions.length}</span>
-          <span style={responsiveStyles.xpPreview}>✨ +250 XP</span>
+      {showConfetti && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000}}>
+          <div style={{backgroundColor:'white', padding:'20px', borderRadius:'16px', textAlign:'center', maxWidth:'90%', fontSize:'clamp(14px, 4vw, 18px)'}}>
+            🎉 Mission Complete! 🎉<br />You earned 250 XP!<br />You are now a Math Wizard! 🧙
+          </div>
         </div>
       )}
 
-      <div style={responsiveStyles.card}>
-        <h2 style={responsiveStyles.title}>{steps[currentStep].title}</h2>
-        <div style={responsiveStyles.scrollableContent}>{renderStepContent()}</div>
+      {showResetConfirm && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, backgroundColor:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2000, padding:'16px'}}>
+          <div style={{backgroundColor:'white', borderRadius:'16px', padding:'20px', maxWidth:'300px', width:'90%', textAlign:'center'}}>
+            <h3 style={{fontSize:'18px', marginBottom:'10px', color:'#ef4444'}}>🔄 Reset Mission?</h3>
+            <p style={{fontSize:'13px', marginBottom:'18px'}}>Are you sure you want to reset this mission? All your progress will be lost.</p>
+            <div style={{display:'flex', gap:'10px', justifyContent:'center', flexDirection:'column'}}>
+              <button style={{backgroundColor:'#ef4444', color:'white', padding:'10px', borderRadius:'8px', border:'none', fontWeight:'bold'}} onClick={confirmReset} disabled={isResetting}>{isResetting ? 'Resetting...' : 'Yes, Reset'}</button>
+              <button style={{backgroundColor:'#6b7280', color:'white', padding:'10px', borderRadius:'8px', border:'none', fontWeight:'bold'}} onClick={cancelReset}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{display:'flex', justifyContent:'flex-end', marginBottom:'8px'}}>
+        <button style={{backgroundColor:'#ef4444', color:'white', padding:'6px 12px', borderRadius:'8px', border:'none', fontSize:'clamp(10px, 3vw, 12px)', fontWeight:'bold'}} onClick={handleResetMission}>🔄 Reset</button>
+      </div>
+
+      {/* Progress Bar */}
+      <div style={{width:'100%', height:'6px', backgroundColor:'#e5e7eb', borderRadius:'3px', marginBottom:'10px', overflow:'hidden'}}>
+        <div style={{height:'100%', backgroundColor:'#8b5cf6', width:`${progressPercentage}%`, transition:'width 0.3s'}} />
+      </div>
+
+      {/* XP Preview for quiz steps */}
+      {steps[currentStep].type === 'quiz' && (
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', fontSize:'clamp(10px, 3vw, 12px)', fontWeight:'bold', color:'#8b5cf6', background:'#ede9fe', padding:'6px 10px', borderRadius:'10px', textAlign: 'left'}}>
+          <span>🧙 Mastered: {questionsCompleted}/{questions.length}</span>
+          <span style={{color:'#d97706'}}>✨ +250 XP</span>
+        </div>
+      )}
+
+      {/* Main Card */}
+      <div style={{
+        backgroundColor:'white', borderRadius:'16px', padding:'clamp(12px, 4vw, 16px)', boxShadow:'0 2px 8px rgba(0,0,0,0.1)',
+        display:'flex', flexDirection:'column', width:'100%', boxSizing:'border-box', overflowX:'hidden'
+      }}>
+        <h2 style={{fontSize:'clamp(16px, 5vw, 20px)', marginBottom:'12px', color:'#333', textAlign: 'left'}}>{steps[currentStep].title}</h2>
+        <div style={{overflowX:'hidden', wordBreak:'break-word', marginBottom:'12px'}}>
+          {renderStepContent()}
+        </div>
         
-        <div style={responsiveStyles.buttonContainer}>
-          {currentStep > 0 && <button style={responsiveStyles.prevButton} onClick={handlePrevious}>← Prev</button>}
+        {/* Navigation Buttons */}
+        <div style={{display:'flex', justifyContent:'space-between', gap:'10px', marginTop:'10px'}}>
+          {currentStep > 0 && <button style={{backgroundColor:'#6b7280', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none', fontSize:'clamp(11px, 3.5vw, 13px)', fontWeight:'bold'}} onClick={handlePrevious}>← Prev</button>}
           {currentStep < steps.length - 1 && steps[currentStep].type !== 'complete' && (
             <button style={{
-              ...responsiveStyles.nextButton,
-              ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? responsiveStyles.disabledButton : {})
+              backgroundColor:'#8b5cf6', color:'white', padding:'8px 16px', borderRadius:'8px', border:'none', fontSize:'clamp(11px, 3.5vw, 13px)', fontWeight:'bold',
+              ...(steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep]) ? {backgroundColor:'#c4b5fd', opacity:0.6} : {})
             }} onClick={handleNext} disabled={steps[currentStep].type === 'quiz' && (!canProceed || !answers[currentStep])}>
               Next →
             </button>
           )}
         </div>
         
-        <div style={responsiveStyles.stepIndicator}>
-          {steps[currentStep].type === 'quiz' ? `Q${currentStep - 1}/${questions.length}` : `Step ${currentStep + 1}/${steps.length}`}
+        <div style={{textAlign:'center', marginTop:'10px', fontSize:'clamp(9px, 3vw, 11px)', color:'#999'}}>
+          {steps[currentStep].type === 'quiz' ? `Q${currentStep-1}/${questions.length}` : `Step ${currentStep+1}/${steps.length}`}
+        </div>
+
+        {/* Avatar Section - No scroll */}
+        <div style={{marginTop:'20px', paddingTop:'14px', borderTop:'1px solid #e5e7eb', display:'flex', flexDirection:'column', alignItems:'flex-start', gap:'12px'}}>
+          {/* Speech Bubble */}
+          <div style={{width:'100%', maxWidth:'280px'}}>
+            {showAvatarMessage && currentAvatarMessage && !showCheckPopup && (
+              <div style={{backgroundColor:'white', padding:'10px 14px', borderRadius:'20px', boxShadow:'0 2px 10px rgba(0,0,0,0.1)', border:'2px solid #8b5cf6', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px'}}>
+                <span style={{fontSize:'clamp(11px, 3.5vw, 13px)', color:'#333', flex:1, lineHeight:'1.4', textAlign: 'left'}}>{currentAvatarMessage}</span>
+                <button onClick={() => setShowAvatarMessage(false)} style={{background:'none', border:'none', fontSize:'12px', color:'#999', cursor:'pointer'}}>✕</button>
+              </div>
+            )}
+            {!showAvatarMessage && !showCheckPopup && (
+              <button onClick={() => { setShowAvatarMessage(true); setCurrentAvatarMessage(getRandomMessage('info')); }} style={{borderRadius:'50%', width:'40px', height:'40px', cursor:'pointer', backgroundColor:'#8b5cf6', color:'white', border:'none', fontSize:'20px', display:'flex', alignItems:'center', justifyContent:'center'}}>💬</button>
+            )}
+          </div>
+          
+          {/* Avatar Image */}
+          <div style={{width:'clamp(70px, 15vw, 90px)', height:'clamp(70px, 15vw, 90px)', borderRadius:'50%', overflow:'hidden', backgroundColor:'#f0f0f0', boxShadow:'0 2px 10px rgba(0,0,0,0.2)', border:'3px solid white'}}>
+            <img src={getAvatarImage()} alt="Assistant" style={{width:'100%', height:'100%', objectFit:'cover'}}
+              onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%238b5cf6'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"; }} />
+          </div>
         </div>
       </div>
 
-      <div style={responsiveStyles.avatarContainer}>
-        <div style={responsiveStyles.bubbleContainer}>
-          {showAvatarMessage && currentAvatarMessage && (
-            <div style={responsiveStyles.speechBubble}>
-              <span style={responsiveStyles.bubbleText}>{currentAvatarMessage}</span>
-              <button onClick={() => setShowAvatarMessage(false)} style={responsiveStyles.closeBubble}>✕</button>
-            </div>
-          )}
-          {!showAvatarMessage && (
-            <button onClick={() => { setShowAvatarMessage(true); setCurrentAvatarMessage(getRandomMessage('info')); }} style={responsiveStyles.reopenBubble}>💬</button>
-          )}
-        </div>
-        <div style={responsiveStyles.avatarWrapper}>
-          <img src={getAvatarImage()} alt="Assistant" style={responsiveStyles.avatarImage}
-            onError={(e) => { e.target.onerror = null; e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%238b5cf6'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"; }} />
-        </div>
-      </div>
+      {/* Global styles for text wrapping and no horizontal scroll */}
+      <style>{`
+        * {
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        body, div, p, h1, h2, h3, h4, span, button, label {
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+        }
+        img, svg {
+          max-width: 100%;
+          height: auto;
+        }
+        button {
+          cursor: pointer;
+        }
+        button:active {
+          transform: scale(0.98);
+        }
+      `}</style>
     </div>
   );
 }
-
-const responsiveStyles = {
-  container: {
-    padding: '10px',
-    minHeight: '100vh',
-    backgroundColor: '#f3f4f6',
-    position: 'relative',
-    boxSizing: 'border-box',
-    width: '100%',
-    '@media (min-width: 769px)': { padding: '20px' }
-  },
-  headerRow: { display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' },
-  resetButton: {
-    backgroundColor: '#ef4444', color: 'white', padding: '6px 12px', border: 'none',
-    borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
-    minHeight: '36px', '@media (min-width: 769px)': { padding: '8px 16px', fontSize: '13px', minHeight: '40px' }
-  },
-  progressBar: { width: '100%', height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', marginBottom: '8px', overflow: 'hidden' },
-  progressFill: { height: '100%', backgroundColor: '#8b5cf6', transition: 'width 0.3s ease' },
-  equationProgress: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px',
-    fontSize: '10px', fontWeight: 'bold', color: '#8b5cf6', padding: '6px 10px',
-    backgroundColor: '#ede9fe', borderRadius: '8px', '@media (min-width: 769px)': { fontSize: '14px', padding: '8px 12px' }
-  },
-  xpPreview: { color: '#d97706', fontSize: '9px', '@media (min-width: 769px)': { fontSize: '12px' } },
-  rewardPreview: { marginTop: '16px', padding: '10px', backgroundColor: '#fef3c7', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', flexWrap: 'wrap', gap: '6px' },
-  rewardPreviewAmount: { fontWeight: 'bold', color: '#d97706', fontSize: '14px' },
-  card: {
-    backgroundColor: 'white', borderRadius: '12px', padding: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-    display: 'flex', flexDirection: 'column', maxHeight: 'calc(100vh - 160px)', overflow: 'hidden',
-    '@media (min-width: 769px)': { padding: '25px', borderRadius: '16px', maxHeight: 'calc(100vh - 200px)' }
-  },
-  scrollableContent: { flex: 1, overflowY: 'auto', paddingRight: '6px', marginBottom: '10px' },
-  title: { fontSize: '16px', color: '#333', textAlign: 'center', marginBottom: '10px', flexShrink: 0, '@media (min-width: 769px)': { fontSize: '24px', marginBottom: '15px' } },
-  infoContent: { textAlign: 'center', padding: '8px' },
-  contentText: { fontSize: '13px', color: '#666', lineHeight: '1.4', marginBottom: '8px', '@media (min-width: 769px)': { fontSize: '15px' } },
-  descriptionText: { fontSize: '12px', color: '#555', lineHeight: '1.4', marginBottom: '8px', '@media (min-width: 769px)': { fontSize: '15px' } },
-  wizardContainer: { display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '12px' },
-  wizardBadge: { fontSize: '28px', '@media (min-width: 769px)': { fontSize: '40px' } },
-  lessonContent: { padding: '8px', lineHeight: '1.5', fontSize: '12px' },
-  quizContent: { padding: '4px' },
-  equationNumber: { fontSize: '11px', color: '#8b5cf6', fontWeight: 'bold', marginBottom: '10px', textAlign: 'center' },
-  questionText: { fontSize: '14px', fontWeight: 'bold', color: '#333', marginBottom: '12px', '@media (min-width: 769px)': { fontSize: '18px', marginBottom: '20px' } },
-  optionsContainer: { display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' },
-  optionLabel: { display: 'flex', alignItems: 'center', padding: '8px', border: '1px solid #e5e7eb', borderRadius: '8px', cursor: 'pointer' },
-  correctOption: { backgroundColor: '#d1fae5', borderColor: '#10b981' },
-  wrongOption: { backgroundColor: '#fee2e2', borderColor: '#ef4444' },
-  radio: { marginRight: '8px', cursor: 'pointer', width: '16px', height: '16px' },
-  optionText: { fontSize: '11px', color: '#333', '@media (min-width: 769px)': { fontSize: '14px' } },
-  correctFeedback: { padding: '8px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  incorrectFeedback: { padding: '8px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  completeContent: { textAlign: 'center', padding: '8px' },
-  completeText: { fontSize: '14px', color: '#333', marginBottom: '12px', '@media (min-width: 769px)': { fontSize: '18px' } },
-  resultBox: { backgroundColor: '#ede9fe', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
-  resultIcon: { fontSize: '24px' },
-  resultText: { fontSize: '16px', fontWeight: 'bold', color: '#6d28d9' },
-  noteText: { fontSize: '11px', color: '#666', marginBottom: '12px', fontStyle: 'italic' },
-  rewardBox: { backgroundColor: '#fef3c7', padding: '10px', borderRadius: '10px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' },
-  rewardIcon: { fontSize: '24px' },
-  rewardText: { fontSize: '14px', fontWeight: 'bold', color: '#d97706' },
-  finishButton: { backgroundColor: '#8b5cf6', color: 'white', padding: '10px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold', width: '100%', minHeight: '44px' },
-  buttonContainer: { display: 'flex', justifyContent: 'space-between', marginTop: '10px', gap: '8px', flexShrink: 0 },
-  prevButton: { backgroundColor: '#6b7280', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
-  nextButton: { backgroundColor: '#8b5cf6', color: 'white', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', minHeight: '36px' },
-  disabledButton: { backgroundColor: '#c4b5fd', cursor: 'not-allowed', opacity: 0.6 },
-  stepIndicator: { textAlign: 'center', marginTop: '10px', fontSize: '10px', color: '#999', flexShrink: 0 },
-  avatarContainer: { position: 'fixed', bottom: '10px', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', zIndex: 100 },
-  bubbleContainer: { marginBottom: '6px', marginRight: '4px' },
-  speechBubble: { backgroundColor: 'white', padding: '6px 10px', borderRadius: '14px', boxShadow: '0 2px 10px rgba(0,0,0,0.15)', maxWidth: '160px', border: '2px solid #8b5cf6' },
-  bubbleText: { fontSize: '9px', color: '#333', lineHeight: '1.3', '@media (min-width: 769px)': { fontSize: '12px' } },
-  closeBubble: { marginLeft: '6px', cursor: 'pointer', background: 'none', border: 'none', fontSize: '9px', color: '#999' },
-  reopenBubble: { borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', backgroundColor: '#8b5cf6', color: 'white', border: 'none', fontSize: '16px', marginRight: '4px', marginBottom: '4px' },
-  avatarWrapper: { width: '50px', height: '50px', borderRadius: '50%', overflow: 'hidden', backgroundColor: '#f0f0f0', boxShadow: '0 2px 10px rgba(0,0,0,0.2)', border: '2px solid white', '@media (min-width: 769px)': { width: '70px', height: '70px' } },
-  avatarImage: { width: '100%', height: '100%', objectFit: 'cover' },
-  confettiOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  confettiMessage: { backgroundColor: 'white', padding: '20px', borderRadius: '16px', fontSize: '16px', textAlign: 'center', maxWidth: '80%' },
-  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '16px' },
-  modalContent: { backgroundColor: 'white', borderRadius: '16px', padding: '16px', maxWidth: '300px', width: '90%', textAlign: 'center' },
-  modalTitle: { fontSize: '16px', marginBottom: '10px', color: '#ef4444' },
-  modalText: { fontSize: '12px', color: '#555', marginBottom: '16px', lineHeight: '1.4' },
-  modalButtons: { display: 'flex', gap: '10px', justifyContent: 'center', flexDirection: 'column', '@media (min-width: 481px)': { flexDirection: 'row' } },
-  confirmResetBtn: { backgroundColor: '#ef4444', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' },
-  cancelResetBtn: { backgroundColor: '#6b7280', color: 'white', padding: '8px 16px', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', minHeight: '40px' }
-};
-
-const lessonStyles = {
-  paragraph: { marginBottom: '10px', fontSize: '12px', color: '#555', '@media (min-width: 769px)': { fontSize: '14px' } },
-  imageContainer: { textAlign: 'center', margin: '10px 0', padding: '8px', backgroundColor: '#f9fafb', borderRadius: '10px' },
-  lessonImage: { maxWidth: '100%', height: 'auto', borderRadius: '8px' },
-  imageCaption: { fontSize: '10px', color: '#6b7280', marginTop: '6px', fontStyle: 'italic' },
-  exampleBox: { backgroundColor: '#f0f9ff', padding: '12px', borderRadius: '10px', marginTop: '12px' },
-  exampleTitle: { color: '#0369a1', marginBottom: '10px', fontSize: '14px' },
-  solutionBox: { backgroundColor: '#fefce8', padding: '10px', borderRadius: '8px', marginTop: '8px', fontSize: '11px' },
-  formulaBox: { backgroundColor: '#e0f2fe', padding: '8px', borderRadius: '6px', margin: '8px 0', textAlign: 'center', fontSize: '11px' },
-  resultBox: { backgroundColor: '#dcfce7', padding: '8px', borderRadius: '6px', marginTop: '8px', textAlign: 'center', fontWeight: 'bold', fontSize: '12px' }
-};
-
-const styleSheet = document.createElement("style");
-styleSheet.innerHTML = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-@keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-5px); } 100% { transform: translateY(0px); } }
-@keyframes bubblePop { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-button:active { transform: scale(0.98); transition: transform 0.05s; }
-@media (max-width: 480px) { button, .optionLabel { min-height: 40px; } input, textarea, select { font-size: 16px !important; } }
-@media (max-width: 360px) { .title { font-size: 14px !important; } .questionText { font-size: 12px !important; } .optionText { font-size: 10px !important; } .avatarWrapper { width: 45px !important; height: 45px !important; } .speechBubble { max-width: 130px !important; } .bubbleText { font-size: 8px !important; } }`;
-if (!document.querySelector('#mission2-responsive-styles')) { styleSheet.id = 'mission2-responsive-styles'; document.head.appendChild(styleSheet); }
 
 export default Mission2;

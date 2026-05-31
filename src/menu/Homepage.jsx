@@ -1,5 +1,5 @@
 // src/menu/Homepage.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 import { 
   FiTrash2, FiArrowLeft, FiBookOpen, FiUsers, FiCalendar, 
@@ -40,14 +40,51 @@ function Homepage() {
 
   // Selected Class for detailed view
   const [selectedClass, setSelectedClass] = useState(null);
+  
+  // Copy State
+  const [copied, setCopied] = useState(false);
 
-  // Function to refresh classes
-  const refreshClasses = async () => {
+  // Function to refresh classes - completely reload from database
+  const refreshClasses = useCallback(async () => {
     if (contextRefreshClasses) {
       await contextRefreshClasses();
     }
     await loadJoinedClasses();
-  };
+  }, [contextRefreshClasses]);
+
+  // Load joined classes from database
+  const loadJoinedClasses = useCallback(async () => {
+    if (!user?.dbId) {
+      setLoadingClasses(false);
+      return;
+    }
+    
+    try {
+      setLoadingClasses(true);
+      console.log('Loading classes for user:', user.dbId);
+      
+      // Fetch fresh data from database
+      const classes = await classService.getStudentClasses(user.dbId);
+      
+      console.log('Classes loaded from DB:', classes.length);
+      
+      const classesWithTeacherNames = classes.map(enrollment => ({
+        ...enrollment,
+        class: {
+          ...enrollment.class,
+          teacher_name: enrollment.class.teacher?.name || enrollment.class.teacher_name || 'Teacher'
+        }
+      }));
+      
+      // Update state with fresh data
+      setJoinedClasses(classesWithTeacherNames);
+      
+    } catch (error) {
+      console.error('Error loading joined classes:', error);
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, [user?.dbId]);
 
   useEffect(() => {
     const gameProgress = userData?.gameProgress || JSON.parse(localStorage.getItem('gameProgress')) || null;
@@ -61,49 +98,38 @@ function Homepage() {
     } else {
       setLoadingClasses(false);
     }
-  }, [userData, user?.dbId]);
+  }, [userData, user?.dbId, loadJoinedClasses]);
 
   // Listen for class deletion events
   useEffect(() => {
     const handleClassDeleted = (event) => {
       console.log('📢 Class deleted event received:', event.detail);
-      setJoinedClasses(prevClasses => prevClasses.filter(c => c.class_id !== event.detail.classId));
+      // Immediately remove from state
+      setJoinedClasses(prevClasses => {
+        const filtered = prevClasses.filter(c => c.class_id !== event.detail.classId);
+        console.log('Removed class, remaining:', filtered.length);
+        return filtered;
+      });
       if (selectedClass && selectedClass.id === event.detail.classId) {
         closeClassView();
       }
-      setJoinSuccess('Class has been removed successfully!');
-      setTimeout(() => setJoinSuccess(''), 3000);
+    };
+    
+    const handleClassesUpdated = () => {
+      console.log('Classes updated event received, reloading...');
+      if (user?.dbId) {
+        loadJoinedClasses();
+      }
     };
     
     window.addEventListener('classDeleted', handleClassDeleted);
+    window.addEventListener('classesUpdated', handleClassesUpdated);
+    
     return () => {
       window.removeEventListener('classDeleted', handleClassDeleted);
+      window.removeEventListener('classesUpdated', handleClassesUpdated);
     };
-  }, [selectedClass]);
-
-  const loadJoinedClasses = async () => {
-    try {
-      setLoadingClasses(true);
-      const classes = await classService.getStudentClasses(user.dbId);
-      
-      const classesWithTeacherNames = classes.map(enrollment => ({
-        ...enrollment,
-        class: {
-          ...enrollment.class,
-          teacher_name: enrollment.class.teacher?.name || enrollment.class.teacher_name || 'Teacher'
-        }
-      }));
-      
-      setJoinedClasses(classesWithTeacherNames);
-      
-      window.dispatchEvent(new Event('classesUpdated'));
-      localStorage.setItem('classesUpdated', Date.now().toString());
-    } catch (error) {
-      console.error('Error loading joined classes:', error);
-    } finally {
-      setLoadingClasses(false);
-    }
-  };
+  }, [selectedClass, user?.dbId, loadJoinedClasses]);
 
   const openClassView = (classId, classData) => {
     setSelectedClass({ id: classId, ...classData });
@@ -111,15 +137,6 @@ function Homepage() {
 
   const closeClassView = () => {
     setSelectedClass(null);
-  };
-
-  const formatDate = (date) => {
-    if (!date) return 'No date';
-    return new Date(date).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
   };
 
   const userName = user?.name || user?.email?.split('@')[0] || 'Student';
@@ -130,45 +147,66 @@ function Homepage() {
     day: 'numeric' 
   });
 
-  const handleClassCodeChange = (e) => {
-    let value = e.target.value.toUpperCase();
-    value = value.replace(/\s/g, '');
-    setClassCode(value);
-    setJoinError('');
-    setJoinSuccess('');
-  };
-
   const validateClassCode = (code) => {
-    const classCodeRegex = /^[A-Z0-9]{4,20}$/;
+    const classCodeRegex = /^[A-Za-z0-9\-_\.@#$%&*+=?!~]{4,30}$/;
     return classCodeRegex.test(code);
   };
 
+  const copyToClipboard = async () => {
+    if (!classCode) return;
+    try {
+      await navigator.clipboard.writeText(classCode);
+      setCopied(true);
+      setJoinSuccess('Code copied to clipboard!');
+      setTimeout(() => {
+        setCopied(false);
+        setJoinSuccess('');
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleClassCodeChange = (e) => {
+    let value = e.target.value;
+    setClassCode(value);
+    setJoinError('');
+    setJoinSuccess('');
+    setClassDetails(null);
+  };
+
   const handlePreviewClass = async () => {
+    setJoinError('');
+    setClassDetails(null);
+    
     if (!classCode.trim()) {
       setJoinError('Please enter a class code');
       return;
     }
     
     if (!validateClassCode(classCode)) {
-      setJoinError('Invalid class code format. Code should be 4-20 characters (letters and numbers only, no spaces)');
+      setJoinError('Invalid class code format. Code should be 4-30 characters and can include letters (A-Z, a-z), numbers (0-9), and symbols (- _ . @ # $ % & * + = ? ! ~)');
       return;
     }
     
     setIsJoining(true);
-    setJoinError('');
     
     try {
       const classData = await classService.getClassByCode(classCode);
       
-      if (!classData) {
-        setJoinError('Class not found. Please check the code and try again.');
+      // Exact match verification
+      if (!classData || classData.code !== classCode) {
+        setJoinError(`No class found with exact code "${classCode}". Please check the code and try again.`);
+        setIsJoining(false);
         return;
       }
       
-      const isAlreadyJoined = await classService.isStudentInClass(user?.dbId, classData.id);
+      // Check if student is already enrolled in this class
+      const isCurrentlyJoined = await classService.isStudentInClass(user?.dbId, classData.id);
       
-      if (isAlreadyJoined) {
+      if (isCurrentlyJoined) {
         setJoinError('You are already a member of this class!');
+        setIsJoining(false);
         return;
       }
       
@@ -242,8 +280,12 @@ function Homepage() {
         setClassDetails(null);
         setClassCode('');
         setShowJoinForm(false);
-        await refreshClasses();
+        // Refresh the classes list immediately
+        await loadJoinedClasses();
         setTimeout(() => setJoinSuccess(''), 3000);
+      } else {
+        setJoinError(result.message || 'Failed to join class. Please try again.');
+        setShowJoinModal(false);
       }
     } catch (error) {
       console.error('Error joining class:', error);
@@ -266,38 +308,61 @@ function Homepage() {
     setIsRemoving(true);
     
     try {
+      console.log('Attempting to remove class:', classToRemove.class_id, classToRemove.class.name);
+      
+      // Remove from database
       const result = await classService.removeStudentFromClass(
         classToRemove.class_id, 
         user.dbId
       );
       
+      console.log('Remove result:', result);
+      
       if (result.success) {
-        setJoinedClasses(prevClasses => 
-          prevClasses.filter(c => c.class_id !== classToRemove.class_id)
-        );
-        
-        const event = new CustomEvent('classDeleted', { 
-          detail: { classId: classToRemove.class_id, timestamp: Date.now() }
+        // IMMEDIATELY remove from local state - this is the key fix
+        setJoinedClasses(prevClasses => {
+          const filtered = prevClasses.filter(c => c.class_id !== classToRemove.class_id);
+          console.log('Class removed from state. Before:', prevClasses.length, 'After:', filtered.length);
+          return filtered;
         });
-        window.dispatchEvent(event);
         
-        setJoinSuccess(`Successfully removed from ${classToRemove.class.name}`);
-        setShowRemoveModal(false);
-        
+        // Clear the class from the selected view if it's open
         if (selectedClass && selectedClass.id === classToRemove.class_id) {
           closeClassView();
         }
         
+        // Dispatch events to notify all components
+        const deleteEvent = new CustomEvent('classDeleted', { 
+          detail: { 
+            classId: classToRemove.class_id, 
+            className: classToRemove.class.name,
+            timestamp: Date.now() 
+          }
+        });
+        window.dispatchEvent(deleteEvent);
+        
+        const updateEvent = new Event('classesUpdated');
+        window.dispatchEvent(updateEvent);
+        
+        // Show success message
+        setJoinSuccess(`Successfully left ${classToRemove.class.name}`);
+        setShowRemoveModal(false);
+        setClassToRemove(null);
+        
+        // Force a fresh reload from database to ensure consistency
+        setTimeout(async () => {
+          await loadJoinedClasses();
+        }, 100);
+        
         setTimeout(() => setJoinSuccess(''), 3000);
       } else {
-        setJoinError(result.message || 'Failed to remove from class');
+        setJoinError(result.message || 'Failed to leave class. Please try again.');
       }
     } catch (error) {
-      console.error('Error removing from class:', error);
-      setJoinError('Failed to remove from class. Please try again.');
+      console.error('Error leaving class:', error);
+      setJoinError('Failed to leave class. Please try again.');
     } finally {
       setIsRemoving(false);
-      setClassToRemove(null);
     }
   };
 
@@ -356,6 +421,7 @@ function Homepage() {
                   setClassCode('');
                   setJoinError('');
                   setJoinSuccess('');
+                  setClassDetails(null);
                 }}
               >
                 ✕
@@ -367,15 +433,27 @@ function Homepage() {
             </p>
             
             <div style={styles.joinClassForm}>
-              <input
-                type="text"
-                style={styles.joinClassInput}
-                placeholder="Enter class code"
-                value={classCode}
-                onChange={handleClassCodeChange}
-                maxLength="20"
-                autoFocus
-              />
+              <div style={styles.inputWrapper}>
+                <input
+                  type="text"
+                  style={styles.joinClassInput}
+                  className="joinClassInput"
+                  placeholder="Enter class code (e.g., Math123, Learn-123, Study@2024)"
+                  value={classCode}
+                  onChange={handleClassCodeChange}
+                  maxLength="30"
+                  autoFocus
+                />
+                {classCode && (
+                  <button 
+                    style={styles.copyButtonInline}
+                    onClick={copyToClipboard}
+                    title="Copy to clipboard"
+                  >
+                    {copied ? <FiCheck size={14} color="#10b981" /> : <FiCopy size={14} />}
+                  </button>
+                )}
+              </div>
               <div style={styles.joinClassButtons}>
                 <button 
                   style={styles.cancelJoinButton}
@@ -384,6 +462,7 @@ function Homepage() {
                     setClassCode('');
                     setJoinError('');
                     setJoinSuccess('');
+                    setClassDetails(null);
                   }}
                 >
                   Cancel
@@ -411,61 +490,75 @@ function Homepage() {
             )}
             
             <div style={styles.exampleCodes}>
-              <p style={styles.exampleTitle}>💡 Tip:</p>
-              <p style={styles.exampleText}>Ask your teacher for the class code</p>
+              <p style={styles.exampleTitle}>💡 Example Class Codes:</p>
+              <p style={styles.exampleText}>• MATH101 • Learn-123 • Study@2024 • GAME_CODE • Class#1</p>
+              <p style={styles.exampleText}>• Codes can include letters, numbers, and symbols</p>
+              <p style={styles.exampleText}>• Make sure to enter the exact code as provided by your teacher</p>
+              <p style={styles.exampleText}>• Class codes must match exactly (case-sensitive)</p>
             </div>
           </div>
         )}
       </div>
 
-      {!loadingClasses && hasJoinedClasses && (
+      {!loadingClasses && (
         <div style={styles.myClassesSection}>
-          <h2 style={styles.sectionTitle}>My Classes ({joinedClasses.length})</h2>
-          <div style={styles.classesGrid}>
-            {joinedClasses.map((enrollment) => {
-              const teacherName = enrollment.class.teacher?.name || enrollment.class.teacher_name || 'Teacher';
-              return (
-                <div 
-                  key={enrollment.class_id} 
-                  style={styles.classCard}
-                  onClick={() => openClassView(enrollment.class_id, enrollment.class)}
-                >
-                  <div style={styles.classIcon}>{getClassIcon(enrollment.class.name)}</div>
-                  <div style={styles.classInfo}>
-                    <div style={styles.classHeader}>
-                      <h3 style={styles.className}>{enrollment.class.name}</h3>
-                      <button 
-                        style={styles.deleteButton}
-                        onClick={(e) => handleRemoveClick(e, enrollment)}
-                        title="Remove from class"
-                      >
-                        <FiTrash2 size={14} color="#ef4444" />
-                      </button>
-                    </div>
-                    <p style={styles.classTeacher}>
-                      <FiUser size={10} style={styles.inlineIcon} />
-                      <span style={styles.label}>Teacher:</span> 
-                      <strong style={styles.teacherName}>{teacherName}</strong>
-                    </p>
-                    <div style={styles.classCodeContainer}>
-                      <span style={styles.classCodeLabel}>Code:</span>
-                      <code style={styles.classCode}>{enrollment.class.code}</code>
-                    </div>
-                    <p style={styles.joinedDate}>
-                      <span style={styles.label}>Joined:</span> {new Date(enrollment.joined_at).toLocaleDateString()}
-                    </p>
-                    <div style={styles.progressBar}>
-                      <div style={{...styles.progressFill, width: `${enrollment.progress || 0}%`}} />
-                    </div>
-                    <p style={styles.progressText}>Progress: {enrollment.progress || 0}%</p>
-                    <div style={styles.openClassButton}>
-                      Tap to open <FiArrowLeft style={{transform: 'rotate(180deg)'}} size={12} />
+          <h2 style={styles.sectionTitle}>
+            My Classes ({joinedClasses.length})
+          </h2>
+          {hasJoinedClasses ? (
+            <div style={styles.classesGrid}>
+              {joinedClasses.map((enrollment) => {
+                const teacherName = enrollment.class.teacher?.name || enrollment.class.teacher_name || 'Teacher';
+                return (
+                  <div 
+                    key={enrollment.class_id} 
+                    style={styles.classCard}
+                    onClick={() => openClassView(enrollment.class_id, enrollment.class)}
+                  >
+                    <div style={styles.classIcon}>{getClassIcon(enrollment.class.name)}</div>
+                    <div style={styles.classInfo}>
+                      <div style={styles.classHeader}>
+                        <h3 style={styles.className}>{enrollment.class.name}</h3>
+                        <button 
+                          style={styles.leaveClassButton}
+                          onClick={(e) => handleRemoveClick(e, enrollment)}
+                          title="Leave this class"
+                        >
+                          Leave Class
+                        </button>
+                      </div>
+                      <p style={styles.classTeacher}>
+                        <FiUser size={10} style={styles.inlineIcon} />
+                        <span style={styles.label}>Teacher:</span> 
+                        <strong style={styles.teacherName}>{teacherName}</strong>
+                      </p>
+                      <div style={styles.classCodeContainer}>
+                        <span style={styles.classCodeLabel}>Code:</span>
+                        <code style={styles.classCode}>{enrollment.class.code}</code>
+                      </div>
+                      <p style={styles.joinedDate}>
+                        <span style={styles.label}>Joined:</span> {new Date(enrollment.joined_at).toLocaleDateString()}
+                      </p>
+                      <div style={styles.progressBar}>
+                        <div style={{...styles.progressFill, width: `${enrollment.progress || 0}%`}} />
+                      </div>
+                      <p style={styles.progressText}>Progress: {enrollment.progress || 0}%</p>
+                      <div style={styles.openClassButton}>
+                        Tap to open <FiArrowLeft style={{transform: 'rotate(180deg)'}} size={12} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          ) : !showJoinForm && (
+            <div style={styles.noClassesCard}>
+              <div style={styles.noClassesIcon}>📚</div>
+              <h3 style={styles.noClassesTitle}>No Classes Yet</h3>
+              <p style={styles.noClassesText}>Tap "Join a New Class" to get started!</p>
+              <p style={styles.noClassesSubtext}>Enter the class code your teacher gave you</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -473,15 +566,6 @@ function Homepage() {
         <div style={styles.loadingClassesContainer}>
           <div style={styles.loadingSpinnerSmall}></div>
           <p>Loading your classes...</p>
-        </div>
-      )}
-
-      {!loadingClasses && !hasJoinedClasses && !showJoinForm && (
-        <div style={styles.noClassesCard}>
-          <div style={styles.noClassesIcon}>📚</div>
-          <h3 style={styles.noClassesTitle}>No Classes Yet</h3>
-          <p style={styles.noClassesText}>Tap "Join a New Class" to get started!</p>
-          <p style={styles.noClassesSubtext}>Enter the class code your teacher gave you</p>
         </div>
       )}
 
@@ -551,7 +635,7 @@ function Homepage() {
               <div style={styles.warningBox}>
                 <span style={styles.warningIcon}>⚠️</span>
                 <p style={styles.warningText}>
-                  Are you sure? You will lose access to this class and your progress will be reset.
+                  Are you sure you want to leave this class? You will lose access to all class content and your progress will be reset. You can rejoin later with the class code.
                 </p>
               </div>
             </div>
@@ -569,7 +653,7 @@ function Homepage() {
                 onClick={handleConfirmRemove}
                 disabled={isRemoving}
               >
-                {isRemoving ? 'Removing...' : 'Leave'}
+                {isRemoving ? 'Leaving...' : 'Yes, Leave Class'}
               </button>
             </div>
           </div>
@@ -702,7 +786,7 @@ const styles = {
     boxSizing: 'border-box',
     '@media (min-width: 769px)': { 
       padding: '32px',
-      maxWidth: '500px',
+      maxWidth: '600px',
       borderRadius: '20px'
     },
   },
@@ -775,22 +859,47 @@ const styles = {
       marginBottom: '16px'
     },
   },
+  inputWrapper: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    width: '100%',
+  },
   joinClassInput: {
     width: '100%',
     padding: '10px 12px',
+    paddingRight: '35px',
     fontSize: '14px',
     border: '2px solid #e5e7eb',
     borderRadius: '10px',
     outline: 'none',
     transition: 'all 0.3s ease',
     fontFamily: 'monospace',
-    textAlign: 'center',
-    letterSpacing: '0.5px',
     boxSizing: 'border-box',
     '@media (min-width: 769px)': { 
       padding: '14px 18px',
+      paddingRight: '40px',
       fontSize: '16px',
-      letterSpacing: '1px'
+    },
+  },
+  copyButtonInline: {
+    position: 'absolute',
+    right: '8px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    transition: 'background-color 0.2s',
+    minWidth: '28px',
+    minHeight: '28px',
+    '@media (min-width: 769px)': { 
+      right: '10px',
+      minWidth: '32px',
+      minHeight: '32px',
     },
   },
   joinClassButtons: {
@@ -888,10 +997,10 @@ const styles = {
     '@media (min-width: 769px)': { fontSize: '12px', marginBottom: '4px' },
   },
   exampleText: {
-    fontSize: '10px',
+    fontSize: '9px',
     color: '#166534',
-    margin: 0,
-    '@media (min-width: 769px)': { fontSize: '12px' },
+    margin: '2px 0',
+    '@media (min-width: 769px)': { fontSize: '11px' },
   },
   myClassesSection: {
     marginBottom: '20px',
@@ -954,6 +1063,7 @@ const styles = {
     alignItems: 'center',
     marginBottom: '6px',
     flexWrap: 'wrap',
+    gap: '8px',
     '@media (min-width: 769px)': { marginBottom: '8px' },
   },
   className: {
@@ -964,23 +1074,24 @@ const styles = {
     wordBreak: 'break-word',
     '@media (min-width: 769px)': { fontSize: '18px' },
   },
-  deleteButton: {
+  leaveClassButton: {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    padding: '6px',
+    padding: '4px 8px',
+    fontSize: '11px',
+    fontWeight: '500',
+    color: '#ef4444',
+    borderRadius: '6px',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '6px',
-    transition: 'background-color 0.2s',
-    minWidth: '32px',
-    minHeight: '32px',
-    flexShrink: 0,
+    gap: '4px',
+    whiteSpace: 'nowrap',
     '@media (min-width: 769px)': { 
-      padding: '8px',
-      minWidth: '40px',
-      minHeight: '40px'
+      fontSize: '13px',
+      padding: '6px 12px',
     },
   },
   label: {
@@ -1113,10 +1224,8 @@ const styles = {
     padding: '32px 16px',
     backgroundColor: '#f9fafb',
     borderRadius: '12px',
-    marginBottom: '20px',
     '@media (min-width: 769px)': { 
       padding: '60px 20px',
-      marginBottom: '40px'
     },
   },
   noClassesIcon: {
@@ -1430,7 +1539,8 @@ styleSheet.textContent = `
   .previewButton:hover:not(:disabled) { transform: translateY(-1px); }
   .cancelJoinButton:hover { background-color: #e5e7eb; }
   .closeButton:hover { background-color: #f3f4f6; }
-  .deleteButton:hover { background-color: #fee2e2; }
+  .leaveClassButton:hover { background-color: #fee2e2; color: #dc2626; }
+  .copyButtonInline:hover { background-color: #e5e7eb; }
   .modalClose:hover { color: #ef4444; }
   .cancelButton:hover { background-color: #e5e7eb; }
   .confirmButton:hover:not(:disabled) { transform: translateY(-1px); }
@@ -1453,9 +1563,10 @@ styleSheet.textContent = `
     input, textarea, select {
       font-size: 16px !important;
     }
-    button, .classCard .deleteButton, .closeButton, .modalClose, 
+    button, .classCard .leaveClassButton, .closeButton, .modalClose, 
     .joinClassButton, .previewButton, .cancelJoinButton, 
-    .cancelButton, .confirmButton, .dangerButton {
+    .cancelButton, .confirmButton, .dangerButton,
+    .copyButtonInline {
       min-height: 40px;
     }
   }
@@ -1495,6 +1606,13 @@ styleSheet.textContent = `
     }
     .previewIcon {
       font-size: 40px !important;
+    }
+    .leaveClassButton {
+      font-size: 10px !important;
+      padding: 3px 6px !important;
+    }
+    .exampleText {
+      font-size: 8px !important;
     }
   }
 `;

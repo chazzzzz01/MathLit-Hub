@@ -1,4 +1,5 @@
 // src/menu/Missions.jsx - FULLY RESPONSIVE (optimized for 308x748 and all screen sizes)
+// FIX: Avatar made larger and positioned with more spacing from corners (not too close to edge)
 import React, { useState, useEffect } from 'react';
 import { useOutletContext, useNavigate, useLocation } from 'react-router-dom';
 import Mission2 from '../missions/mission2';
@@ -538,7 +539,7 @@ function Missions() {
         </div>
       </div>
 
-      {/* Floating Assistant - Responsive positioning */}
+      {/* Floating Assistant - LARGER AVATAR with more spacing from corner */}
       <div style={styles.avatarContainer}>
         <div style={styles.bubbleContainer}>
           {showMessage ? (
@@ -555,6 +556,7 @@ function Missions() {
           )}
         </div>
 
+        {/* LARGER AVATAR */}
         <div style={styles.avatarWrapper}>
           <img
             src="/avatar_happy.jpg"
@@ -562,7 +564,7 @@ function Missions() {
             style={styles.avatarImage}
             onError={(e) => {
               e.target.onerror = null;
-              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
+              e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%232563eb'/%3E%3Ccircle cx='35' cy='40' r='5' fill='white'/%3E%3Ccircle cx='65' cy='40' r='5' fill='white'/%3E%3Cpath d='M35 60 Q50 75 65 60' stroke='white' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E";
             }}
           />
         </div>
@@ -865,10 +867,13 @@ const styles = {
     padding: '14px',
     borderRadius: '12px',
     boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-    marginBottom: '60px',
+    marginBottom: '100px', // Increased to make room for avatar
     '@media (min-width: 769px)': {
       padding: '20px',
-      marginBottom: '20px',
+      marginBottom: '120px',
+    },
+    '@media (max-width: 480px)': {
+      marginBottom: '90px',
     },
   },
   xpBreakdownList: {
@@ -937,101 +942,135 @@ const styles = {
       fontSize: '18px',
     },
   },
+  // AVATAR CONTAINER - More spacing from corners (not too close to edge)
   avatarContainer: {
     position: 'fixed',
-    bottom: '12px',
-    right: '12px',
+    bottom: '30px',
+    right: '30px',
     display: 'flex',
     alignItems: 'flex-end',
     zIndex: 1000,
     '@media (min-width: 769px)': {
+      bottom: '40px',
+      right: '40px',
+    },
+    '@media (max-width: 480px)': {
       bottom: '20px',
       right: '20px',
     },
   },
   bubbleContainer: {
-    marginRight: '8px',
-    marginBottom: '8px',
+    marginRight: '15px',
+    marginBottom: '12px',
     '@media (min-width: 769px)': {
+      marginRight: '20px',
+      marginBottom: '15px',
+    },
+    '@media (max-width: 480px)': {
       marginRight: '10px',
-      marginBottom: '10px',
+      marginBottom: '8px',
     },
   },
   speechBubble: {
     backgroundColor: 'white',
-    padding: '8px 10px',
-    borderRadius: '14px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+    padding: '10px 14px',
+    borderRadius: '18px',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
     animation: 'bubblePop 0.3s ease-out',
-    maxWidth: '160px',
+    maxWidth: '200px',
     position: 'relative',
     border: '2px solid #2563eb',
     '@media (min-width: 769px)': {
-      padding: '12px 15px',
-      borderRadius: '18px',
-      maxWidth: '220px',
+      padding: '14px 18px',
+      borderRadius: '22px',
+      maxWidth: '260px',
+    },
+    '@media (max-width: 480px)': {
+      padding: '6px 10px',
+      maxWidth: '150px',
     },
   },
   bubbleText: {
-    fontSize: '10px',
+    fontSize: '12px',
     color: '#333',
-    lineHeight: '1.3',
+    lineHeight: '1.4',
     '@media (min-width: 769px)': {
-      fontSize: '14px',
-      lineHeight: '1.4',
+      fontSize: '15px',
+      lineHeight: '1.5',
+    },
+    '@media (max-width: 480px)': {
+      fontSize: '10px',
     },
   },
   closeBubble: {
-    marginLeft: '6px',
+    marginLeft: '8px',
     cursor: 'pointer',
     background: 'none',
     border: 'none',
-    fontSize: '9px',
+    fontSize: '11px',
     color: '#999',
     padding: '2px 4px',
     '@media (min-width: 769px)': {
-      marginLeft: '10px',
-      fontSize: '12px',
+      marginLeft: '12px',
+      fontSize: '14px',
     },
   },
   reopenBubble: {
     borderRadius: '50%',
-    width: '32px',
-    height: '32px',
+    width: '40px',
+    height: '40px',
     cursor: 'pointer',
     backgroundColor: '#2563eb',
     color: 'white',
     border: 'none',
-    fontSize: '16px',
-    marginRight: '8px',
-    marginBottom: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+    fontSize: '20px',
+    marginRight: '15px',
+    marginBottom: '12px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
     transition: 'all 0.2s',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     '@media (min-width: 769px)': {
-      width: '40px',
-      height: '40px',
-      fontSize: '20px',
+      width: '50px',
+      height: '50px',
+      fontSize: '24px',
+      marginRight: '20px',
+      marginBottom: '15px',
+    },
+    '@media (max-width: 480px)': {
+      width: '32px',
+      height: '32px',
+      fontSize: '16px',
       marginRight: '10px',
-      marginBottom: '10px',
+      marginBottom: '8px',
     },
   },
+  // LARGER AVATAR - INCREASED SIZE with good spacing
   avatarWrapper: {
-    width: '60px',
-    height: '60px',
+    width: '110px',
+    height: '110px',
     borderRadius: '50%',
     overflow: 'hidden',
     animation: 'float 3s ease-in-out infinite',
     backgroundColor: '#f0f0f0',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-    border: '2px solid white',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.25)',
+    border: '4px solid white',
     cursor: 'pointer',
-    transition: 'transform 0.2s',
+    transition: 'transform 0.2s, box-shadow 0.2s',
+    '&:hover': {
+      transform: 'scale(1.05)',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+    },
     '@media (min-width: 769px)': {
-      width: '90px',
-      height: '90px',
+      width: '140px',
+      height: '140px',
+      borderWidth: '5px',
+      boxShadow: '0 8px 25px rgba(0,0,0,0.3)',
+    },
+    '@media (max-width: 480px)': {
+      width: '85px',
+      height: '85px',
       borderWidth: '3px',
     },
   },
@@ -1191,7 +1230,7 @@ styleSheet.innerHTML = `
   }
   @keyframes float {
     0% { transform: translateY(0px); }
-    50% { transform: translateY(-6px); }
+    50% { transform: translateY(-8px); }
     100% { transform: translateY(0px); }
   }
   @keyframes bubblePop {
@@ -1258,14 +1297,18 @@ styleSheet.innerHTML = `
       font-size: 13px !important;
     }
     .avatarWrapper {
-      width: 50px !important;
-      height: 50px !important;
+      width: 75px !important;
+      height: 75px !important;
     }
     .speechBubble {
-      max-width: 130px !important;
+      max-width: 140px !important;
     }
     .bubbleText {
-      font-size: 8px !important;
+      font-size: 9px !important;
+    }
+    .avatarContainer {
+      bottom: 15px !important;
+      right: 15px !important;
     }
   }
 `;
