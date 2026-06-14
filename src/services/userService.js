@@ -13,7 +13,7 @@ export const userService = {
     if (fetchError && fetchError.code !== 'PGRST116') {
       throw fetchError;
     }
-    
+     
     if (existingUser) {
       // Update last login or other info
       const { data: updatedUser, error: updateError } = await supabase
