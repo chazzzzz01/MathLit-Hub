@@ -25,26 +25,24 @@ function SignIn() {
     }
   }, []);
 
-  // Function to save or get user from Supabase
+  // FIXED: Function to save or get user from Supabase - NO .single()
   const getOrCreateUser = async (userData) => {
     try {
       console.log('Getting/Creating user:', userData.email);
       
-      // First, try to get existing user - use maybeSingle() to avoid 406 errors
-      const { data: existingUser, error: fetchError } = await supabase
+      // First, try to get existing user - use .select() without .single()
+      const { data: existingUsers, error: fetchError } = await supabase
         .from('users')
         .select('*')
-        .eq('email', userData.email)
-        .maybeSingle();
+        .eq('email', userData.email);
       
-      // If user exists, return it
-      if (existingUser) {
-        console.log('User found:', existingUser);
-        return existingUser;
+      // If user exists, return the first one
+      if (existingUsers && existingUsers.length > 0) {
+        console.log('User found:', existingUsers[0]);
+        return existingUsers[0];
       }
       
-      // Check if error is not just "no rows returned"
-      if (fetchError && fetchError.code !== 'PGRST116') {
+      if (fetchError) {
         console.error('Fetch error:', fetchError);
         throw fetchError;
       }
@@ -54,41 +52,43 @@ function SignIn() {
       
       const newUserId = userData.sub || userData.id || crypto.randomUUID();
       
-      const { data: newUser, error: insertError } = await supabase
+      const { data: newUsers, error: insertError } = await supabase
         .from('users')
-        .insert({
+        .insert([{
           id: newUserId,
           google_id: userData.sub || userData.id,
           email: userData.email,
           name: userData.name,
           avatar_url: userData.picture,
           role: null
-        })
-        .select()
-        .single();
+        }])
+        .select();
       
       if (insertError) {
         console.error('Insert error:', insertError);
         
-        // If insert fails because user already exists (race condition), try fetching again
+        // If insert fails because user already exists, try fetching again
         if (insertError.code === '23505') { // Unique violation
           console.log('User was created by another request, fetching again...');
-          const { data: retryUser, error: retryError } = await supabase
+          const { data: retryUsers, error: retryError } = await supabase
             .from('users')
             .select('*')
-            .eq('email', userData.email)
-            .maybeSingle();
+            .eq('email', userData.email);
           
-          if (retryUser) {
-            return retryUser;
+          if (retryUsers && retryUsers.length > 0) {
+            return retryUsers[0];
           }
         }
         
         throw insertError;
       }
       
-      console.log('User created:', newUser);
-      return newUser;
+      if (!newUsers || newUsers.length === 0) {
+        throw new Error('Failed to create user');
+      }
+      
+      console.log('User created:', newUsers[0]);
+      return newUsers[0];
       
     } catch (error) {
       console.error('Error in getOrCreateUser:', error);
@@ -183,6 +183,7 @@ function SignIn() {
     handleGoogleSignIn();
   };
 
+  // FIXED: handleRoleSelect without .single()
   const handleRoleSelect = async (role) => {
     setSelectedRole(role);
     
@@ -190,16 +191,24 @@ function SignIn() {
       try {
         setSavingRole(true);
         
-        const { data: updatedUser, error: updateError } = await supabase
+        const { data: updatedUsers, error: updateError } = await supabase
           .from('users')
           .update({ role: role })
           .eq('id', user.dbId)
-          .select()
-          .single();
+          .select();
         
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('Update error:', updateError);
+          throw updateError;
+        }
         
-        const updatedUserWithRole = { ...user, role: updatedUser.role };
+        // Update local state even if no rows returned
+        let updatedRole = role;
+        if (updatedUsers && updatedUsers.length > 0) {
+          updatedRole = updatedUsers[0].role;
+        }
+        
+        const updatedUserWithRole = { ...user, role: updatedRole };
         setUser(updatedUserWithRole);
         localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
         
@@ -212,6 +221,7 @@ function SignIn() {
     }
   };
 
+  // FIXED: handleContinue without .single()
   const handleContinue = async () => {
     // Validate terms agreement
     if (!agreeToTerms) {
@@ -235,22 +245,58 @@ function SignIn() {
       try {
         setSavingRole(true);
         
-        const { data: updatedUser, error: updateError } = await supabase
+        // First check if user exists
+        const { data: existingUsers, error: checkError } = await supabase
           .from('users')
-          .update({ role: selectedRole })
-          .eq('id', user.dbId)
-          .select()
-          .single();
+          .select('id')
+          .eq('id', user.dbId);
         
-        if (updateError) throw updateError;
+        if (checkError) {
+          console.error('Check error:', checkError);
+          throw checkError;
+        }
         
-        const updatedUserWithRole = { ...user, role: updatedUser.role };
-        setUser(updatedUserWithRole);
-        localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+        // If user doesn't exist, create them
+        if (!existingUsers || existingUsers.length === 0) {
+          console.log('User not found, creating new record...');
+          const { data: newUsers, error: insertError } = await supabase
+            .from('users')
+            .insert([{
+              id: user.dbId,
+              google_id: user.googleId,
+              email: user.email,
+              name: user.name,
+              avatar_url: user.picture,
+              role: selectedRole
+            }])
+            .select();
+          
+          if (insertError) throw insertError;
+          
+          if (newUsers && newUsers.length > 0) {
+            const updatedUserWithRole = { ...user, role: newUsers[0].role };
+            setUser(updatedUserWithRole);
+            localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+          }
+        } else {
+          // Update existing user
+          const { data: updatedUsers, error: updateError } = await supabase
+            .from('users')
+            .update({ role: selectedRole })
+            .eq('id', user.dbId)
+            .select();
+          
+          if (updateError) throw updateError;
+          
+          // Update local state
+          const updatedUserWithRole = { ...user, role: selectedRole };
+          setUser(updatedUserWithRole);
+          localStorage.setItem('user', JSON.stringify(updatedUserWithRole));
+        }
         
       } catch (error) {
         console.error('Error saving role:', error);
-        alert('Failed to save your role. Please try again.');
+        alert(`Failed to save your role: ${error.message || 'Please try again.'}`);
         setSavingRole(false);
         return;
       } finally {
