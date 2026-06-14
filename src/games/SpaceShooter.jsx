@@ -1,6 +1,5 @@
 // src/games/SpaceShooter.jsx - FULLY RESPONSIVE with MUSIC & SOUND EFFECTS
-// Stats displayed ONLY inside the canvas on the RIGHT SIDE (compact panel)
-// Notifications appear ONLY on the right side (not full width)
+// Fixed for small mobile devices (274x879)
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaArrowRight, FaCrosshairs, FaVolumeUp, FaVolumeMute, FaMusic } from 'react-icons/fa';
@@ -105,7 +104,7 @@ const SpaceShooter = () => {
   const [wrongShots, setWrongShots] = useState(0);
   const [correctShots, setCorrectShots] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 800, height: 800 });
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 400, height: 400 });
   
   const [gameStartTime, setGameStartTime] = useState(null);
   const [gameResultSent, setGameResultSent] = useState(false);
@@ -127,7 +126,7 @@ const SpaceShooter = () => {
   const sfxAudioContext = useRef(null);
 
   const gameRef = useRef({
-    player: { x: 380, y: 720, width: 40, height: 40 },
+    player: { x: 180, y: 340, width: 40, height: 40 },
     bullets: [],
     enemies: [],
     particles: [],
@@ -144,7 +143,6 @@ const SpaceShooter = () => {
 
   const xpSoFar = React.useMemo(() => (correctAnswers * 10) - (wrongAnswers * 5), [correctAnswers, wrongAnswers]);
 
-  // Show compact notification on the RIGHT side only
   const showNotification = useCallback((message, type = 'info') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification({ show: false, message: '', type: '' }), 2500);
@@ -336,35 +334,38 @@ const SpaceShooter = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
-  // Responsive canvas sizing
+  // FIXED: Responsive canvas sizing for small screens
   useEffect(() => {
     const updateCanvasSize = () => {
-      const isMobileDevice = window.innerWidth <= 768 || window.innerWidth <= 1024;
-      setIsMobile(isMobileDevice);
-      
       const viewportHeight = window.innerHeight;
       const viewportWidth = window.innerWidth;
-      const topBarHeight = 60;
-      const questionHeight = 80;
+      const isMobileDevice = viewportWidth <= 768;
+      setIsMobile(isMobileDevice);
+      
+      // Calculate available space
+      const questionHeight = isMobileDevice ? 90 : 100;
+      const topControlsHeight = 50;
       const mobileControlsHeight = isMobileDevice ? 80 : 0;
-      const availableHeight = viewportHeight - topBarHeight - questionHeight - mobileControlsHeight - 30;
-      const availableWidth = viewportWidth - 40;
+      const bottomPadding = 20;
       
-      let canvasWidth = Math.min(availableWidth, 900);
-      let canvasHeight = Math.min(availableHeight, canvasWidth);
+      const availableHeight = viewportHeight - questionHeight - topControlsHeight - mobileControlsHeight - bottomPadding;
+      const availableWidth = viewportWidth - 20;
       
-      canvasWidth = Math.max(350, canvasWidth);
-      canvasHeight = Math.max(350, canvasHeight);
+      // Make canvas square but fit within available space
+      let canvasSize = Math.min(availableWidth, availableHeight, 500); // Max 500px on mobile
+      canvasSize = Math.max(280, canvasSize); // Minimum 280px
+      
+      // Update player position based on new canvas size
+      const scale = canvasSize / 800;
+      gameRef.current.player.x = (canvasSize / 2) - 20;
+      gameRef.current.player.y = canvasSize - 60;
+      gameRef.current.player.width = 40 * scale;
+      gameRef.current.player.height = 40 * scale;
       
       setCanvasDimensions({
-        width: canvasWidth,
-        height: canvasHeight
+        width: canvasSize,
+        height: canvasSize
       });
-      
-      if (canvasRef.current) {
-        canvasRef.current.style.width = `${canvasWidth}px`;
-        canvasRef.current.style.height = `${canvasHeight}px`;
-      }
     };
     
     updateCanvasSize();
@@ -390,7 +391,6 @@ const SpaceShooter = () => {
   ];
 
   const getRandomQuestion = useCallback(() => {
-    // Get random question, but different from current if possible
     const newQuestions = [...questions];
     if (currentQuestion) {
       const filtered = newQuestions.filter(q => q.text !== currentQuestion.text);
@@ -406,35 +406,26 @@ const SpaceShooter = () => {
     if (displayText && displayText.includes('. ')) {
       displayText = displayText.substring(displayText.indexOf('. ') + 2);
     }
-    const width = Math.min(340, Math.max(190, displayText.length * 10 + 45));
-    let height = 80;
-    if (displayText.length > 22) height = 95;
-    if (displayText.length > 32) height = 110;
-    if (displayText.length > 42) height = 125;
+    const width = Math.min(300, Math.max(160, displayText.length * 8 + 40));
+    let height = 65;
+    if (displayText.length > 25) height = 80;
+    if (displayText.length > 35) height = 95;
     return { width, height };
   }, []);
 
-  // Get required correct shots for current level
-  // Level 1: 3 correct answers, Level 2: 3 correct answers, Level 3: 4 correct answers
   const getRequiredCorrectShots = useCallback((currentLevel) => {
     if (currentLevel === 1) return 3;
     if (currentLevel === 2) return 3;
     if (currentLevel === 3) return 4;
-    return currentLevel + 1; // For levels beyond 3
+    return currentLevel + 1;
   }, []);
 
-  // Get speed multiplier for enemy fall speed based on level
-  // Each level makes enemies fall MUCH faster
   const getLevelFallSpeed = useCallback((currentLevel) => {
-    // Level 1: 1.0x base speed
-    // Level 2: 1.6x faster (60% increase)
-    // Level 3: 2.3x faster (130% increase)
-    // Level 4: 3.1x faster (210% increase)
     if (currentLevel === 1) return 1.0;
     if (currentLevel === 2) return 1.6;
     if (currentLevel === 3) return 2.3;
     if (currentLevel === 4) return 3.1;
-    return 1 + (currentLevel - 1) * 0.7; // 70% increase per level after 4
+    return 1 + (currentLevel - 1) * 0.7;
   }, []);
 
   const createEnemy = useCallback(() => {
@@ -444,13 +435,13 @@ const SpaceShooter = () => {
     const wrongOptions = allOptions.filter(opt => !opt.startsWith(currentQuestion.correctAnswer));
     const isCorrect = Math.random() < 0.4;
     const displayAnswer = isCorrect ? correctOptionText : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
-    // Fall speed increases dramatically with level
     const fallSpeed = gameRef.current.baseEnemySpeed * getLevelFallSpeed(level) * gameRef.current.currentSpeedMultiplier;
     const dimensions = calculateEnemyDimensions(displayAnswer);
+    const canvasWidth = canvasDimensions.width;
     
     return { 
       id: Math.random(), 
-      x: Math.random() * (800 - dimensions.width - 10), 
+      x: Math.random() * (canvasWidth - dimensions.width - 10), 
       y: -60, 
       width: dimensions.width, 
       height: dimensions.height, 
@@ -464,26 +455,22 @@ const SpaceShooter = () => {
       allOptions: currentQuestion.options, 
       explanation: currentQuestion.explanation 
     };
-  }, [currentQuestion, level, calculateEnemyDimensions, getLevelFallSpeed]);
+  }, [currentQuestion, level, calculateEnemyDimensions, getLevelFallSpeed, canvasDimensions.width]);
 
   const advanceToNextLevel = useCallback(() => {
     playLevelUpSound();
     const newLevel = level + 1;
     setLevel(newLevel); 
     setHighestLevel(h => Math.max(h, newLevel)); 
-    // Reset combo multiplier
     gameRef.current.currentSpeedMultiplier = 1.0; 
-    // Spawn delay decreases with level (more enemies faster)
     gameRef.current.spawnDelay = Math.max(30, 130 - (newLevel - 1) * 20); 
     setLevelAnnouncement(`LEVEL ${newLevel}`); 
     setShowLevelAnnouncement(true); 
     gameRef.current.waitingForSpace = true; 
     gameRef.current.gameActive = false; 
-    // Get a NEW question for the new level
     setCurrentQuestion(getRandomQuestion()); 
     gameRef.current.enemies = []; 
     gameRef.current.bullets = []; 
-    // More enemies per level
     const enemyCount = Math.min(8, 2 + Math.floor(newLevel / 1.5)); 
     for (let i = 0; i < enemyCount; i++) { 
       const e = createEnemy(); 
@@ -494,17 +481,16 @@ const SpaceShooter = () => {
     } 
     const nextRequired = getRequiredCorrectShots(newLevel);
     const fallSpeedBonus = Math.round((getLevelFallSpeed(newLevel) - 1) * 100);
-    showNotification(`⭐ LEVEL UP! Now at Level ${newLevel} ⭐\n💨 Enemies fall ${fallSpeedBonus}% FASTER! Need ${nextRequired} correct shots!`, 'success');
+    showNotification(`⭐ LEVEL UP! Level ${newLevel} 💨 +${fallSpeedBonus}% speed! Need ${nextRequired} correct!`, 'success');
     setCorrectShots(0);
     
-    // Auto-start the level after 2.8 seconds
     setTimeout(() => { 
       if (gameRef.current.waitingForSpace) { 
         setShowLevelAnnouncement(false); 
         gameRef.current.waitingForSpace = false; 
         gameRef.current.gameActive = true; 
       } 
-    }, 2800);
+    }, 2500);
   }, [level, getRandomQuestion, createEnemy, playLevelUpSound, showNotification, getRequiredCorrectShots, getLevelFallSpeed]);
 
   const initLevel = useCallback(() => {
@@ -543,7 +529,7 @@ const SpaceShooter = () => {
         gameRef.current.waitingForSpace = false; 
         gameRef.current.gameActive = true; 
       } 
-    }, 2800);
+    }, 2500);
   }, [getRandomQuestion, createEnemy]);
 
   const startGame = () => {
@@ -565,7 +551,9 @@ const SpaceShooter = () => {
     if (now - gameRef.current.lastShot < 280) return;
     playShootSound();
     setTotalShots(prev => prev + 1);
-    gameRef.current.bullets.push({ x: gameRef.current.player.x + 35, y: gameRef.current.player.y - 20, width: 5, height: 12, speed: 8 });
+    const playerX = gameRef.current.player.x;
+    const playerY = gameRef.current.player.y;
+    gameRef.current.bullets.push({ x: playerX + 18, y: playerY - 20, width: 5, height: 12, speed: 8 });
     gameRef.current.lastShot = now;
   }, [playShootSound]);
 
@@ -579,35 +567,51 @@ const SpaceShooter = () => {
     gameRef.current.spawnDelay = Math.max(30, 130 - (gameRef.current.currentSpeedMultiplier - 1) * 40 - (level - 1) * 15);
   }, [level, getLevelFallSpeed]);
 
-  const moveLeft = () => { gameRef.current.player.x = Math.max(0, gameRef.current.player.x - 38); };
-  const moveRight = () => { gameRef.current.player.x = Math.min(760, gameRef.current.player.x + 38); };
+  const moveLeft = () => { 
+    const minX = 0;
+    const maxX = canvasDimensions.width - 40;
+    gameRef.current.player.x = Math.max(minX, gameRef.current.player.x - 38);
+  };
+  
+  const moveRight = () => { 
+    const maxX = canvasDimensions.width - 40;
+    gameRef.current.player.x = Math.min(maxX, gameRef.current.player.x + 38);
+  };
+  
   const handleMobileShoot = () => shoot();
 
   const updateGame = useCallback(() => {
     const game = gameRef.current;
+    const canvasWidth = canvasDimensions.width;
+    
     if (!game.gameActive || game.waitingForSpace) return;
+    
     if (game.keys['ArrowLeft']) game.player.x -= 6;
     if (game.keys['ArrowRight']) game.player.x += 6;
-    game.player.x = Math.max(0, Math.min(760, game.player.x));
+    game.player.x = Math.max(0, Math.min(canvasWidth - 40, game.player.x));
+    
     if (game.keys['Space']) shoot();
+    
     game.bullets = game.bullets.filter(b => { b.y -= b.speed; return b.y > -20; });
+    
     game.spawnTimer++;
     const maxEnemies = Math.min(9, 3 + Math.floor(level / 1.5));
     if (game.spawnTimer > (game.spawnDelay || 130) && game.enemies.length < maxEnemies) { 
       const newEnemy = createEnemy(); 
       if (newEnemy) { 
         newEnemy.y = -60; 
-        newEnemy.x = Math.random() * (800 - newEnemy.width - 10); 
+        newEnemy.x = Math.random() * (canvasWidth - newEnemy.width - 10); 
         game.enemies.push(newEnemy); 
         game.spawnTimer = 0; 
       } 
     }
+    
     game.enemies.forEach(e => { 
       e.x += e.horizontalSpeed * e.direction; 
-      if (e.x <= 0 || e.x >= 800 - e.width) e.direction *= -1; 
+      if (e.x <= 0 || e.x >= canvasWidth - e.width) e.direction *= -1; 
       e.y += e.speed; 
     });
-    game.enemies = game.enemies.filter(e => e.y < 850);
+    game.enemies = game.enemies.filter(e => e.y < canvasWidth + 50);
     
     for (let bi = game.bullets.length - 1; bi >= 0; bi--) {
       const b = game.bullets[bi];
@@ -623,14 +627,12 @@ const SpaceShooter = () => {
             setCorrectShots(prev => { 
               const newCorrect = prev + 1;
               const required = getRequiredCorrectShots(level);
-              showNotification(`✅ +100 Correct! (${newCorrect}/${required}) Speed: ${game.currentSpeedMultiplier.toFixed(1)}x`, 'success');
+              showNotification(`✅ +100! (${newCorrect}/${required})`, 'success');
               return newCorrect; 
             });
             for (let i = 0; i < 20; i++) game.particles.push({ x: e.x + e.width/2, y: e.y + e.height/2, vx: (Math.random() - 0.5) * 8, vy: (Math.random() - 0.5) * 8, life: 30 });
             increaseSpeed();
-            // Get new question after correct answer
             setCurrentQuestion(getRandomQuestion());
-            // Update all enemies with new question
             game.enemies.forEach(enemy => { 
               enemy.questionText = currentQuestion?.text || ""; 
               enemy.allOptions = currentQuestion?.options || []; 
@@ -651,7 +653,7 @@ const SpaceShooter = () => {
             setWrongShots(prev => { 
               const newWrong = prev + 1; 
               setScore(s => Math.max(0, s - 10)); 
-              showNotification(`❌ -10 Wrong! (${newWrong}/3 mistakes) Speed reset!`, 'error');
+              showNotification(`❌ -10! (${newWrong}/3 mistakes)`, 'error');
               game.currentSpeedMultiplier = 1.0; 
               game.spawnDelay = Math.max(45, 130 - (level - 1) * 15); 
               const fallSpeed = game.baseEnemySpeed * getLevelFallSpeed(level);
@@ -667,7 +669,7 @@ const SpaceShooter = () => {
                 sendGameResult(false, score, finalTimeSpent, { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong + 1 }); 
                 setGameState('gameOver'); 
                 setShowLevelAnnouncement(false);
-                showNotification('💀 Game Over! 3 wrong answers!', 'error');
+                showNotification('💀 Game Over!', 'error');
               } 
               return newWrong; 
             });
@@ -679,44 +681,52 @@ const SpaceShooter = () => {
         }
       }
     }
-    // Use dynamic required correct shots based on level
+    
     const requiredCorrectShots = getRequiredCorrectShots(level);
     if (correctShots >= requiredCorrectShots && game.gameActive && !game.waitingForSpace) {
       advanceToNextLevel();
     }
+    
     game.particles = game.particles.filter(p => { p.x += p.vx; p.y += p.vy; p.life--; return p.life > 0; });
     sendScoreUpdate();
-  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, sendScoreUpdate, shoot, createEnemy, calculateEnemyDimensions, playCorrectSound, playWrongSound, playExplosionSound, playGameOverSound, showNotification, getRequiredCorrectShots, getLevelFallSpeed]);
+  }, [currentQuestion, getRandomQuestion, increaseSpeed, correctShots, level, advanceToNextLevel, gameStartTime, score, totalCorrect, totalShots, totalWrong, sendXPUpdate, sendGameResult, sendScoreUpdate, shoot, createEnemy, calculateEnemyDimensions, playCorrectSound, playWrongSound, playExplosionSound, playGameOverSound, showNotification, getRequiredCorrectShots, getLevelFallSpeed, canvasDimensions.width]);
 
   const drawGame = useCallback((ctx) => {
     const game = gameRef.current;
-    const scale = canvasDimensions.width / 800;
-    const gradient = ctx.createLinearGradient(0, 0, 0, 800);
+    const canvasWidth = canvasDimensions.width;
+    const canvasHeight = canvasDimensions.height;
+    const scale = canvasWidth / 800;
+    
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
     gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`); 
     gradient.addColorStop(1, '#000000');
     ctx.fillStyle = gradient; 
-    ctx.fillRect(0, 0, 800, 800);
-    ctx.fillStyle = 'white';
-    for (let i = 0; i < 150; i++) ctx.fillRect((i * 131) % 800, (i * 253) % 800, 1.8, 1.8);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
-    // Player ship
+    ctx.fillStyle = 'white';
+    const starCount = Math.min(100, Math.floor(canvasWidth / 8));
+    for (let i = 0; i < starCount; i++) ctx.fillRect((i * 131) % canvasWidth, (i * 253) % canvasHeight, 1.5, 1.5);
+    
+    // Player ship (scaled)
+    const px = game.player.x;
+    const py = game.player.y;
     ctx.fillStyle = '#ff6600';
     ctx.beginPath(); 
-    ctx.moveTo(game.player.x + 5, game.player.y + 15); 
-    ctx.lineTo(game.player.x + 15, game.player.y + 10); 
-    ctx.lineTo(game.player.x + 15, game.player.y + 20); 
+    ctx.moveTo(px + 5 * scale, py + 15 * scale); 
+    ctx.lineTo(px + 15 * scale, py + 10 * scale); 
+    ctx.lineTo(px + 15 * scale, py + 20 * scale); 
     ctx.fill();
     ctx.fillStyle = '#00ffff';
     ctx.beginPath(); 
-    ctx.moveTo(game.player.x + 20, game.player.y); 
-    ctx.lineTo(game.player.x + 5, game.player.y + 20); 
-    ctx.lineTo(game.player.x + 20, game.player.y + 15); 
-    ctx.lineTo(game.player.x + 35, game.player.y + 20); 
+    ctx.moveTo(px + 20 * scale, py); 
+    ctx.lineTo(px + 5 * scale, py + 20 * scale); 
+    ctx.lineTo(px + 20 * scale, py + 15 * scale); 
+    ctx.lineTo(px + 35 * scale, py + 20 * scale); 
     ctx.fill();
     ctx.fillStyle = '#0099ff'; 
-    ctx.fillRect(game.player.x + 15, game.player.y + 12, 10, 15);
+    ctx.fillRect(px + 15 * scale, py + 12 * scale, 10 * scale, 15 * scale);
     ctx.fillStyle = '#ff4400'; 
-    ctx.fillRect(game.player.x + 32, game.player.y + 27, 6, 10);
+    ctx.fillRect(px + 32 * scale, py + 27 * scale, 6 * scale, 10 * scale);
     
     // Bullets
     ctx.fillStyle = '#ffff00';
@@ -728,147 +738,92 @@ const SpaceShooter = () => {
       ctx.fillRect(p.x, p.y, 3, 3); 
     });
     
-    // ENEMIES - EXTREMELY CLEAR WHITE TEXT WITH MAXIMUM CONTRAST
+    // Enemies
     game.enemies.forEach(e => {
-      // Enemy body - very dark background for maximum text contrast
       ctx.fillStyle = '#0a0a1a';
       ctx.fillRect(e.x, e.y, e.width, e.height);
       ctx.fillStyle = '#111122';
       ctx.fillRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
       
-      // Bright neon border
       ctx.strokeStyle = '#ffcc44';
-      ctx.lineWidth = 2.5;
+      ctx.lineWidth = 2;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
       
-      // Red side accents
       ctx.fillStyle = '#ff3333';
-      ctx.fillRect(e.x + 5, e.y + 8, 12, 10);
-      ctx.fillRect(e.x + e.width - 17, e.y + 8, 12, 10);
+      ctx.fillRect(e.x + 5, e.y + 8, 10, 8);
+      ctx.fillRect(e.x + e.width - 15, e.y + 8, 10, 8);
       
-      // TEXT RENDERING - PURE WHITE WITH BLACK OUTLINE FOR MAXIMUM LEGIBILITY
       let displayText = e.displayAnswer;
       if (displayText && displayText.includes('. ')) {
         displayText = displayText.substring(displayText.indexOf('. ') + 2);
       }
       
-      // Larger, bolder font for better readability
-      let fontSize = Math.max(14, Math.min(19, Math.floor(e.width / 11)));
-      ctx.font = `bold ${fontSize}px "Segoe UI", "Arial", "Courier New", monospace`;
+      let fontSize = Math.max(11, Math.min(16, Math.floor(e.width / 12)));
+      ctx.font = `bold ${fontSize}px "Segoe UI", Arial`;
       let textWidth = ctx.measureText(displayText || "?").width;
       
-      // Reduce font size only if absolutely necessary
-      while (textWidth > e.width - 25 && fontSize > 12) {
+      while (textWidth > e.width - 20 && fontSize > 10) {
         fontSize--;
-        ctx.font = `bold ${fontSize}px "Segoe UI", "Arial", "Courier New", monospace`;
+        ctx.font = `bold ${fontSize}px "Segoe UI", Arial`;
         textWidth = ctx.measureText(displayText || "?").width;
       }
       
       const textX = e.x + (e.width / 2) - (textWidth / 2);
-      const textY = e.y + (e.height / 2) + 7;
+      const textY = e.y + (e.height / 2) + 6;
       
-      // DRAW BLACK OUTLINE FOR TEXT (for maximum contrast on any background)
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.strokeStyle = '#000000';
       ctx.strokeText(displayText || "?", textX, textY);
-      
-      // DRAW PURE WHITE TEXT (crisp and clear, no shadow blur)
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText(displayText || "?", textX, textY);
       
-      // Add small correct/incorrect indicator
-      ctx.font = `bold ${Math.max(12, 15)}px Arial`;
-      ctx.lineWidth = 1.5;
+      ctx.font = `bold ${Math.max(11, 13)}px Arial`;
       if (e.isCorrect) {
         ctx.fillStyle = '#44ff44';
-        ctx.strokeStyle = '#004400';
-        ctx.strokeText("✓", e.x + e.width - 22, e.y + 20);
-        ctx.fillText("✓", e.x + e.width - 22, e.y + 20);
+        ctx.fillText("✓", e.x + e.width - 18, e.y + 18);
       } else {
         ctx.fillStyle = '#ff4444';
-        ctx.strokeStyle = '#440000';
-        ctx.strokeText("✗", e.x + e.width - 22, e.y + 20);
-        ctx.fillText("✗", e.x + e.width - 22, e.y + 20);
+        ctx.fillText("✗", e.x + e.width - 18, e.y + 18);
       }
     });
     
-    // Level announcement (full screen)
+    // Level announcement
     if (showLevelAnnouncement && gameState === 'playing') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.92)'; 
-      ctx.fillRect(0, 0, 800, 800);
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       ctx.fillStyle = '#ffd700'; 
-      ctx.font = `bold ${Math.max(38, 44 * scale)}px Arial`; 
-      const levelX = 400 - ctx.measureText(levelAnnouncement).width / 2;
-      ctx.fillText(levelAnnouncement, levelX, 380);
+      ctx.font = `bold ${Math.max(28, 36 * scale)}px Arial`; 
+      const levelX = canvasWidth/2 - ctx.measureText(levelAnnouncement).width / 2;
+      ctx.fillText(levelAnnouncement, levelX, canvasHeight/2 - 20);
       ctx.fillStyle = '#ffffff'; 
-      ctx.font = `bold ${Math.max(18, 22 * scale)}px Arial`; 
-      const spaceX = 400 - ctx.measureText('Press SPACE to start!').width / 2;
-      ctx.fillText('Press SPACE to start!', spaceX, 460);
-      ctx.fillStyle = '#88ff88'; 
-      ctx.font = `${Math.max(14, 18 * scale)}px Arial`; 
-      const shootX = 400 - ctx.measureText('Shoot the correct answer!').width / 2;
-      ctx.fillText('Shoot the correct answer!', shootX, 520);
+      ctx.font = `bold ${Math.max(14, 18 * scale)}px Arial`; 
+      const spaceX = canvasWidth/2 - ctx.measureText('Tap/Click to start!').width / 2;
+      ctx.fillText('Tap/Click to start!', spaceX, canvasHeight/2 + 30);
     }
     
-    // STATS DISPLAYED ONLY ON THE RIGHT SIDE INSIDE CANVAS - Compact panel
+    // Stats panel - right side
     if (!showLevelAnnouncement && game.gameActive && gameState === 'playing') {
-      // Score - top right
+      const rightX = canvasWidth - 95;
       ctx.fillStyle = '#ffd700';
-      ctx.font = `bold ${Math.max(18, 22 * scale)}px Arial`;
-      ctx.fillText(`🎯 ${score}`, 680, 45);
+      ctx.font = `bold ${Math.max(14, 18 * scale)}px Arial`;
+      ctx.fillText(`🎯 ${score}`, rightX, 30);
       
-      // Level
       ctx.fillStyle = '#00ccff';
-      ctx.font = `bold ${Math.max(14, 16 * scale)}px Arial`;
-      ctx.fillText(`LVL ${level}`, 710, 80);
+      ctx.font = `bold ${Math.max(11, 14 * scale)}px Arial`;
+      ctx.fillText(`LVL ${level}`, rightX + 10, 55);
       
-      // Mistakes
       ctx.fillStyle = wrongShots >= 2 ? '#ff6666' : '#ffffff';
-      ctx.font = `${Math.max(12, 14 * scale)}px Arial`;
-      ctx.fillText(`⚠️ ${wrongShots}/3`, 700, 110);
+      ctx.font = `${Math.max(10, 12 * scale)}px Arial`;
+      ctx.fillText(`⚠️ ${wrongShots}/3`, rightX + 15, 75);
       
-      // Fall speed - show total fall speed increase
-      const fallSpeedPercent = Math.round((getLevelFallSpeed(level) * game.currentSpeedMultiplier - 1) * 100);
-      ctx.fillStyle = fallSpeedPercent > 150 ? '#ff4444' : (fallSpeedPercent > 80 ? '#ffaa44' : '#88ff88');
-      ctx.font = `${Math.max(11, 13 * scale)}px Arial`;
-      ctx.fillText(`💨 +${fallSpeedPercent}%`, 695, 140);
-      
-      // XP
-      ctx.fillStyle = '#aaffaa';
-      ctx.font = `${Math.max(11, 13 * scale)}px Arial`;
-      ctx.fillText(`⭐ ${xpSoFar}`, 710, 170);
-      
-      // Progress bar - show required correct shots for current level
       const requiredCorrect = getRequiredCorrectShots(level);
       const progress = (correctShots / requiredCorrect) * 100;
       ctx.fillStyle = '#333333';
-      ctx.fillRect(680, 185, 100, 6);
+      ctx.fillRect(rightX, 85, 80, 5);
       ctx.fillStyle = '#4caf50';
-      ctx.fillRect(680, 185, (progress / 100) * 100, 6);
-      ctx.fillStyle = '#cccccc';
-      ctx.font = `${Math.max(9, 11 * scale)}px Arial`;
-      ctx.fillText(`${correctShots}/${requiredCorrect}`, 710, 180);
-      
-      // Accuracy
-      if (totalShots > 0) {
-        ctx.fillStyle = '#88ff88';
-        ctx.font = `${Math.max(10, 12 * scale)}px Arial`;
-        ctx.fillText(`🎯 ${Math.round((totalCorrect / totalShots) * 100)}%`, 710, 210);
-      }
-      
-      // Time
-      const mins = Math.floor(timeSpent / 60);
-      const secs = timeSpent % 60;
-      ctx.fillStyle = '#aaaaaa';
-      ctx.font = `${Math.max(10, 12 * scale)}px Arial`;
-      ctx.fillText(`⏱ ${mins}:${secs.toString().padStart(2, '0')}`, 710, 235);
-      
-      // Enemies count
-      ctx.fillStyle = '#ff8888';
-      ctx.font = `bold ${Math.max(12, 14 * scale)}px Arial`;
-      ctx.fillText(`👾 ${game.enemies.length}`, 715, 265);
+      ctx.fillRect(rightX, 85, (progress / 100) * 80, 5);
     }
-  }, [showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, totalShots, totalCorrect, gameState, timeSpent, xpSoFar, score, canvasDimensions, getRequiredCorrectShots, getLevelFallSpeed]);
+  }, [showLevelAnnouncement, levelAnnouncement, wrongShots, level, correctShots, gameState, canvasDimensions, getRequiredCorrectShots]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -876,12 +831,15 @@ const SpaceShooter = () => {
     let animationId;
     const loop = () => { 
       if (gameState === 'playing') updateGame(); 
-      if (ctx) drawGame(ctx); 
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasDimensions.width, canvasDimensions.height);
+        drawGame(ctx); 
+      }
       animationId = requestAnimationFrame(loop); 
     };
     loop();
     return () => cancelAnimationFrame(animationId);
-  }, [gameState, updateGame, drawGame]);
+  }, [gameState, updateGame, drawGame, canvasDimensions]);
 
   useEffect(() => {
     const handleKeyDown = (e) => { 
@@ -919,7 +877,7 @@ const SpaceShooter = () => {
       
       {showMusicNote && <div style={styles.musicNoteAnimation}>🎵</div>}
 
-      {/* NOTIFICATION - ONLY ON RIGHT SIDE, NOT FULL WIDTH */}
+      {/* Notification */}
       {notification.show && (
         <div style={{
           ...styles.notification,
@@ -929,14 +887,14 @@ const SpaceShooter = () => {
         </div>
       )}
       
-      {/* QUESTION DISPLAYED ABOVE THE CANVAS */}
+      {/* Question Display */}
       {gameState === 'playing' && currentQuestion && !showLevelAnnouncement && (
         <div style={styles.questionContainer}>
           <div style={styles.questionText}>
             📖 {currentQuestion.text}
           </div>
           <div style={styles.questionHint}>
-            🎯 Level {level} - Need {getRequiredCorrectShots(level)} correct shots! (💨 Fall speed: +{Math.round((getLevelFallSpeed(level) - 1) * 100)}%)
+            🎯 Level {level} - Need {getRequiredCorrectShots(level)} correct!
           </div>
         </div>
       )}
@@ -944,8 +902,8 @@ const SpaceShooter = () => {
       <div style={styles.gameWrapper}>
         <canvas 
           ref={canvasRef} 
-          width={800} 
-          height={800} 
+          width={canvasDimensions.width} 
+          height={canvasDimensions.height} 
           style={{
             ...styles.canvas,
             width: `${canvasDimensions.width}px`,
@@ -955,58 +913,55 @@ const SpaceShooter = () => {
           }} 
         />
         
-        {/* ENLARGED RECTANGULAR MENU - Larger on desktop */}
+        {/* Menu Overlay - FIXED for small screens */}
         {gameState === 'menu' && (
           <div style={styles.menuOverlay}>
             <div style={styles.menuContent}>
               <h1 style={styles.gameTitle}>🚀 Equation Shooter</h1>
               <p style={styles.gameSubtitle}>Shoot the correct answer!</p>
               <div style={styles.features}>
-                <p>🎯 Read the question above the game</p>
-                <p>🔫 Shoot the CORRECT answer enemy</p>
+                <p>🎯 Read the question above</p>
+                <p>🔫 Shoot the CORRECT answer</p>
                 <p>⚠️ 3 mistakes = Game Over!</p>
-                <p>⭐ +10 XP per correct, -5 XP per wrong</p>
+                <p>⭐ +10 XP per correct</p>
                 <p>💨 Enemies fall FASTER each level!</p>
-                <p>📈 Level 1: 3 correct → Level 2 (60% faster fall)</p>
-                <p>📈 Level 2: 3 correct → Level 3 (130% faster fall)</p>
-                <p>📈 Level 3: 4 correct → Level 4 (210% faster fall)</p>
-                <p>🏆 Each level = dramatically faster enemies + more enemies + new questions!</p>
               </div>
-              <button onClick={startGame} style={styles.startButton}>Start Game</button>
+              <button onClick={startGame} style={styles.startButton}>START GAME</button>
             </div>
           </div>
         )}
         
+        {/* Game Over Overlay */}
         {gameState === 'gameOver' && (
           <div style={styles.gameOverOverlay}>
             <div style={styles.gameOverContent}>
               <h2 style={styles.gameOverTitle}>💀 Game Over</h2>
               <p style={styles.finalScore}>Score: {score}</p>
-              <p>⭐ Level Reached: {highestLevel}</p>
-              <p>✅ Correct: {correctAnswers} (+{correctAnswers * 10} XP)</p>
-              <p>❌ Wrong: {wrongAnswers} (-{wrongAnswers * 5} XP)</p>
+              <p>⭐ Level: {highestLevel}</p>
+              <p>✅ Correct: {correctAnswers}</p>
+              <p>❌ Wrong: {wrongAnswers}</p>
               <p>🎯 Accuracy: {totalShots > 0 ? Math.round((totalCorrect / totalShots) * 100) : 0}%</p>
               <p>⭐ Total XP: {totalXPEarned}</p>
-              <button onClick={startGame} style={styles.retryButton}>Play Again</button>
+              <button onClick={startGame} style={styles.retryButton}>PLAY AGAIN</button>
             </div>
           </div>
         )}
       </div>
       
-      {/* MOBILE CONTROLS - LEFT/RIGHT ON LEFT SIDE, SHOOT ON RIGHT SIDE */}
+      {/* Mobile Controls */}
       {isMobile && gameState === 'playing' && !showLevelAnnouncement && (
         <div style={styles.mobileControlsContainer}>
           <div style={styles.movementControls}>
             <button onTouchStart={moveLeft} onMouseDown={moveLeft} style={styles.mobileButton}>
-              <FaArrowLeft size={32} />
+              <FaArrowLeft size={28} />
             </button>
             <button onTouchStart={moveRight} onMouseDown={moveRight} style={styles.mobileButton}>
-              <FaArrowRight size={32} />
+              <FaArrowRight size={28} />
             </button>
           </div>
           <div style={styles.shootControl}>
             <button onTouchStart={handleMobileShoot} onMouseDown={handleMobileShoot} style={styles.shootButtonMobile}>
-              <FaCrosshairs size={36} />
+              <FaCrosshairs size={32} />
             </button>
           </div>
         </div>
@@ -1028,18 +983,18 @@ const styles = {
     alignItems: 'center', 
     justifyContent: 'center',
     position: 'relative',
-    overflow: 'hidden'
+    overflow: 'auto'
   },
   musicControls: { 
     position: 'fixed', 
-    top: '10px', 
-    right: '12px', 
+    top: '8px', 
+    right: '8px', 
     display: 'flex', 
-    gap: '8px', 
+    gap: '6px', 
     alignItems: 'center', 
     zIndex: 1001, 
-    backgroundColor: 'rgba(0,0,0,0.65)', 
-    padding: '6px 12px', 
+    backgroundColor: 'rgba(0,0,0,0.7)', 
+    padding: '5px 10px', 
     borderRadius: '30px', 
     backdropFilter: 'blur(4px)',
   },
@@ -1047,19 +1002,18 @@ const styles = {
     backgroundColor: '#4a6fa5', 
     color: 'white', 
     border: 'none', 
-    width: '36px', 
-    height: '36px', 
+    width: '32px', 
+    height: '32px', 
     borderRadius: '50%', 
     cursor: 'pointer', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
-    fontSize: '16px',
-    transition: 'transform 0.1s',
+    fontSize: '14px',
   },
   volumeSlider: { 
-    width: '70px', 
-    height: '4px', 
+    width: '60px', 
+    height: '3px', 
     cursor: 'pointer', 
     backgroundColor: '#667eea', 
     borderRadius: '4px', 
@@ -1070,55 +1024,48 @@ const styles = {
     top: '50%', 
     left: '50%', 
     transform: 'translate(-50%, -50%)', 
-    fontSize: '55px', 
+    fontSize: '45px', 
     animation: 'musicNote 0.9s ease-out', 
     pointerEvents: 'none', 
     zIndex: 2000, 
   },
-  // NOTIFICATION - RIGHT SIDE ONLY, COMPACT, NOT FULL WIDTH
   notification: {
     position: 'fixed',
     bottom: '20px',
-    right: '20px',
-    padding: '12px 20px',
-    borderRadius: '12px',
+    right: '10px',
+    padding: '8px 15px',
+    borderRadius: '10px',
     zIndex: 10002,
     animation: 'slideInRight 0.3s ease-out',
     boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
     fontWeight: 'bold',
     color: 'white',
     textAlign: 'center',
-    fontSize: '14px',
-    maxWidth: '280px',
+    fontSize: '12px',
+    maxWidth: '200px',
     wordBreak: 'break-word',
-    whiteSpace: 'pre-line',
   },
   questionContainer: {
-    position: 'relative',
-    width: '90%',
-    maxWidth: '850px',
-    margin: '5px auto 10px auto',
-    padding: '12px 24px',
-    background: 'linear-gradient(135deg, rgba(0,0,0,0.75), rgba(25,35,70,0.85))',
-    borderRadius: '20px',
-    border: '2px solid rgba(255,215,0,0.4)',
+    width: '95%',
+    maxWidth: '500px',
+    margin: '5px auto 8px auto',
+    padding: '8px 16px',
+    background: 'linear-gradient(135deg, rgba(0,0,0,0.8), rgba(25,35,70,0.9))',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,215,0,0.4)',
     textAlign: 'center',
     zIndex: 5,
-    backdropFilter: 'blur(8px)',
   },
   questionText: {
     color: '#ffd700',
-    fontSize: 'clamp(14px, 4vw, 19px)',
+    fontSize: 'clamp(12px, 3.5vw, 16px)',
     fontWeight: 'bold',
-    fontFamily: 'Arial, sans-serif',
-    lineHeight: '1.4',
-    letterSpacing: '0.5px',
+    lineHeight: '1.3',
   },
   questionHint: {
     color: '#88ff88',
-    fontSize: 'clamp(11px, 3vw, 14px)',
-    marginTop: '6px',
-    fontFamily: 'Arial, sans-serif',
+    fontSize: 'clamp(10px, 2.5vw, 12px)',
+    marginTop: '4px',
   },
   gameWrapper: { 
     position: 'relative', 
@@ -1126,15 +1073,15 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     width: '100%',
-    marginTop: '5px',
+    marginTop: '0px',
   },
   canvas: { 
     display: 'block', 
-    border: '3px solid rgba(255,215,0,0.4)', 
-    borderRadius: '16px', 
+    border: '2px solid rgba(255,215,0,0.4)', 
+    borderRadius: '12px', 
     touchAction: 'none',
     backgroundColor: '#000',
-    boxShadow: '0 10px 35px rgba(0,0,0,0.5)',
+    boxShadow: '0 5px 20px rgba(0,0,0,0.5)',
   },
   menuOverlay: { 
     position: 'absolute', 
@@ -1142,69 +1089,61 @@ const styles = {
     left: 0, 
     right: 0, 
     bottom: 0, 
-    background: 'rgba(0,0,0,0.92)', 
+    background: 'rgba(0,0,0,0.95)', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
-    borderRadius: '16px',
+    borderRadius: '12px',
     zIndex: 10,
   },
   menuContent: { 
     display: 'flex', 
     flexDirection: 'column', 
     alignItems: 'center', 
-    gap: '20px', 
-    padding: '40px 60px', 
+    gap: '12px', 
+    padding: '20px 25px', 
     textAlign: 'center', 
-    width: 'auto',
-    maxWidth: '800px',
-    minWidth: '340px',
-    background: 'linear-gradient(145deg, rgba(25,35,70,0.95), rgba(15,20,45,0.98))',
-    borderRadius: '48px',
+    width: '85%',
+    maxWidth: '350px',
+    background: 'linear-gradient(145deg, rgba(25,35,70,0.98), rgba(15,20,45,0.99))',
+    borderRadius: '30px',
     border: '2px solid rgba(255,215,0,0.5)',
-    boxShadow: '0 30px 55px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.15)',
-    backdropFilter: 'blur(10px)',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
   },
   gameTitle: { 
-    fontSize: '42px', 
+    fontSize: 'clamp(22px, 6vw, 32px)', 
     textAlign: 'center', 
     color: '#ffd700', 
     margin: 0,
-    textShadow: '0 0 15px rgba(255,215,0,0.6)',
-    letterSpacing: '1px',
   },
   gameSubtitle: { 
-    fontSize: '20px', 
+    fontSize: 'clamp(14px, 3.5vw, 18px)', 
     textAlign: 'center', 
-    margin: '0 0 5px 0',
+    margin: 0,
     color: '#aaddff',
-    fontWeight: '500',
   },
   features: { 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    padding: '20px 35px', 
-    borderRadius: '32px', 
+    backgroundColor: 'rgba(0,0,0,0.5)', 
+    padding: '12px 20px', 
+    borderRadius: '20px', 
     textAlign: 'left', 
     width: '100%', 
-    fontSize: '16px', 
-    border: '1px solid rgba(255,255,255,0.25)',
-    lineHeight: '2.2',
-    margin: '8px 0',
-    fontWeight: '500',
+    fontSize: 'clamp(11px, 3vw, 13px)', 
+    border: '1px solid rgba(255,255,255,0.2)',
+    lineHeight: '1.8',
+    margin: '5px 0',
   },
   startButton: { 
-    padding: '14px 45px', 
-    fontSize: '22px', 
+    padding: '10px 25px', 
+    fontSize: 'clamp(16px, 4.5vw, 20px)', 
     fontWeight: 'bold', 
     background: 'linear-gradient(135deg, #4CAF50, #2e7d32)', 
     color: 'white', 
     border: 'none', 
-    borderRadius: '60px', 
+    borderRadius: '50px', 
     cursor: 'pointer', 
-    minWidth: '240px',
-    marginTop: '12px',
-    transition: 'transform 0.2s, box-shadow 0.2s',
-    boxShadow: '0 8px 20px rgba(76,175,80,0.4)',
+    width: '80%',
+    marginTop: '5px',
   },
   gameOverOverlay: { 
     position: 'absolute', 
@@ -1216,122 +1155,106 @@ const styles = {
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
-    borderRadius: '16px',
+    borderRadius: '12px',
     zIndex: 10,
   },
   gameOverContent: { 
     display: 'flex', 
     flexDirection: 'column', 
     alignItems: 'center', 
-    gap: '12px', 
-    padding: '35px 55px',
-    backgroundColor: 'rgba(30,20,50,0.95)',
-    borderRadius: '40px',
-    minWidth: '300px',
+    gap: '8px', 
+    padding: '20px 30px',
+    backgroundColor: 'rgba(30,20,50,0.98)',
+    borderRadius: '30px',
+    width: '80%',
+    maxWidth: '300px',
     textAlign: 'center',
     border: '2px solid #ff8888',
-    backdropFilter: 'blur(8px)',
   },
   gameOverTitle: { 
-    fontSize: '38px', 
+    fontSize: 'clamp(24px, 6vw, 32px)', 
     color: '#ff6b6b', 
     margin: 0,
   },
   finalScore: { 
-    fontSize: '30px', 
-    margin: '10px 0', 
+    fontSize: 'clamp(20px, 5vw, 26px)', 
+    margin: '5px 0', 
     fontWeight: 'bold',
     color: '#ffd700',
   },
   retryButton: { 
-    padding: '12px 38px', 
-    fontSize: '19px', 
+    padding: '8px 25px', 
+    fontSize: 'clamp(14px, 4vw, 16px)', 
     fontWeight: 'bold', 
     background: 'linear-gradient(135deg, #2196F3, #0b5e9e)', 
     color: 'white', 
     border: 'none', 
-    borderRadius: '60px', 
+    borderRadius: '50px', 
     cursor: 'pointer', 
-    marginTop: '15px',
+    marginTop: '8px',
   },
-  // Mobile Controls - LEFT SIDE for arrows, RIGHT SIDE for shoot button
   mobileControlsContainer: {
     position: 'fixed',
-    bottom: '20px',
+    bottom: '15px',
     left: 0,
     right: 0,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '0 20px',
+    padding: '0 15px',
     zIndex: 100,
     pointerEvents: 'none',
   },
   movementControls: {
     display: 'flex',
-    gap: '20px',
+    gap: '15px',
     pointerEvents: 'auto',
   },
   shootControl: {
     pointerEvents: 'auto',
   },
   mobileButton: { 
-    backgroundColor: 'rgba(0,0,0,0.75)', 
+    backgroundColor: 'rgba(0,0,0,0.8)', 
     border: '2px solid rgba(255,215,0,0.8)', 
-    borderRadius: '60px', 
-    width: '70px', 
-    height: '70px', 
+    borderRadius: '50px', 
+    width: '55px', 
+    height: '55px', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
     color: '#ffd700', 
     cursor: 'pointer',
-    fontSize: '28px',
     backdropFilter: 'blur(8px)',
-    boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
-    transition: 'transform 0.05s linear',
-    active: { transform: 'scale(0.92)' }
   },
   shootButtonMobile: { 
-    backgroundColor: 'rgba(255,60,60,0.85)', 
+    backgroundColor: 'rgba(255,60,60,0.9)', 
     border: '3px solid #ffaa55', 
-    borderRadius: '60px', 
-    width: '80px', 
-    height: '80px', 
+    borderRadius: '50px', 
+    width: '65px', 
+    height: '65px', 
     display: 'flex', 
     alignItems: 'center', 
     justifyContent: 'center', 
     color: 'white', 
     cursor: 'pointer',
-    fontSize: '32px',
     backdropFilter: 'blur(4px)',
-    boxShadow: '0 4px 20px rgba(255,60,60,0.5)',
-    transition: 'transform 0.05s linear',
-    active: { transform: 'scale(0.92)' }
   }
 };
 
 // Inject keyframes
 const styleSheet = document.createElement("style");
 styleSheet.textContent = `
-  button:hover:enabled { transform: scale(1.03); } 
-  button:active { transform: scale(0.96); } 
+  button:active { transform: scale(0.95); } 
   @keyframes musicNote { 
     0% { transform: translate(-50%, -50%) scale(0.5) rotate(0deg); opacity: 1; } 
-    100% { transform: translate(-50%, -180%) scale(1.6) rotate(25deg); opacity: 0; } 
+    100% { transform: translate(-50%, -180%) scale(1.5) rotate(25deg); opacity: 0; } 
   }
   @keyframes slideInRight {
-    from {
-      opacity: 0;
-      transform: translateX(100%);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    from { opacity: 0; transform: translateX(100%); }
+    to { opacity: 1; transform: translateX(0); }
   }
-  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; height: 4px; border-radius: 4px; } 
-  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #ffd93d; cursor: pointer; border: none; } 
+  input[type="range"] { -webkit-appearance: none; background: #667eea; outline: none; height: 3px; border-radius: 3px; } 
+  input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #ffd93d; cursor: pointer; border: none; } 
 `;
 document.head.appendChild(styleSheet);
 
