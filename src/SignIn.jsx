@@ -13,7 +13,7 @@ function SignIn() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
-  
+   
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
