@@ -1,5 +1,5 @@
 // src/games/SpaceShooter.jsx - FULLY RESPONSIVE with MUSIC & SOUND EFFECTS
-// Fixed for small mobile devices (274x879)
+// Fixed: No check/cross marks on enemies, spaceship on top always visible
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaArrowRight, FaCrosshairs, FaVolumeUp, FaVolumeMute, FaMusic } from 'react-icons/fa';
@@ -98,7 +98,6 @@ const SpaceShooter = () => {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [feedback, setFeedback] = useState({ message: '', type: '' });
   const [showLevelAnnouncement, setShowLevelAnnouncement] = useState(false);
   const [levelAnnouncement, setLevelAnnouncement] = useState('');
   const [wrongShots, setWrongShots] = useState(0);
@@ -318,14 +317,6 @@ const SpaceShooter = () => {
     setGameResultSent(true);
   }, [gameResultSent, correctAnswers, wrongAnswers, totalShots]);
 
-  const handleBackToGames = () => {
-    if (gameState === 'playing' && !gameResultSent && gameStartTime) {
-      sendGameResult(false, score, Math.floor((Date.now() - gameStartTime) / 1000), { correctShots: totalCorrect, totalShots, highestLevel: level, wrongShots: totalWrong });
-    }
-    if (backgroundMusic.current) backgroundMusic.current.stopMusic();
-    navigate('/studenthub/games');
-  };
-
   useEffect(() => {
     let timer;
     if (gameState === 'playing' && gameStartTime && !gameResultSent) {
@@ -334,7 +325,7 @@ const SpaceShooter = () => {
     return () => clearInterval(timer);
   }, [gameState, gameStartTime, gameResultSent]);
 
-  // FIXED: Responsive canvas sizing for small screens
+  // Responsive canvas sizing
   useEffect(() => {
     const updateCanvasSize = () => {
       const viewportHeight = window.innerHeight;
@@ -342,7 +333,6 @@ const SpaceShooter = () => {
       const isMobileDevice = viewportWidth <= 768;
       setIsMobile(isMobileDevice);
       
-      // Calculate available space
       const questionHeight = isMobileDevice ? 90 : 100;
       const topControlsHeight = 50;
       const mobileControlsHeight = isMobileDevice ? 80 : 0;
@@ -351,16 +341,13 @@ const SpaceShooter = () => {
       const availableHeight = viewportHeight - questionHeight - topControlsHeight - mobileControlsHeight - bottomPadding;
       const availableWidth = viewportWidth - 20;
       
-      // Make canvas square but fit within available space
-      let canvasSize = Math.min(availableWidth, availableHeight, 500); // Max 500px on mobile
-      canvasSize = Math.max(280, canvasSize); // Minimum 280px
+      let canvasSize = Math.min(availableWidth, availableHeight, 500);
+      canvasSize = Math.max(280, canvasSize);
       
-      // Update player position based on new canvas size
-      const scale = canvasSize / 800;
       gameRef.current.player.x = (canvasSize / 2) - 20;
       gameRef.current.player.y = canvasSize - 60;
-      gameRef.current.player.width = 40 * scale;
-      gameRef.current.player.height = 40 * scale;
+      gameRef.current.player.width = 40;
+      gameRef.current.player.height = 40;
       
       setCanvasDimensions({
         width: canvasSize,
@@ -697,36 +684,17 @@ const SpaceShooter = () => {
     const canvasHeight = canvasDimensions.height;
     const scale = canvasWidth / 800;
     
+    // Background
     const gradient = ctx.createLinearGradient(0, 0, 0, canvasHeight);
     gradient.addColorStop(0, `rgb(${10 + level * 2}, ${10 + level}, ${40 + level * 3})`); 
     gradient.addColorStop(1, '#000000');
     ctx.fillStyle = gradient; 
     ctx.fillRect(0, 0, canvasWidth, canvasHeight);
     
+    // Stars
     ctx.fillStyle = 'white';
     const starCount = Math.min(100, Math.floor(canvasWidth / 8));
     for (let i = 0; i < starCount; i++) ctx.fillRect((i * 131) % canvasWidth, (i * 253) % canvasHeight, 1.5, 1.5);
-    
-    // Player ship (scaled)
-    const px = game.player.x;
-    const py = game.player.y;
-    ctx.fillStyle = '#ff6600';
-    ctx.beginPath(); 
-    ctx.moveTo(px + 5 * scale, py + 15 * scale); 
-    ctx.lineTo(px + 15 * scale, py + 10 * scale); 
-    ctx.lineTo(px + 15 * scale, py + 20 * scale); 
-    ctx.fill();
-    ctx.fillStyle = '#00ffff';
-    ctx.beginPath(); 
-    ctx.moveTo(px + 20 * scale, py); 
-    ctx.lineTo(px + 5 * scale, py + 20 * scale); 
-    ctx.lineTo(px + 20 * scale, py + 15 * scale); 
-    ctx.lineTo(px + 35 * scale, py + 20 * scale); 
-    ctx.fill();
-    ctx.fillStyle = '#0099ff'; 
-    ctx.fillRect(px + 15 * scale, py + 12 * scale, 10 * scale, 15 * scale);
-    ctx.fillStyle = '#ff4400'; 
-    ctx.fillRect(px + 32 * scale, py + 27 * scale, 6 * scale, 10 * scale);
     
     // Bullets
     ctx.fillStyle = '#ffff00';
@@ -738,21 +706,25 @@ const SpaceShooter = () => {
       ctx.fillRect(p.x, p.y, 3, 3); 
     });
     
-    // Enemies
+    // Enemies (Drawn FIRST so spaceship goes on top)
     game.enemies.forEach(e => {
+      // Enemy body
       ctx.fillStyle = '#0a0a1a';
       ctx.fillRect(e.x, e.y, e.width, e.height);
       ctx.fillStyle = '#111122';
       ctx.fillRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
       
+      // Border
       ctx.strokeStyle = '#ffcc44';
       ctx.lineWidth = 2;
       ctx.strokeRect(e.x + 2, e.y + 2, e.width - 4, e.height - 4);
       
+      // Red side accents (no check/cross marks)
       ctx.fillStyle = '#ff3333';
       ctx.fillRect(e.x + 5, e.y + 8, 10, 8);
       ctx.fillRect(e.x + e.width - 15, e.y + 8, 10, 8);
       
+      // Enemy text
       let displayText = e.displayAnswer;
       if (displayText && displayText.includes('. ')) {
         displayText = displayText.substring(displayText.indexOf('. ') + 2);
@@ -777,17 +749,43 @@ const SpaceShooter = () => {
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText(displayText || "?", textX, textY);
       
-      ctx.font = `bold ${Math.max(11, 13)}px Arial`;
-      if (e.isCorrect) {
-        ctx.fillStyle = '#44ff44';
-        ctx.fillText("✓", e.x + e.width - 18, e.y + 18);
-      } else {
-        ctx.fillStyle = '#ff4444';
-        ctx.fillText("✗", e.x + e.width - 18, e.y + 18);
-      }
+      // NO CHECK/CROSS MARKS - REMOVED
     });
     
-    // Level announcement
+    // Player ship (Drawn LAST so it's always on top of enemies)
+    const px = game.player.x;
+    const py = game.player.y;
+    
+    // Ship body
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath(); 
+    ctx.moveTo(px + 5 * scale, py + 15 * scale); 
+    ctx.lineTo(px + 15 * scale, py + 10 * scale); 
+    ctx.lineTo(px + 15 * scale, py + 20 * scale); 
+    ctx.fill();
+    
+    // Ship wings
+    ctx.fillStyle = '#00ffff';
+    ctx.beginPath(); 
+    ctx.moveTo(px + 20 * scale, py); 
+    ctx.lineTo(px + 5 * scale, py + 20 * scale); 
+    ctx.lineTo(px + 20 * scale, py + 15 * scale); 
+    ctx.lineTo(px + 35 * scale, py + 20 * scale); 
+    ctx.fill();
+    
+    // Ship center
+    ctx.fillStyle = '#0099ff'; 
+    ctx.fillRect(px + 15 * scale, py + 12 * scale, 10 * scale, 15 * scale);
+    
+    // Ship engine
+    ctx.fillStyle = '#ff4400'; 
+    ctx.fillRect(px + 32 * scale, py + 27 * scale, 6 * scale, 10 * scale);
+    
+    // Engine glow effect
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillRect(px + 34 * scale, py + 30 * scale, 3 * scale, 8 * scale);
+    
+    // Level announcement overlay
     if (showLevelAnnouncement && gameState === 'playing') {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.92)'; 
       ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -913,7 +911,7 @@ const SpaceShooter = () => {
           }} 
         />
         
-        {/* Menu Overlay - FIXED for small screens */}
+        {/* Menu Overlay */}
         {gameState === 'menu' && (
           <div style={styles.menuOverlay}>
             <div style={styles.menuContent}>
