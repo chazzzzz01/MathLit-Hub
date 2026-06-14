@@ -20,6 +20,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [userProgress, setUserProgress] = useState(0);
+  const [userXP, setUserXP] = useState(0);
   const [copiedCode, setCopiedCode] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState(null);
   const [currentUserId, setCurrentUserId] = useState(null);
@@ -41,6 +42,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     battleScore: 0,
     spaceShooterScore: 0
   });
+  
   const [stats, setStats] = useState({
     totalStudents: 0,
     averageProgress: 0,
@@ -82,13 +84,8 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                          user.userType === 'teacher';
     setIsTeacher(isUserTeacher);
     
-    // Load game scores
-    const savedProgress = localStorage.getItem('gameProgress');
-    if (savedProgress) {
-      const gameProgress = JSON.parse(savedProgress);
-      const scores = getGameTotalScores(gameProgress);
-      setTotalScores(scores);
-    }
+    // Load game scores and XP for current user
+    loadCurrentUserData();
     
     if (classId) {
       loadClassData();
@@ -98,6 +95,28 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       loadAnnouncements();
     }
   }, [classId, passedClassData]);
+
+  // Load current user's game scores and XP
+  const loadCurrentUserData = () => {
+    // Load game progress
+    const savedProgress = localStorage.getItem('gameProgress');
+    if (savedProgress) {
+      const gameProgress = JSON.parse(savedProgress);
+      const scores = getGameTotalScores(gameProgress);
+      setTotalScores(scores);
+      
+      // Calculate user's overall progress
+      const userProgressPercent = calculateOverallProgress(gameProgress);
+      setUserProgress(userProgressPercent);
+    }
+    
+    // Load XP
+    const savedXP = localStorage.getItem('userXP');
+    if (savedXP) {
+      const xp = parseInt(savedXP) || 0;
+      setUserXP(xp);
+    }
+  };
 
   // Reset selection when exiting selection mode
   useEffect(() => {
@@ -146,11 +165,19 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       const classStudents = await classService.getClassStudents(passedClassData.id);
       const enrichedStudents = await enrichStudentsWithProgress(classStudents);
       setStudents(enrichedStudents);
+      
+      // Calculate stats after students are loaded
       calculateStats(enrichedStudents, classMissions);
       
+      // Find current user's enrollment
       const enrollment = enrichedStudents.find(s => s.student_id === currentUserId);
       if (enrollment) {
-        setUserProgress(enrollment.progress || 0);
+        if (enrollment.users?.gameProgressPercent) {
+          setUserProgress(enrollment.users.gameProgressPercent);
+        }
+        if (enrollment.users?.xp) {
+          setUserXP(enrollment.users.xp);
+        }
       }
       
     } catch (error) {
@@ -196,11 +223,19 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       const classStudents = await classService.getClassStudents(classId);
       const enrichedStudents = await enrichStudentsWithProgress(classStudents);
       setStudents(enrichedStudents);
+      
+      // Calculate stats after students are loaded
       calculateStats(enrichedStudents, classMissions);
       
+      // Find current user's enrollment
       const enrollment = enrichedStudents.find(s => s.student_id === currentUserId);
       if (enrollment) {
-        setUserProgress(enrollment.progress || 0);
+        if (enrollment.users?.gameProgressPercent) {
+          setUserProgress(enrollment.users.gameProgressPercent);
+        }
+        if (enrollment.users?.xp) {
+          setUserXP(enrollment.users.xp);
+        }
       }
       
     } catch (error) {
@@ -211,80 +246,208 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     }
   };
 
+  // FIXED: Enhanced function to get student XP from multiple sources
+  const getStudentXP = (studentEmail, studentId) => {
+    let xp = 0;
+    
+    // Try multiple storage keys
+    const storageKeys = [
+      `userXP_${studentEmail}`,
+      `xp_${studentEmail}`,
+      `studentXP_${studentEmail}`,
+      `userXP_${studentId}`,
+      `userXP`
+    ];
+    
+    for (const key of storageKeys) {
+      const savedXP = localStorage.getItem(key);
+      if (savedXP) {
+        xp = parseInt(savedXP) || 0;
+        if (xp > 0) break;
+      }
+    }
+    
+    // Also check if there's XP stored in the user object
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.xp && xp === 0) {
+      xp = parseInt(user.xp) || 0;
+    }
+    
+    return xp;
+  };
+
+  // FIXED: Enhanced function to get student game progress from all possible sources
+  const getStudentGameProgress = (studentEmail, studentId) => {
+    let gameProgress = null;
+    
+    // Try multiple storage keys
+    const storageKeys = [
+      `gameProgress_${studentEmail}`,
+      `progress_${studentEmail}`,
+      `studentProgress_${studentEmail}`,
+      `gameProgress_${studentId}`,
+      `gameProgress`
+    ];
+    
+    for (const key of storageKeys) {
+      const savedProgress = localStorage.getItem(key);
+      if (savedProgress) {
+        try {
+          gameProgress = JSON.parse(savedProgress);
+          if (gameProgress && Object.keys(gameProgress).length > 0) break;
+        } catch (e) {
+          console.error(`Error parsing ${key}:`, e);
+        }
+      }
+    }
+    
+    return gameProgress;
+  };
+
   const enrichStudentsWithProgress = async (classStudents) => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     const currentUserEmail = user.email;
     
-    return classStudents.map(enrollment => {
-      const studentEmail = enrollment.users?.email;
-      let gameProgress = null;
-      let xp = 0;
-      let totalGameScore = 0;
+    console.log('Raw classStudents data:', classStudents);
+    
+    const enrichedStudents = classStudents.map(enrollment => {
+      // Get student name from multiple possible sources
+      let studentName = 'Student';
       
-      if (studentEmail) {
-        const savedProgress = localStorage.getItem(`gameProgress_${studentEmail}`);
-        if (savedProgress) {
-          gameProgress = JSON.parse(savedProgress);
-        } else {
-          const defaultProgress = localStorage.getItem('gameProgress');
-          if (defaultProgress && studentEmail === currentUserEmail) {
-            gameProgress = JSON.parse(defaultProgress);
-          }
-        }
-        
-        if (gameProgress) {
-          totalGameScore = calculateTotalGameScore(gameProgress);
-        }
-        
-        const savedXP = localStorage.getItem(`userXP_${studentEmail}`);
-        if (savedXP) {
-          xp = parseInt(savedXP) || 0;
-        } else if (studentEmail === currentUserEmail) {
-          const defaultXP = localStorage.getItem('userXP');
-          if (defaultXP) {
-            xp = parseInt(defaultXP) || 0;
-          }
+      if (enrollment.users) {
+        if (enrollment.users.name) {
+          studentName = enrollment.users.name;
+        } else if (enrollment.users.full_name) {
+          studentName = enrollment.users.full_name;
+        } else if (enrollment.users.display_name) {
+          studentName = enrollment.users.display_name;
         }
       }
       
+      if (studentName === 'Student' && enrollment.profiles) {
+        if (enrollment.profiles.name) {
+          studentName = enrollment.profiles.name;
+        } else if (enrollment.profiles.full_name) {
+          studentName = enrollment.profiles.full_name;
+        }
+      }
+      
+      if (studentName === 'Student') {
+        if (enrollment.student_name) {
+          studentName = enrollment.student_name;
+        } else if (enrollment.name) {
+          studentName = enrollment.name;
+        }
+      }
+      
+      const studentEmail = enrollment.users?.email || enrollment.email;
+      const studentId = enrollment.student_id || enrollment.id;
+      
+      if (studentName === 'Student' && studentEmail) {
+        studentName = studentEmail.split('@')[0];
+      }
+      
+      // FIXED: Get game progress and XP with enhanced functions
+      const gameProgress = getStudentGameProgress(studentEmail, studentId);
+      const xp = getStudentXP(studentEmail, studentId);
+      const totalGameScore = calculateTotalGameScore(gameProgress);
       const gameProgressPercent = calculateOverallProgress(gameProgress);
+      
+      // Calculate mission progress for this student
+      const missionProgress = calculateStudentMissionProgress(enrollment.id, missions);
+      
+      console.log(`Student ${enrollment.id}: name=${studentName}, email=${studentEmail}, xp=${xp}, progress=${gameProgressPercent}%, gameScore=${totalGameScore}`);
       
       return {
         ...enrollment,
+        student_display_name: studentName,
+        student_xp: xp, // Store XP directly on enrollment for easy access
         users: {
           ...enrollment.users,
+          name: studentName,
+          email: studentEmail,
           gameProgress,
-          xp,
+          xp: xp,
           totalGameScore,
-          gameProgressPercent
+          gameProgressPercent,
+          missionProgress
         }
       };
     });
+    
+    return enrichedStudents;
+  };
+
+  // Calculate mission progress for a student
+  const calculateStudentMissionProgress = (studentId, classMissions) => {
+    // This would typically fetch from a database table tracking mission completion
+    // For now, we'll simulate based on game progress
+    // You can expand this based on your actual data structure
+    
+    const completedMissions = classMissions.filter(mission => {
+      // Check if mission is completed (you can customize this logic)
+      return mission.status === 'completed';
+    }).length;
+    
+    const totalMissions = classMissions.length;
+    const missionProgressPercent = totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0;
+    
+    return {
+      completed: completedMissions,
+      total: totalMissions,
+      percent: missionProgressPercent
+    };
   };
 
   const calculateStats = (enrichedStudents, classMissions) => {
     const totalStudents = enrichedStudents.length;
-    const avgProgress = totalStudents > 0 
-      ? Math.round(enrichedStudents.reduce((sum, s) => sum + (s.users?.gameProgressPercent || 0), 0) / totalStudents)
-      : 0;
-    const activeMissions = classMissions.filter(m => m.status === 'active').length;
-    const completionRate = classMissions.length > 0
-      ? Math.round((classMissions.filter(m => m.status === 'completed').length / classMissions.length) * 100)
-      : 0;
-    const totalXP = enrichedStudents.reduce((sum, s) => sum + (s.users?.xp || 0), 0);
+    
+    // Calculate averages
+    let totalProgress = 0;
+    let totalXP = 0;
+    let totalGameScore = 0;
+    let validStudents = 0;
+    
+    enrichedStudents.forEach(student => {
+      const progress = student.users?.gameProgressPercent || 0;
+      const xp = student.users?.xp || 0;
+      const gameScore = student.users?.totalGameScore || 0;
+      
+      totalProgress += progress;
+      totalXP += xp;
+      totalGameScore += gameScore;
+      validStudents++;
+      
+      console.log(`Stats - Student: ${student.users?.name}, XP: ${xp}, Progress: ${progress}%, GameScore: ${gameScore}`);
+    });
+    
+    const averageProgress = totalStudents > 0 ? Math.round(totalProgress / totalStudents) : 0;
     const averageXP = totalStudents > 0 ? Math.round(totalXP / totalStudents) : 0;
-    const totalGameScore = enrichedStudents.reduce((sum, s) => sum + (s.users?.totalGameScore || 0), 0);
     const averageGameScore = totalStudents > 0 ? Math.round(totalGameScore / totalStudents) : 0;
+    
+    // Calculate mission stats
+    const activeMissions = classMissions.filter(m => m.status === 'active').length;
+    const completedMissions = classMissions.filter(m => m.status === 'completed').length;
+    const completionRate = classMissions.length > 0 ? Math.round((completedMissions / classMissions.length) * 100) : 0;
     
     setStats({ 
       totalStudents, 
-      averageProgress: avgProgress, 
+      averageProgress, 
       activeMissions, 
       completionRate,
       totalXP,
       averageXP,
       totalGameScore,
       averageGameScore
+    });
+    
+    console.log('Calculated stats:', { 
+      totalStudents, 
+      averageProgress, 
+      averageXP, 
+      averageGameScore, 
+      totalXP,
+      totalGameScore 
     });
   };
 
@@ -391,7 +554,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     return equationScore + battleScore + spaceScore;
   };
 
-  // Calculate overall game progress percentage
+  // Calculate overall game progress percentage (0-100)
   const calculateOverallProgress = (gameProgress) => {
     if (!gameProgress) return 0;
     
@@ -406,6 +569,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       validGames++;
       let gameProgressPercent = 0;
       
+      // Weight: completion 50%, high score 30%, attempts 20%
       const completionWeight = 0.5;
       const completionScore = game.completed ? 100 : 0;
       
@@ -418,7 +582,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       const highScorePercent = Math.min(100, (game.highScore / maxScores[gameId]) * 100);
       
       const attemptsWeight = 0.2;
-      const attemptsScore = Math.min(100, (game.attempts / 3) * 100);
+      const attemptsScore = Math.min(100, (game.attempts / 10) * 100); // Max 10 attempts for 100%
       
       gameProgressPercent = (completionScore * completionWeight) + 
                            (highScorePercent * highScoreWeight) + 
@@ -427,7 +591,8 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
       totalProgress += gameProgressPercent;
     });
     
-    return validGames > 0 ? Math.round(totalProgress / validGames) : 0;
+    const overallProgress = validGames > 0 ? Math.round(totalProgress / validGames) : 0;
+    return overallProgress;
   };
 
   // Calculate individual game progress details
@@ -448,7 +613,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
     const highScoreWeight = 0.3;
     const highScorePercent = Math.min(100, (game.highScore / maxScores[gameId]) * 100);
     const attemptsWeight = 0.2;
-    const attemptsScore = Math.min(100, (game.attempts / 3) * 100);
+    const attemptsScore = Math.min(100, (game.attempts / 10) * 100);
     
     const progressPercent = Math.round(
       (completionScore * completionWeight) + 
@@ -603,7 +768,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </div>
       </div>
 
-      {/* Stats Overview */}
+      {/* Stats Overview - FIXED: Now showing correct values including XP */}
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
           <div style={styles.statIcon}><FiUsers size={24} color="#2563eb" /></div>
@@ -635,14 +800,27 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
         </div>
       </div>
 
-      {/* Your Progress Section */}
+      {/* Your Progress Section - FIXED: Now shows both progress and XP */}
       <div style={styles.progressSection}>
-        <div style={styles.progressLabel}>
-          <span>Your Overall Game Progress</span>
-          <span style={styles.progressPercent}>{userProgress}%</span>
-        </div>
-        <div style={styles.progressBarContainer}>
-          <div style={{...styles.progressBar, width: `${userProgress}%`}} />
+        <div style={styles.userStatsRow}>
+          <div style={styles.userStatItem}>
+            <div style={styles.progressLabel}>
+              <span>Your Overall Game Progress</span>
+              <span style={styles.progressPercent}>{userProgress}%</span>
+            </div>
+            <div style={styles.progressBarContainer}>
+              <div style={{...styles.progressBar, width: `${userProgress}%`}} />
+            </div>
+          </div>
+          <div style={styles.userStatItem}>
+            <div style={styles.xpLabel}>
+              <span>Your Total XP Points</span>
+              <span style={styles.xpValue}>⭐ {userXP} XP</span>
+            </div>
+            <div style={styles.xpBarContainer}>
+              <div style={{...styles.xpBar, width: `${Math.min(100, (userXP / 1000) * 100)}%`, backgroundColor: '#f59e0b'}} />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -730,10 +908,9 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
           </div>
         )}
 
-        {/* Announcements Tab with Selection and Bulk Delete */}
+        {/* Announcements Tab */}
         {activeTab === 'announcements' && (
           <div>
-            {/* Selection Mode Toggle and Bulk Delete Bar */}
             {isTeacher && announcements.length > 0 && (
               <div style={styles.selectionBar}>
                 {!isSelectionMode ? (
@@ -780,7 +957,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
               </div>
             )}
 
-            {/* Announcements List */}
             <div style={styles.scrollableContent}>
               {loadingAnnouncements ? (
                 <div style={styles.loadingContainerSmall}>
@@ -803,7 +979,6 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                       }}
                     >
                       <div style={styles.announcementHeader}>
-                        {/* Selection Checkbox */}
                         {isSelectionMode && (
                           <div style={styles.checkboxContainer}>
                             {selectedAnnouncements.has(announcement.id) ? (
@@ -831,14 +1006,15 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                           </div>
                         </div>
                         
-                        {/* Individual Delete Button (when not in selection mode) */}
                         {!isSelectionMode && isTeacher && (
                           <button
                             style={styles.deleteButton}
                             onClick={(e) => {
                               e.stopPropagation();
                               if (window.confirm('Delete this announcement?')) {
-                                handleDeleteSelected([announcement.id]);
+                                const singleSet = new Set([announcement.id]);
+                                setSelectedAnnouncements(singleSet);
+                                handleDeleteSelected();
                               }
                             }}
                             title="Delete announcement"
@@ -942,7 +1118,7 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
           </div>
         )}
 
-        {/* Students Tab */}
+        {/* Students Tab - FIXED: Now shows XP points for each student */}
         {activeTab === 'students' && (
           <div style={styles.scrollableContent}>
             {students.length > 0 ? (
@@ -953,25 +1129,64 @@ function ClassView({ classId, classData: passedClassData, onBack }) {
                   const battleDetails = calculateGameProgressDetails(gameProgress, 'battle');
                   const spaceDetails = calculateGameProgressDetails(gameProgress, 'spaceShooter');
                   
+                  // Get student details
+                  const studentName = enrollment.users?.name || 
+                                     enrollment.student_display_name || 
+                                     enrollment.users?.full_name ||
+                                     enrollment.users?.display_name ||
+                                     enrollment.profiles?.name ||
+                                     enrollment.profiles?.full_name ||
+                                     enrollment.student_name ||
+                                     enrollment.name ||
+                                     (enrollment.users?.email ? enrollment.users.email.split('@')[0] : 'Student');
+                  
+                  const studentEmail = enrollment.users?.email || enrollment.email || '';
+                  // FIXED: Get XP from multiple sources
+                  const studentXP = enrollment.users?.xp || enrollment.student_xp || 0;
+                  const studentProgress = enrollment.users?.gameProgressPercent || 0;
+                  const studentTotalScore = enrollment.users?.totalGameScore || 0;
+                  const missionProgress = enrollment.users?.missionProgress || { completed: 0, total: missions.length, percent: 0 };
+                  
                   return (
                     <div key={enrollment.id} style={styles.studentCard}>
                       <div style={styles.studentAvatar}>
-                        {enrollment.users?.name?.charAt(0) || 'S'}
+                        {studentName.charAt(0).toUpperCase()}
                       </div>
                       <div style={styles.studentInfo}>
                         <div style={styles.studentHeader}>
-                          <h4 style={styles.studentName}>{enrollment.users?.name || 'Student'}</h4>
-                          <span style={styles.studentXPBadge}>⭐ {enrollment.users?.xp || 0} XP</span>
+                          <h4 style={styles.studentName}>{studentName}</h4>
+                          <div style={styles.studentBadges}>
+                            <span style={styles.studentXPBadge}>
+                              ⭐ {studentXP} XP
+                            </span>
+                            <span style={styles.studentScoreBadge}>
+                              🎮 {studentTotalScore}
+                            </span>
+                          </div>
                         </div>
-                        <p style={styles.studentEmail}>{enrollment.users?.email}</p>
+                        {studentEmail && (
+                          <p style={styles.studentEmail}>{studentEmail}</p>
+                        )}
                         
+                        {/* Overall Progress */}
                         <div style={styles.studentProgressWrapper}>
                           <div style={styles.studentProgressBar}>
-                            <div style={{...styles.studentProgressFill, width: `${enrollment.users?.gameProgressPercent || 0}%`}} />
+                            <div style={{...styles.studentProgressFill, width: `${studentProgress}%`}} />
                           </div>
-                          <span style={styles.studentProgressText}>{enrollment.users?.gameProgressPercent || 0}% Overall</span>
+                          <span style={styles.studentProgressText}>{studentProgress}% Overall</span>
                         </div>
                         
+                        {/* Mission Progress */}
+                        <div style={styles.missionProgressWrapper}>
+                          <div style={styles.missionProgressBar}>
+                            <div style={{...styles.missionProgressFill, width: `${missionProgress.percent}%`, backgroundColor: '#f59e0b'}} />
+                          </div>
+                          <span style={styles.missionProgressText}>
+                            Missions: {missionProgress.completed}/{missionProgress.total} ({missionProgress.percent}%)
+                          </span>
+                        </div>
+                        
+                        {/* Game Progress Details */}
                         <div style={styles.gameProgressGrid}>
                           <div style={styles.gameProgressItem}>
                             <span style={styles.gameProgressIcon}>🧮</span>
@@ -1233,6 +1448,14 @@ const styles = {
     margin: '0 20px 20px 20px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
   },
+  userStatsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '20px',
+  },
+  userStatItem: {
+    flex: 1,
+  },
   progressLabel: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -1255,6 +1478,31 @@ const styles = {
   progressBar: {
     height: '100%',
     backgroundColor: '#10b981',
+    borderRadius: '4px',
+    transition: 'width 0.3s ease',
+  },
+  xpLabel: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginBottom: '12px',
+    flexWrap: 'wrap',
+    gap: '8px',
+  },
+  xpValue: {
+    color: '#f59e0b',
+    fontWeight: '700',
+  },
+  xpBarContainer: {
+    height: '8px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '4px',
+    overflow: 'hidden',
+  },
+  xpBar: {
+    height: '100%',
+    backgroundColor: '#f59e0b',
     borderRadius: '4px',
     transition: 'width 0.3s ease',
   },
@@ -1346,7 +1594,6 @@ const styles = {
     fontSize: '11px',
     color: '#6b7280',
   },
-  // Selection Bar Styles
   selectionBar: {
     marginBottom: '20px',
     padding: '12px',
@@ -1664,11 +1911,24 @@ const styles = {
     fontWeight: '700',
     color: '#1f2937',
   },
+  studentBadges: {
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
   studentXPBadge: {
     fontSize: '11px',
     fontWeight: '600',
     color: '#f59e0b',
     backgroundColor: '#fef3c7',
+    padding: '3px 8px',
+    borderRadius: '20px',
+  },
+  studentScoreBadge: {
+    fontSize: '11px',
+    fontWeight: '600',
+    color: '#8b5cf6',
+    backgroundColor: '#ede9fe',
     padding: '3px 8px',
     borderRadius: '20px',
   },
@@ -1682,7 +1942,7 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    marginBottom: '10px',
+    marginBottom: '8px',
   },
   studentProgressBar: {
     flex: 1,
@@ -1700,6 +1960,30 @@ const styles = {
     fontSize: '11px',
     fontWeight: '600',
     color: '#10b981',
+    whiteSpace: 'nowrap',
+  },
+  missionProgressWrapper: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+  },
+  missionProgressBar: {
+    flex: 1,
+    height: '6px',
+    backgroundColor: '#e5e7eb',
+    borderRadius: '3px',
+    overflow: 'hidden',
+  },
+  missionProgressFill: {
+    height: '100%',
+    backgroundColor: '#f59e0b',
+    transition: 'width 0.3s ease',
+  },
+  missionProgressText: {
+    fontSize: '10px',
+    fontWeight: '500',
+    color: '#6b7280',
     whiteSpace: 'nowrap',
   },
   gameProgressGrid: {

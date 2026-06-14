@@ -1,4 +1,4 @@
-// src/menu1/StartRound.jsx
+// src/menu1/StartRound.jsx - COMPLETE FIXED VERSION
 import { useState, useEffect, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { FiClock, FiCheckCircle, FiXCircle, FiUsers, FiAlertCircle, FiSend, FiStar, FiAward, FiPlus, FiMinus, FiRefreshCw } from 'react-icons/fi';
@@ -6,124 +6,48 @@ import { supabase } from '../lib/supabase';
 
 const animationStyles = `
   @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateX(-50%) translateY(-20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
   }
-  
   @keyframes pulse {
     0% { transform: scale(1); opacity: 1; }
     50% { transform: scale(1.05); opacity: 0.8; }
     100% { transform: scale(1); opacity: 1; }
   }
+  .answer-updated { animation: pulse 0.5s ease-in-out; }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  .spin { animation: spin 1s linear infinite; }
   
-  .answer-updated {
-    animation: pulse 0.5s ease-in-out;
-  }
-
-  /* Mobile Responsive Styles */
   @media (max-width: 768px) {
-    .modal {
-      padding: 16px !important;
-      width: 95% !important;
-    }
-    .teams-container {
-      grid-template-columns: 1fr !important;
-      gap: 16px !important;
-    }
-    .teams-ready-container {
-      grid-template-columns: 1fr !important;
-      gap: 16px !important;
-    }
-    .summary-grid {
-      grid-template-columns: 1fr !important;
-    }
-    .points-teams-container {
-      grid-template-columns: 1fr !important;
-    }
-    .header {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-    }
-    .team-header-a, .team-header-b {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-    }
-    .team-stats {
-      flex-wrap: wrap !important;
-    }
-    .student-answer-header {
-      flex-wrap: wrap !important;
-      gap: 8px !important;
-    }
-    .points-card-header {
-      flex-wrap: wrap !important;
-    }
-    .awarded-badge {
-      margin-left: 0 !important;
-    }
-    .points-input-wrapper {
-      flex-wrap: wrap !important;
-    }
-    .points-actions {
-      flex-direction: column !important;
-    }
-    .points-actions button {
-      width: 100% !important;
-    }
+    .modal { padding: 16px !important; width: 95% !important; }
+    .teams-container, .teams-ready-container, .summary-grid, .points-teams-container { grid-template-columns: 1fr !important; gap: 16px !important; }
+    .header { flex-direction: column !important; align-items: flex-start !important; }
+    .team-header-a, .team-header-b { flex-direction: column !important; align-items: flex-start !important; }
+    .team-stats { flex-wrap: wrap !important; }
+    .student-answer-header { flex-wrap: wrap !important; gap: 8px !important; }
+    .points-card-header { flex-wrap: wrap !important; }
+    .awarded-badge { margin-left: 0 !important; }
+    .points-input-wrapper { flex-wrap: wrap !important; }
+    .points-actions { flex-direction: column !important; }
+    .points-actions button { width: 100% !important; }
   }
-
   @media (max-width: 480px) {
-    .timer-number {
-      font-size: 32px !important;
-    }
-    .question-text {
-      font-size: 16px !important;
-    }
-    .team-title {
-      font-size: 16px !important;
-    }
-    .points-team-title {
-      font-size: 18px !important;
-    }
-    .member-item {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-      gap: 6px !important;
-    }
-    .student-answer-content {
-      flex-direction: column !important;
-      align-items: flex-start !important;
-    }
-    .answer-content {
-      flex-direction: column !important;
-      text-align: center !important;
-    }
+    .timer-number { font-size: 32px !important; }
+    .question-text { font-size: 16px !important; }
+    .team-title { font-size: 16px !important; }
+    .points-team-title { font-size: 18px !important; }
+    .member-item, .student-answer-content, .answer-content { flex-direction: column !important; align-items: flex-start !important; gap: 6px !important; }
+    .student-answer-content, .answer-content { text-align: center !important; }
   }
-
   @media (max-width: 320px) {
-    .modal {
-      padding: 12px !important;
-    }
-    .timer-number {
-      font-size: 28px !important;
-    }
-    .points-input {
-      width: 60px !important;
-      font-size: 16px !important;
-    }
-    .points-adjust-btn {
-      width: 30px !important;
-      height: 30px !important;
-    }
-    .member-count, .submission-count {
-      font-size: 10px !important;
-    }
+    .modal { padding: 12px !important; }
+    .timer-number { font-size: 28px !important; }
+    .points-input { width: 60px !important; font-size: 16px !important; }
+    .points-adjust-btn { width: 30px !important; height: 30px !important; }
+    .member-count, .submission-count { font-size: 10px !important; }
   }
 `;
 
@@ -152,11 +76,16 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   const [answerUpdateTrigger, setAnswerUpdateTrigger] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isLoadingAnswers, setIsLoadingAnswers] = useState(false);
+  const [isRestoringSession, setIsRestoringSession] = useState(false);
   
   const timerIntervalRef = useRef(null);
   const readinessSubscriptionRef = useRef(null);
   const answersSubscriptionRef = useRef(null);
   const answerPollIntervalRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  const isActiveRef = useRef(false);
+  const roundEndedRef = useRef(false);
   
   // Handle window resize for responsive design
   useEffect(() => {
@@ -190,7 +119,6 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
           student_id,
           answer,
           created_at,
-          updated_at,
           students (
             id,
             name,
@@ -236,7 +164,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         };
       });
       
-      console.log('Team assignments map:', teamMap);
+      console.log('Team assignments map:', Object.keys(teamMap).length, 'students');
       return teamMap;
     } catch (error) {
       console.error('Error in getTeamAssignments:', error);
@@ -254,26 +182,28 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     
     answers?.forEach(answer => {
       const assignment = teamAssignments[answer.student_id];
-      const studentName = answer.students?.name || 'Unknown Student';
+      let studentName = 'Unknown Student';
+      if (answer.students) {
+        studentName = answer.students.name || 'Unknown Student';
+      }
       
       const answerData = {
         id: answer.id,
         studentId: answer.student_id,
         studentName: studentName,
-        answer: answer.answer,
-        submittedAt: answer.created_at,
-        updatedAt: answer.updated_at
+        answer: answer.answer || '',
+        submittedAt: answer.created_at
       };
       
       if (assignment?.team === 'A') {
         teamAAnswers.push(answerData);
-        console.log(`Team A answer from ${studentName}: "${answer.answer}"`);
+        console.log(`Team A answer from ${studentName}: "${answerData.answer}"`);
       } else if (assignment?.team === 'B') {
         teamBAnswers.push(answerData);
-        console.log(`Team B answer from ${studentName}: "${answer.answer}"`);
+        console.log(`Team B answer from ${studentName}: "${answerData.answer}"`);
       } else {
         unassignedAnswers.push(answerData);
-        console.warn(`Unassigned student ${studentName} submitted answer: "${answer.answer}"`);
+        console.warn(`Unassigned student ${studentName} submitted answer: "${answerData.answer}"`);
       }
     });
     
@@ -316,15 +246,17 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   // FETCH AND PROCESS ALL ANSWERS FOR CURRENT SESSION
   // ============================================================
   const fetchAndProcessAnswers = async () => {
-    if (!sessionId) {
+    const currentSessionId = sessionIdRef.current || sessionId;
+    if (!currentSessionId) {
       console.log('No active session ID, skipping answer fetch');
       return;
     }
     
+    setIsLoadingAnswers(true);
     try {
-      console.log(`📡 Fetching answers for session: ${sessionId}`);
+      console.log(`📡 Fetching answers for session: ${currentSessionId}`);
       
-      const answers = await fetchStudentAnswers(sessionId);
+      const answers = await fetchStudentAnswers(currentSessionId);
       const teamAssignments = await getTeamAssignments();
       const { teamAAnswers, teamBAnswers, unassignedAnswers } = processAnswersByTeam(answers, teamAssignments);
       
@@ -372,6 +304,97 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       
     } catch (error) {
       console.error('Error in fetchAndProcessAnswers:', error);
+    } finally {
+      setIsLoadingAnswers(false);
+    }
+  };
+
+  // ============================================================
+  // CHECK IF THERE'S AN ACTIVE SESSION (FOR PAGE REFRESH)
+  // ============================================================
+  const checkForActiveSession = async () => {
+    try {
+      console.log('🔍 Checking for active game session...');
+      
+      const { data: activeSession, error } = await supabase
+        .from('game_sessions')
+        .select('*')
+        .eq('class_id', classId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) {
+        console.error('Error checking for active session:', error);
+        return null;
+      }
+      
+      if (activeSession) {
+        console.log('✅ Found active session:', activeSession.id);
+        return activeSession;
+      }
+      
+      console.log('No active session found');
+      return null;
+    } catch (error) {
+      console.error('Error in checkForActiveSession:', error);
+      return null;
+    }
+  };
+
+  // ============================================================
+  // RESTORE SESSION AFTER PAGE REFRESH
+  // ============================================================
+  const restoreSession = async () => {
+    setIsRestoringSession(true);
+    try {
+      const activeSession = await checkForActiveSession();
+      
+      if (activeSession) {
+        console.log('🔄 Restoring session:', activeSession.id);
+        
+        setSessionId(activeSession.id);
+        sessionIdRef.current = activeSession.id;
+        
+        const roundStartTime = new Date(activeSession.current_question?.started_at);
+        const elapsed = Math.floor((new Date() - roundStartTime) / 1000);
+        const remainingTime = Math.max(0, 20 - elapsed);
+        
+        if (remainingTime > 0 && activeSession.status === 'active') {
+          setIsActive(true);
+          isActiveRef.current = true;
+          setTimeLeft(remainingTime);
+          setIsReadyPhase(false);
+          setRoundEnded(false);
+          roundEndedRef.current = false;
+          
+          startTimer(remainingTime, activeSession.id, roundStartTime.toISOString());
+          setupAnswerListeners(activeSession.id);
+          await fetchAndProcessAnswers();
+          
+          console.log(`✅ Session restored! Time remaining: ${remainingTime}s`);
+        } else {
+          setIsActive(false);
+          isActiveRef.current = false;
+          setIsReadyPhase(false);
+          setRoundEnded(true);
+          roundEndedRef.current = true;
+          
+          await fetchAndProcessAnswers();
+          
+          await supabase
+            .from('game_sessions')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('id', activeSession.id);
+          
+          console.log('✅ Session restored as completed');
+        }
+      }
+    } catch (error) {
+      console.error('Error restoring session:', error);
+    } finally {
+      setIsRestoringSession(false);
     }
   };
 
@@ -421,8 +444,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         student_id: student.student_id,
         class_id: classId,
         team: index % 2 === 0 ? 'A' : 'B',
-        role: index % 3 === 0 ? 'analyzer' : index % 3 === 1 ? 'solver' : 'checker',
-        updated_at: new Date().toISOString()
+        role: index % 3 === 0 ? 'analyzer' : index % 3 === 1 ? 'solver' : 'checker'
       }));
       
       const { error: insertError } = await supabase
@@ -467,27 +489,19 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         console.log(`Found ${existingSessions.length} old sessions to clean up`);
         
         for (const session of existingSessions) {
-          const { error: deleteAnswersError } = await supabase
+          await supabase
             .from('student_answers')
             .delete()
             .eq('session_id', session.id);
-          
-          if (deleteAnswersError) {
-            console.error(`Error deleting answers for session ${session.id}:`, deleteAnswersError);
-          }
         }
         
-        const { error: deleteError } = await supabase
+        await supabase
           .from('game_sessions')
           .delete()
           .eq('class_id', classId)
           .in('status', ['active', 'pending']);
         
-        if (deleteError) {
-          console.error('Error deleting old sessions:', deleteError);
-        } else {
-          console.log('✅ Old game sessions cleaned up');
-        }
+        console.log('✅ Old game sessions cleaned up');
       }
     } catch (error) {
       console.error('Error cleaning up:', error);
@@ -576,25 +590,31 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     }
   };
 
+  // ============================================================
+  // INITIAL LOAD - CHECK FOR ACTIVE SESSION
+  // ============================================================
+  useEffect(() => {
+    if (!classId) return;
+    restoreSession();
+  }, [classId]);
+
+  // Clear old ready statuses on mount
   useEffect(() => {
     const clearOldReadyStatuses = async () => {
-      console.log('Clearing old ready statuses for class:', classId);
-      const { error } = await supabase
-        .from('student_ready_status')
-        .delete()
-        .eq('class_id', classId);
-      
-      if (error) {
-        console.error('Error clearing old ready statuses:', error);
-      } else {
-        console.log('Cleared old ready statuses successfully');
+      if (!sessionIdRef.current) {
+        console.log('Clearing old ready statuses for class:', classId);
+        await supabase
+          .from('student_ready_status')
+          .delete()
+          .eq('class_id', classId);
       }
     };
     clearOldReadyStatuses();
   }, [classId]);
 
+  // Ready status subscription (only in ready phase)
   useEffect(() => {
-    if (!classId) return;
+    if (!classId || !isReadyPhase) return;
     
     fetchReadyStatus();
     
@@ -617,7 +637,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       subscription.unsubscribe();
       clearInterval(interval);
     };
-  }, [classId, teamA, teamB]);
+  }, [classId, teamA, teamB, isReadyPhase]);
 
   const allTeamAReady = teamA.length > 0 && teamAReadyStudents.length === teamA.length;
   const allTeamBReady = teamB.length > 0 && teamBReadyStudents.length === teamB.length;
@@ -667,8 +687,10 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
       const { id: newSessionId } = await createGameSession();
       
       setSessionId(newSessionId);
+      sessionIdRef.current = newSessionId;
       setIsReadyPhase(false);
       setIsActive(true);
+      isActiveRef.current = true;
       setTimeLeft(20);
       
       startTimer(20, newSessionId, new Date().toISOString());
@@ -695,7 +717,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     
     if (answerPollIntervalRef.current) clearInterval(answerPollIntervalRef.current);
     answerPollIntervalRef.current = setInterval(() => {
-      if (isActive && sessionIdParam) {
+      if (isActiveRef.current && sessionIdParam) {
         console.log('🔄 Polling for answers...');
         fetchAndProcessAnswers();
       }
@@ -706,12 +728,12 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     const subscription = supabase
       .channel(`answers_${sessionIdParam}`)
       .on('postgres_changes', { 
-        event: 'INSERT', 
+        event: '*', 
         schema: 'public', 
         table: 'student_answers', 
         filter: `session_id=eq.${sessionIdParam}` 
-      }, (payload) => {
-        console.log('🔔 New answer submitted!', payload.new);
+      }, () => {
+        console.log('🔔 Answer event detected!');
         fetchAndProcessAnswers();
       })
       .subscribe();
@@ -734,11 +756,11 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     }
     
     timerIntervalRef.current = setInterval(() => {
-      if (timeRemaining > 0) {
+      if (timeRemaining > 0 && isActiveRef.current) {
         timeRemaining--;
         setTimeLeft(timeRemaining);
       }
-      if (timeRemaining <= 0) {
+      if (timeRemaining <= 0 && isActiveRef.current) {
         clearInterval(timerIntervalRef.current);
         endRound();
       }
@@ -746,7 +768,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   };
 
   const endRound = async () => {
-    if (!isActive && roundEnded) return;
+    if (!isActiveRef.current && roundEndedRef.current) return;
     console.log('🏁 Ending round...');
     
     await fetchAndProcessAnswers();
@@ -756,13 +778,15 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     if (answersSubscriptionRef.current) supabase.removeChannel(answersSubscriptionRef.current);
     
     setIsActive(false);
+    isActiveRef.current = false;
     setRoundEnded(true);
+    roundEndedRef.current = true;
     
     const teamAResult = { correct: checkAnswer(teamAnswers.A), answer: teamAnswers.A };
     const teamBResult = { correct: checkAnswer(teamAnswers.B), answer: teamAnswers.B };
     
-    if (sessionId) {
-      await updateGameSession(sessionId, { 
+    if (sessionIdRef.current) {
+      await updateGameSession(sessionIdRef.current, { 
         status: 'completed', 
         updated_at: new Date().toISOString(),
         round_results: { A: teamAResult, B: teamBResult }
@@ -784,60 +808,96 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     };
   }, []);
 
+  // FIXED: Award points function that properly saves and shows awarded points
   const awardTeamPoints = async (team, points) => {
     if (points <= 0) {
-      setShowSuccessMessage({ team, message: 'Please enter a valid point value' });
+      setShowSuccessMessage({ team, message: 'Please enter a valid point value (must be greater than 0)' });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
+    
     if (teamPointsAwarded[team]) {
-      setShowSuccessMessage({ team, message: `Team ${team} already received points!` });
+      setShowSuccessMessage({ team, message: `Team ${team} has already received points for this round!` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
     
     const students = team === 'A' ? teamA : teamB;
     if (!students || students.length === 0) {
-      setShowSuccessMessage({ team, message: `Team ${team} has no members` });
+      setShowSuccessMessage({ team, message: `Team ${team} has no members to award points to` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
       return;
     }
     
     try {
+      console.log(`🏆 Awarding ${points} points to each member of Team ${team}`);
+      console.log('Team members:', students.map(s => s.name));
+      
+      // Award points to each team member
       for (const student of students) {
-        const { data: existing } = await supabase
+        // Get current points
+        const { data: existing, error: fetchError } = await supabase
           .from('student_points')
           .select('points')
           .eq('student_id', student.id)
           .eq('class_id', classId)
           .maybeSingle();
         
-        await supabase
+        if (fetchError && fetchError.code !== 'PGRST116') {
+          console.error('Error fetching student points:', fetchError);
+          continue;
+        }
+        
+        const currentPoints = existing?.points || 0;
+        const newPoints = currentPoints + points;
+        
+        console.log(`Student ${student.name}: ${currentPoints} → ${newPoints} points (+${points})`);
+        
+        // Update or insert points
+        const { error: upsertError } = await supabase
           .from('student_points')
           .upsert({
             student_id: student.id,
             class_id: classId,
-            points: (existing?.points || 0) + points,
+            points: newPoints,
             updated_at: new Date().toISOString()
           }, { onConflict: 'student_id,class_id' });
+        
+        if (upsertError) {
+          console.error('Error upserting points:', upsertError);
+          throw upsertError;
+        }
       }
+      
+      // Update state to show points have been awarded
       setTeamPointsAwarded(prev => ({ ...prev, [team]: true }));
-      setShowSuccessMessage({ team, message: `✓ Team ${team} awarded ${points} points to each member!` });
-      if (onPointsAwarded) await onPointsAwarded();
-      setTimeout(() => setShowSuccessMessage(null), 4000);
+      
+      // Store the awarded points for display
+      const awardedPoints = points;
+      
+      // Show success message
+      setShowSuccessMessage({ 
+        team, 
+        message: `✓ Team ${team} awarded ${awardedPoints} point${awardedPoints !== 1 ? 's' : ''} to each of ${students.length} member${students.length !== 1 ? 's' : ''}! Total: ${awardedPoints * students.length} points awarded!` 
+      });
+      
+      // Refresh points in parent component
+      if (onPointsAwarded) {
+        await onPointsAwarded();
+      }
+      
+      setTimeout(() => setShowSuccessMessage(null), 5000);
+      
     } catch (error) {
       console.error('Error awarding points:', error);
-      setShowSuccessMessage({ team, message: `Error: ${error.message}` });
+      setShowSuccessMessage({ team, message: `Error awarding points: ${error.message || 'Unknown error'}` });
       setTimeout(() => setShowSuccessMessage(null), 3000);
     }
   };
 
   const goToPointsPhase = () => setPointsPhase(true);
-  const isTeacher = true;
 
-  // ============================================================
-  // RENDER FUNCTIONS
-  // ============================================================
+  // Render answer display
   const renderAnswerDisplay = (team) => {
     const hasAnswer = submittedStatus[team];
     const answer = teamAnswers[team];
@@ -854,6 +914,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     return <div style={styles.waitingAnswer}><FiAlertCircle size={16} /><span>{isActive ? 'Waiting for answers...' : 'No answers submitted'}</span></div>;
   };
 
+  // Render student answers
   const renderStudentAnswers = (team) => {
     const answers = studentAnswers[team];
     const teamMembersList = team === 'A' ? teamA : teamB;
@@ -891,6 +952,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
         <div style={styles.submissionStats}>
           <FiUsers size={isMobile ? 12 : 14} />
           <span style={{ fontWeight: 'bold' }}>{submittedCount}/{totalCount} students have submitted answers</span>
+          {isLoadingAnswers && <span style={{ marginLeft: '8px', fontSize: '11px', color: '#3b82f6' }}>🔄 Refreshing...</span>}
         </div>
         {allStudents.map((student) => {
           const isCorrect = student.answer ? checkAnswer(student.answer) : false;
@@ -947,6 +1009,19 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
     fetchAndProcessAnswers();
   };
 
+  if (isRestoringSession) {
+    return (
+      <div style={styles.modalOverlay}>
+        <div style={styles.modal}>
+          <div style={styles.loadingContainer}>
+            <div style={styles.loadingSpinner}></div>
+            <p>Restoring session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <style>{animationStyles}</style>
@@ -957,8 +1032,9 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
             <h3 style={styles.className}>{className || 'Class'}</h3>
             {!roundEnded && isActive && (
               <>
-                <button style={styles.refreshButton} onClick={handleManualRefresh}>
-                  <FiRefreshCw size={isMobile ? 12 : 16} /> {!isMobile && "Refresh Answers"}
+                <button style={styles.refreshButton} onClick={handleManualRefresh} disabled={isLoadingAnswers}>
+                  <FiRefreshCw size={isMobile ? 12 : 16} className={isLoadingAnswers ? 'spin' : ''} /> 
+                  {!isMobile && (isLoadingAnswers ? "Refreshing..." : "Refresh Answers")}
                 </button>
                 <button style={styles.endEarlyButton} onClick={endRound}>End Round Early</button>
               </>
@@ -1136,7 +1212,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   {teamA?.map(student => (
                     <div key={student.id} style={styles.memberItem} className="member-item">
                       <span>{student.name}</span>
-                      <span style={{...styles.roleBadge, backgroundColor: styles.roleBadge(student.role).backgroundColor}}>{student.role || 'member'}</span>
+                      <span style={{...styles.roleBadge, backgroundColor: student.role === 'analyzer' ? '#ede9fe' : student.role === 'checker' ? '#fed7aa' : '#d1fae5'}}>{student.role || 'member'}</span>
                     </div>
                   ))}
                 </div>
@@ -1182,7 +1258,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                   {teamB?.map(student => (
                     <div key={student.id} style={styles.memberItem} className="member-item">
                       <span>{student.name}</span>
-                      <span style={{...styles.roleBadge, backgroundColor: styles.roleBadge(student.role).backgroundColor}}>{student.role || 'member'}</span>
+                      <span style={{...styles.roleBadge, backgroundColor: student.role === 'analyzer' ? '#ede9fe' : student.role === 'checker' ? '#fed7aa' : '#d1fae5'}}>{student.role || 'member'}</span>
                     </div>
                   ))}
                 </div>
@@ -1244,6 +1320,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
               </div>
 
               <div style={styles.pointsTeamsContainer} className="points-teams-container">
+                {/* Team A Points Card */}
                 <div style={teamPointsAwarded.A ? styles.pointsCardAAwarded : styles.pointsCardA}>
                   <div style={styles.pointsCardHeader} className="points-card-header">
                     <div style={styles.teamIconWrapperA}><FiUsers size={isMobile ? 22 : 28} /></div>
@@ -1251,35 +1328,76 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                       <h3 style={styles.pointsTeamTitle}>Team A</h3>
                       <span style={styles.pointsMemberCount}>{teamA?.length || 0} members</span>
                     </div>
-                    {teamPointsAwarded.A && <div style={styles.awardedBadge} className="awarded-badge"><FiCheckCircle size={16} /> Points Awarded</div>}
+                    {teamPointsAwarded.A && (
+                      <div style={styles.awardedBadge} className="awarded-badge">
+                        <FiCheckCircle size={16} /> 
+                        Awarded {teamPoints.A} pts each
+                      </div>
+                    )}
                   </div>
+                  
                   <div style={styles.pointsDisplay}>
                     <div style={styles.pointsInfo}>
                       <div style={styles.pointsLabel}>Points per member:</div>
                       {teamPointsAwarded.A ? (
-                        <div style={styles.pointsValueAwarded}><FiStar size={isMobile ? 20 : 24} color="#f59e0b" /><span>{teamPoints.A} point{teamPoints.A !== 1 ? 's' : ''}</span></div>
+                        <div style={styles.pointsValueAwarded}>
+                          <FiStar size={isMobile ? 20 : 24} color="#f59e0b" />
+                          <span style={{fontSize: 'clamp(20px, 6vw, 28px)', fontWeight: 'bold'}}>
+                            {teamPoints.A} point{teamPoints.A !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       ) : (
                         <div style={styles.pointsInputWrapper} className="points-input-wrapper">
-                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, A: Math.max(0, prev.A - 1) }))}><FiMinus size={isMobile ? 12 : 16} /></button>
-                          <input type="number" min="0" value={teamPoints.A} onChange={(e) => setTeamPoints(prev => ({ ...prev, A: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} className="points-input" />
-                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, A: prev.A + 1 }))}><FiPlus size={isMobile ? 12 : 16} /></button>
+                          <button 
+                            style={styles.pointsAdjustBtn} 
+                            className="points-adjust-btn" 
+                            onClick={() => setTeamPoints(prev => ({ ...prev, A: Math.max(0, prev.A - 1) }))}
+                          >
+                            <FiMinus size={isMobile ? 12 : 16} />
+                          </button>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            value={teamPoints.A} 
+                            onChange={(e) => setTeamPoints(prev => ({ ...prev, A: Math.max(0, parseInt(e.target.value) || 0) }))} 
+                            style={styles.pointsInput} 
+                            className="points-input" 
+                          />
+                          <button 
+                            style={styles.pointsAdjustBtn} 
+                            className="points-adjust-btn" 
+                            onClick={() => setTeamPoints(prev => ({ ...prev, A: prev.A + 1 }))}
+                          >
+                            <FiPlus size={isMobile ? 12 : 16} />
+                          </button>
                         </div>
                       )}
                     </div>
+                    
                     <div style={styles.totalPointsInfo}>
                       <span>Total points awarded:</span>
-                      <strong>{teamPointsAwarded.A ? teamPoints.A * (teamA?.length || 0) : 0}</strong>
-                      <span style={styles.pointsBreakdown}>({teamPoints.A} × {teamA?.length || 0} members)</span>
+                      <strong style={{fontSize: 'clamp(16px, 5vw, 20px)', color: '#f59e0b'}}>
+                        {teamPointsAwarded.A ? teamPoints.A * (teamA?.length || 0) : 0}
+                      </strong>
+                      <span style={styles.pointsBreakdown}>
+                        ({teamPoints.A} × {teamA?.length || 0} members)
+                      </span>
                     </div>
                   </div>
+                  
                   {!teamPointsAwarded.A && (teamA?.length || 0) > 0 && (
-                    <button style={styles.awardTeamButton} onClick={() => awardTeamPoints('A', teamPoints.A)}>
-                      <FiSend size={isMobile ? 14 : 18} /> Award {teamPoints.A} Point{teamPoints.A !== 1 ? 's' : ''} to Team A
+                    <button 
+                      style={styles.awardTeamButton} 
+                      onClick={() => awardTeamPoints('A', teamPoints.A)}
+                    >
+                      <FiSend size={isMobile ? 14 : 18} /> 
+                      Award {teamPoints.A} Point{teamPoints.A !== 1 ? 's' : ''} to Team A
                     </button>
                   )}
+                  
                   {teamPointsAwarded.A && (
                     <div style={styles.membersPointsSummary}>
-                      <strong>📊 Points awarded to:</strong>
+                      <strong>📊 Points awarded to each member:</strong>
                       <div style={styles.membersPointsList}>
                         {teamA?.map(student => (
                           <div key={student.id} style={styles.memberPointsItem}>
@@ -1288,10 +1406,20 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                           </div>
                         ))}
                       </div>
+                      <div style={styles.totalPointsSummary}>
+                        <strong>Team Total: +{teamPoints.A * (teamA?.length || 0)} points</strong>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {teamA?.length === 0 && (
+                    <div style={styles.noMembersWarning}>
+                      No team members to award points to
                     </div>
                   )}
                 </div>
 
+                {/* Team B Points Card */}
                 <div style={teamPointsAwarded.B ? styles.pointsCardBAwarded : styles.pointsCardB}>
                   <div style={styles.pointsCardHeader} className="points-card-header">
                     <div style={styles.teamIconWrapperB}><FiUsers size={isMobile ? 22 : 28} /></div>
@@ -1299,35 +1427,76 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                       <h3 style={styles.pointsTeamTitle}>Team B</h3>
                       <span style={styles.pointsMemberCount}>{teamB?.length || 0} members</span>
                     </div>
-                    {teamPointsAwarded.B && <div style={styles.awardedBadge} className="awarded-badge"><FiCheckCircle size={16} /> Points Awarded</div>}
+                    {teamPointsAwarded.B && (
+                      <div style={styles.awardedBadge} className="awarded-badge">
+                        <FiCheckCircle size={16} /> 
+                        Awarded {teamPoints.B} pts each
+                      </div>
+                    )}
                   </div>
+                  
                   <div style={styles.pointsDisplay}>
                     <div style={styles.pointsInfo}>
                       <div style={styles.pointsLabel}>Points per member:</div>
                       {teamPointsAwarded.B ? (
-                        <div style={styles.pointsValueAwarded}><FiStar size={isMobile ? 20 : 24} color="#f59e0b" /><span>{teamPoints.B} point{teamPoints.B !== 1 ? 's' : ''}</span></div>
+                        <div style={styles.pointsValueAwarded}>
+                          <FiStar size={isMobile ? 20 : 24} color="#f59e0b" />
+                          <span style={{fontSize: 'clamp(20px, 6vw, 28px)', fontWeight: 'bold'}}>
+                            {teamPoints.B} point{teamPoints.B !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       ) : (
                         <div style={styles.pointsInputWrapper} className="points-input-wrapper">
-                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, B: Math.max(0, prev.B - 1) }))}><FiMinus size={isMobile ? 12 : 16} /></button>
-                          <input type="number" min="0" value={teamPoints.B} onChange={(e) => setTeamPoints(prev => ({ ...prev, B: Math.max(0, parseInt(e.target.value) || 0) }))} style={styles.pointsInput} className="points-input" />
-                          <button style={styles.pointsAdjustBtn} className="points-adjust-btn" onClick={() => setTeamPoints(prev => ({ ...prev, B: prev.B + 1 }))}><FiPlus size={isMobile ? 12 : 16} /></button>
+                          <button 
+                            style={styles.pointsAdjustBtn} 
+                            className="points-adjust-btn" 
+                            onClick={() => setTeamPoints(prev => ({ ...prev, B: Math.max(0, prev.B - 1) }))}
+                          >
+                            <FiMinus size={isMobile ? 12 : 16} />
+                          </button>
+                          <input 
+                            type="number" 
+                            min="0" 
+                            value={teamPoints.B} 
+                            onChange={(e) => setTeamPoints(prev => ({ ...prev, B: Math.max(0, parseInt(e.target.value) || 0) }))} 
+                            style={styles.pointsInput} 
+                            className="points-input" 
+                          />
+                          <button 
+                            style={styles.pointsAdjustBtn} 
+                            className="points-adjust-btn" 
+                            onClick={() => setTeamPoints(prev => ({ ...prev, B: prev.B + 1 }))}
+                          >
+                            <FiPlus size={isMobile ? 12 : 16} />
+                          </button>
                         </div>
                       )}
                     </div>
+                    
                     <div style={styles.totalPointsInfo}>
                       <span>Total points awarded:</span>
-                      <strong>{teamPointsAwarded.B ? teamPoints.B * (teamB?.length || 0) : 0}</strong>
-                      <span style={styles.pointsBreakdown}>({teamPoints.B} × {teamB?.length || 0} members)</span>
+                      <strong style={{fontSize: 'clamp(16px, 5vw, 20px)', color: '#f59e0b'}}>
+                        {teamPointsAwarded.B ? teamPoints.B * (teamB?.length || 0) : 0}
+                      </strong>
+                      <span style={styles.pointsBreakdown}>
+                        ({teamPoints.B} × {teamB?.length || 0} members)
+                      </span>
                     </div>
                   </div>
+                  
                   {!teamPointsAwarded.B && (teamB?.length || 0) > 0 && (
-                    <button style={styles.awardTeamButton} onClick={() => awardTeamPoints('B', teamPoints.B)}>
-                      <FiSend size={isMobile ? 14 : 18} /> Award {teamPoints.B} Point{teamPoints.B !== 1 ? 's' : ''} to Team B
+                    <button 
+                      style={styles.awardTeamButton} 
+                      onClick={() => awardTeamPoints('B', teamPoints.B)}
+                    >
+                      <FiSend size={isMobile ? 14 : 18} /> 
+                      Award {teamPoints.B} Point{teamPoints.B !== 1 ? 's' : ''} to Team B
                     </button>
                   )}
+                  
                   {teamPointsAwarded.B && (
                     <div style={styles.membersPointsSummary}>
-                      <strong>📊 Points awarded to:</strong>
+                      <strong>📊 Points awarded to each member:</strong>
                       <div style={styles.membersPointsList}>
                         {teamB?.map(student => (
                           <div key={student.id} style={styles.memberPointsItem}>
@@ -1336,6 +1505,15 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
                           </div>
                         ))}
                       </div>
+                      <div style={styles.totalPointsSummary}>
+                        <strong>Team Total: +{teamPoints.B * (teamB?.length || 0)} points</strong>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {teamB?.length === 0 && (
+                    <div style={styles.noMembersWarning}>
+                      No team members to award points to
                     </div>
                   )}
                 </div>
@@ -1349,14 +1527,20 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
               )}
 
               <div style={styles.pointsActions} className="points-actions">
-                <button style={styles.backToSummaryButton} onClick={() => setPointsPhase(false)}>Back to Summary</button>
-                <button style={styles.finishRoundButton} onClick={onClose}><FiCheckCircle size={18} /> Finish Round</button>
+                <button style={styles.backToSummaryButton} onClick={() => setPointsPhase(false)}>
+                  Back to Summary
+                </button>
+                <button style={styles.finishRoundButton} onClick={onClose}>
+                  <FiCheckCircle size={18} /> Finish Round
+                </button>
               </div>
             </div>
           )}
 
           <div style={styles.buttonContainer}>
-            <button style={styles.closeButtonMain} onClick={onClose}>{roundEnded ? 'Close Round' : 'Exit'}</button>
+            <button style={styles.closeButtonMain} onClick={onClose}>
+              {roundEnded ? 'Close Round' : 'Exit'}
+            </button>
           </div>
         </div>
       </div>
@@ -1364,6 +1548,7 @@ function StartRound({ onClose, teamA, teamB, classId, className, onPointsAwarded
   );
 }
 
+// Styles object
 const styles = {
   modalOverlay: { 
     position: 'fixed', 
@@ -1450,6 +1635,23 @@ const styles = {
     gap: '12px',
     color: '#991b1b',
     fontSize: 'clamp(12px, 3.5vw, 14px)'
+  },
+  loadingContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '60px',
+    gap: '16px',
+    textAlign: 'center'
+  },
+  loadingSpinner: {
+    width: '40px',
+    height: '40px',
+    border: '3px solid #e2e8f0',
+    borderTop: '3px solid #6366f1',
+    borderRadius: '50%',
+    animation: 'spin 1s linear infinite'
   },
   readyPhaseContainer: { 
     padding: 'clamp(16px, 5vw, 20px)', 
@@ -1744,20 +1946,6 @@ const styles = {
     alignItems: 'center',
     flexWrap: 'wrap'
   },
-  memberCount: {
-    fontSize: 'clamp(10px, 3vw, 12px)',
-    color: '#6b7280',
-    backgroundColor: 'white',
-    padding: '4px 8px',
-    borderRadius: '20px'
-  },
-  submissionCount: {
-    fontSize: 'clamp(10px, 3vw, 12px)',
-    color: '#6b7280',
-    backgroundColor: 'white',
-    padding: '4px 8px',
-    borderRadius: '20px'
-  },
   answerSection: {
     marginBottom: '20px'
   },
@@ -1957,14 +2145,12 @@ const styles = {
     flexWrap: 'wrap',
     gap: '8px'
   },
-  roleBadge: (role) => ({
+  roleBadge: {
     padding: '2px 8px',
     borderRadius: '10px',
     fontSize: '10px',
-    fontWeight: '500',
-    backgroundColor: role === 'analyzer' ? '#ede9fe' : role === 'checker' ? '#fed7aa' : '#d1fae5',
-    color: role === 'analyzer' ? '#6d28d9' : role === 'checker' ? '#92400e' : '#065f46'
-  }),
+    fontWeight: '500'
+  },
   summaryCard: {
     backgroundColor: '#fef3c7',
     padding: 'clamp(16px, 5vw, 20px)',
@@ -2076,7 +2262,7 @@ const styles = {
     borderRadius: '20px',
     padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #bfdbfe',
-    opacity: 0.85
+    opacity: 0.9
   },
   pointsCardB: {
     backgroundColor: '#fce7f3',
@@ -2090,7 +2276,7 @@ const styles = {
     borderRadius: '20px',
     padding: 'clamp(16px, 5vw, 24px)',
     border: '2px solid #fbcfe8',
-    opacity: 0.85
+    opacity: 0.9
   },
   pointsCardHeader: {
     display: 'flex',
@@ -2234,6 +2420,23 @@ const styles = {
     fontWeight: '600',
     color: '#10b981'
   },
+  totalPointsSummary: {
+    marginTop: '12px',
+    padding: '8px',
+    backgroundColor: '#fef3c7',
+    borderRadius: '8px',
+    textAlign: 'center',
+    fontSize: 'clamp(12px, 3.5vw, 14px)'
+  },
+  noMembersWarning: {
+    textAlign: 'center',
+    padding: '16px',
+    backgroundColor: '#fef2f2',
+    borderRadius: '8px',
+    color: '#991b1b',
+    fontSize: 'clamp(11px, 3.5vw, 13px)',
+    marginTop: '12px'
+  },
   successMessageA: {
     position: 'fixed',
     top: '20px',
@@ -2319,4 +2522,4 @@ const styles = {
   }
 };
 
-export default StartRound; //
+export default StartRound;

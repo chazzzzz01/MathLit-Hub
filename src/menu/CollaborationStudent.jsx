@@ -440,7 +440,7 @@ function CollaborationStudent() {
 
             <div style={styles.membersSection}><div style={styles.sectionHeader}><FiUsers size={18} /><h3 style={styles.sectionTitle}>Team {teamInfo.team} Members</h3><span style={styles.memberCount}>{teamMembers.length}</span></div><div style={styles.membersGrid}>{teamMembers.map((member) => (<div key={member.id} style={{...styles.memberCardModern, ...(member.isCurrentUser ? styles.currentUserCardModern : {})}}><div style={styles.memberAvatarModern}><div style={styles.avatarPlaceholderModern}>{member.name?.charAt(0) || 'S'}</div></div><div><div style={styles.memberNameModern}>{member.name}{member.isCurrentUser && <span style={styles.youBadgeModern}>(You)</span>}</div><div style={styles.memberRoleModern}>{getRoleIcon(member.role)}{getRoleInfo(member.role).label}</div><div style={styles.memberPointsModern}><FiStar size={10} color="#f59e0b" />{member.points} pts</div></div></div>))}</div></div>
 
-            {roundActive && !answerSubmitted && (<button style={styles.collaborationHubButton} onClick={() => setShowCollaborationHub(true)}><FiMessageSquare size={16} /> Team Collaboration Hub <span style={styles.collaborationBadge}>Brainstorm</span></button>)}
+            
 
             {waitingForTeacher && !roundActive && !roundEnded && !answerSubmitted && (<div style={styles.waitingMessageModern}><div style={styles.waitingContent}><div style={styles.waitingIconSection}><span style={styles.waitingSpinner}>⏳</span><div><div style={styles.waitingTitle}>Waiting for Teacher</div><p style={styles.waitingText}>You are ready! Waiting for game to start...</p></div></div><button onClick={handleCancelReady} style={styles.cancelReadyButton}><FiX size={14} /> Not Ready</button></div></div>)}
 

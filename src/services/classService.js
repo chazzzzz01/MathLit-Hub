@@ -301,7 +301,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get teacher classes ==========
   async getTeacherClasses(teacherAuthUserId) {
     try {
       if (!teacherAuthUserId) return [];
@@ -331,7 +330,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get class by ID ==========
   async getClassById(classId) {
     try {
       if (!classId) return null;
@@ -379,7 +377,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get class by code ==========
   async getClassByCode(code) {
     try {
       if (!code) return null;
@@ -434,7 +431,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get class with students ==========
   async getClassWithStudents(classId) {
     try {
       if (!classId) return null;
@@ -455,7 +451,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get class students ==========
   async getClassStudents(classId) {
     try {
       if (!classId) return [];
@@ -518,7 +513,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Get student classes (THIS WAS THE MAIN ISSUE) ==========
   async getStudentClasses(authUserId) {
     try {
       if (!authUserId) {
@@ -528,7 +522,6 @@ export const classService = {
       
       console.log('📚 Getting classes for student:', authUserId);
       
-      // First get the student record
       const student = await this.getStudentByUserId(authUserId);
       if (!student) {
         console.log('No student record found for user:', authUserId);
@@ -537,7 +530,6 @@ export const classService = {
       
       console.log('✅ Found student record:', student.id);
       
-      // Get enrollments - SIMPLE query without joins
       const { data: enrollments, error: enrollError } = await supabase
         .from('class_students')
         .select('*')
@@ -556,7 +548,6 @@ export const classService = {
       
       console.log(`Found ${enrollments.length} enrollment(s)`);
       
-      // Get class details for each enrollment
       const enrichedEnrollments = [];
       for (const enrollment of enrollments) {
         const classData = await this.getClassById(enrollment.class_id);
@@ -579,7 +570,6 @@ export const classService = {
     }
   },
 
-  // ========== FIXED: Join class ==========
   async joinClass(authUserId, classCode) {
     try {
       if (!authUserId || !classCode) {
@@ -588,7 +578,6 @@ export const classService = {
 
       console.log('🔍 Joining class with code:', classCode);
       
-      // First, try to get existing student
       let student = await this.getStudentByUserId(authUserId);
       
       if (!student) {
@@ -603,7 +592,6 @@ export const classService = {
       
       console.log('✅ Student record found/created:', student.id);
       
-      // Get the class by code
       const classData = await this.getClassByCode(classCode);
       if (!classData) {
         throw new Error(`Class not found with code: ${classCode}`);
@@ -611,7 +599,6 @@ export const classService = {
       
       console.log('✅ Class found:', classData.name);
       
-      // Check if already enrolled
       const { data: existingEnrollment, error: checkError } = await supabase
         .from('class_students')
         .select('id')
@@ -619,15 +606,10 @@ export const classService = {
         .eq('student_id', student.id)
         .maybeSingle();
       
-      if (checkError) {
-        console.error('Error checking enrollment:', checkError);
-      }
-      
       if (existingEnrollment) {
         throw new Error('You are already a member of this class!');
       }
 
-      // Join the class
       const { data: enrollment, error: joinError } = await supabase
         .from('class_students')
         .insert({
@@ -646,10 +628,8 @@ export const classService = {
 
       console.log('✅ Successfully joined class!');
       
-      // Update student count
       await this.updateStudentCount(classData.id);
       
-      // Update localStorage and dispatch event
       if (typeof window !== 'undefined') {
         localStorage.setItem('hasActiveClass', 'true');
         localStorage.setItem('activeClassId', classData.id);
@@ -729,7 +709,6 @@ export const classService = {
     }
   },
 
-  // ========== DELETE CLASS ==========
   async deleteClass(classId, teacherAuthUserId) {
     try {
       if (!classId) throw new Error('Class ID is required');
@@ -749,7 +728,6 @@ export const classService = {
         throw new Error('You do not have permission to delete this class');
       }
       
-      // Delete related records
       await supabase.from('class_students').delete().eq('class_id', classId);
       await supabase.from('classes').delete().eq('id', classId);
       
@@ -761,8 +739,6 @@ export const classService = {
     }
   },
 
-  // ========== SIMPLIFIED METHODS FOR OTHER FEATURES ==========
-  
   async hasAnyClass(authUserId) {
     const classes = await this.getStudentClasses(authUserId);
     return classes.length > 0;
@@ -899,55 +875,151 @@ export const classService = {
     return error ? [] : (data || []);
   },
 
-  // Team methods
+  // ========== TEAM METHODS ==========
+
   async getClassTeamAssignments(classId) {
-    const { data, error } = await supabase
-      .from('team_assignments')
-      .select('*')
-      .eq('class_id', classId);
-    
-    return error ? [] : (data || []);
+    try {
+      if (!classId) return [];
+      
+      const { data, error } = await supabase
+        .from('team_assignments')
+        .select('*')
+        .eq('class_id', classId);
+      
+      if (error) {
+        console.error('Error getting team assignments:', error);
+        return [];
+      }
+      return data || [];
+    } catch (error) {
+      console.error('Error in getClassTeamAssignments:', error);
+      return [];
+    }
   },
 
   async assignStudentToTeam(classId, studentId, team, role) {
-    const { data: existing, error: checkError } = await supabase
-      .from('team_assignments')
-      .select('id')
-      .eq('class_id', classId)
-      .eq('student_id', studentId)
-      .maybeSingle();
-    
-    if (existing) {
-      const { data, error } = await supabase
-        .from('team_assignments')
-        .update({ team, role, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-        .select()
-        .single();
+    try {
+      if (!classId || !studentId || !team || !role) {
+        throw new Error('Missing required fields for team assignment');
+      }
       
-      if (error) throw error;
-      return data;
-    } else {
-      const { data, error } = await supabase
-        .from('team_assignments')
-        .insert({ class_id: classId, student_id: studentId, team, role, updated_at: new Date().toISOString() })
-        .select()
-        .single();
+      console.log('📝 Assigning student to team:', { classId, studentId, team, role });
       
-      if (error) throw error;
-      return data;
+      const { data: existing, error: checkError } = await supabase
+        .from('team_assignments')
+        .select('id')
+        .eq('class_id', classId)
+        .eq('student_id', studentId)
+        .maybeSingle();
+      
+      let result;
+      
+      if (existing) {
+        const { data, error } = await supabase
+          .from('team_assignments')
+          .update({
+            team: team,
+            role: role,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+        console.log('✅ Updated existing assignment:', result);
+      } else {
+        const { data, error } = await supabase
+          .from('team_assignments')
+          .insert({
+            class_id: classId,
+            student_id: studentId,
+            team: team,
+            role: role,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (error) throw error;
+        result = data;
+        console.log('✅ Created new assignment:', result);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error in assignStudentToTeam:', error);
+      throw error;
+    }
+  },
+
+  // FIXED: Remove student from team
+  async removeStudentFromTeam(classId, studentId) {
+    try {
+      if (!classId || !studentId) {
+        console.error('Missing classId or studentId');
+        return { success: false, message: 'Missing required information' };
+      }
+      
+      console.log('🗑️ Removing student from team:', { classId, studentId });
+      
+      const { error } = await supabase
+        .from('team_assignments')
+        .delete()
+        .eq('class_id', classId)
+        .eq('student_id', studentId);
+      
+      if (error) {
+        console.error('Error removing team assignment:', error);
+        return { success: false, message: error.message };
+      }
+      
+      console.log('✅ Student successfully removed from team');
+      return { success: true, message: 'Student removed from team' };
+      
+    } catch (error) {
+      console.error('Error in removeStudentFromTeam:', error);
+      return { success: false, message: error.message };
     }
   },
 
   async getStudentTeamAssignment(studentId, classId) {
-    const { data, error } = await supabase
-      .from('team_assignments')
-      .select('*')
-      .eq('student_id', studentId)
-      .eq('class_id', classId)
-      .maybeSingle();
-    
-    return error ? null : data;
+    try {
+      if (!studentId || !classId) return null;
+      
+      const { data, error } = await supabase
+        .from('team_assignments')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('class_id', classId)
+        .maybeSingle();
+      
+      if (error) return null;
+      return data;
+    } catch (error) {
+      console.error('Error in getStudentTeamAssignment:', error);
+      return null;
+    }
+  },
+
+  async getStudentsByTeam(classId, team) {
+    try {
+      if (!classId || !team) return [];
+      
+      const { data, error } = await supabase
+        .from('team_assignments')
+        .select('*, student:students(*)')
+        .eq('class_id', classId)
+        .eq('team', team);
+      
+      if (error) return [];
+      return data || [];
+    } catch (error) {
+      console.error('Error in getStudentsByTeam:', error);
+      return [];
+    }
   }
 };
 

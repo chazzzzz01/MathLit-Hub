@@ -1,4 +1,4 @@
-// src/menu/Dashboard.jsx - FULLY RESPONSIVE WITH WORKING ANNOUNCEMENTS (localStorage working)
+// src/menu/Dashboard.jsx - FIXED WITH PROPER XP AND SCORES
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
@@ -9,7 +9,7 @@ import {
   FiMessageSquare, FiClipboard, FiCheckSquare, FiBarChart,
   FiPlusCircle, FiZap, FiCode, FiTrendingUp as FiTrending,
   FiHexagon, FiBox, FiSend, FiBell, FiEye, FiMaximize2,
-  FiMinimize2, FiRefreshCw
+  FiMinimize2, FiRefreshCw, FiDollarSign as FiCoin
 } from 'react-icons/fi';
 import { classService } from '../services/classService';
 import { supabase } from '../lib/supabase';
@@ -140,36 +140,205 @@ function Dashboard() {
       else { const singleClass = await classService.getClassById(selectedClass); teacherClasses = singleClass ? [singleClass] : []; }
       if (!teacherClasses || teacherClasses.length === 0) { setStudentsList([]); return; }
       let allStudents = [];
+      
       for (const classItem of teacherClasses) {
         const students = await classService.getClassStudents(classItem.id);
         if (!students || students.length === 0) continue;
+        
         for (const enrollment of students) {
           const studentUser = enrollment.users;
-          let studentName = 'Unknown Student'; let studentEmail = '';
-          if (studentUser) { studentName = studentUser.name || studentUser.email?.split('@')[0] || 'Unknown Student'; studentEmail = studentUser.email || ''; }
-          let studentXP = 0, studentTotalScores = 0, studentCompletedMissions = [], studentGameProgress = {};
-          if (studentEmail) {
-            const savedXP = localStorage.getItem(`userXP_${studentEmail}`); if (savedXP && !isNaN(parseInt(savedXP))) studentXP = parseInt(savedXP);
-            const savedScores = localStorage.getItem(`userTotalScores_${studentEmail}`); if (savedScores && !isNaN(parseInt(savedScores))) studentTotalScores = parseInt(savedScores);
-            const savedMissions = localStorage.getItem(`completedMissions_${studentEmail}`); if (savedMissions) studentCompletedMissions = JSON.parse(savedMissions);
-            const savedGames = localStorage.getItem(`gameProgress_${studentEmail}`); if (savedGames) studentGameProgress = JSON.parse(savedGames);
+          let studentName = 'Student';
+          let studentEmail = '';
+          let studentUserId = null;
+          let studentUUID = enrollment.student_id;
+          
+          // Get student name from users table first
+          if (studentUser) {
+            studentName = studentUser.name || studentUser.email?.split('@')[0] || 'Student';
+            studentEmail = studentUser.email || '';
+            studentUserId = studentUser.id;
           }
+          
+          // If no name found, try to get from students table
+          if (studentName === 'Student' || !studentName) {
+            const { data: studentData } = await supabase
+              .from('students')
+              .select('name, email, user_id')
+              .eq('id', enrollment.student_id)
+              .maybeSingle();
+            if (studentData) {
+              studentName = studentData.name || 'Student';
+              studentEmail = studentData.email || studentEmail;
+              if (studentData.user_id && !studentUserId) studentUserId = studentData.user_id;
+            }
+          }
+          
+          // If still no name, try to get from users via user_id
+          if ((studentName === 'Student' || !studentName) && studentUserId) {
+            const { data: userData } = await supabase
+              .from('users')
+              .select('name, email')
+              .eq('id', studentUserId)
+              .maybeSingle();
+            if (userData && userData.name) studentName = userData.name;
+            if (userData && userData.email && !studentEmail) studentEmail = userData.email;
+          }
+          
+          // Clean up the name
+          if (studentName && studentName !== 'Student') {
+            studentName = studentName.split(' ').map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            ).join(' ');
+          } else if (studentEmail && studentEmail.includes('@')) {
+            studentName = studentEmail.split('@')[0];
+            studentName = studentName.charAt(0).toUpperCase() + studentName.slice(1);
+          } else {
+            studentName = `Student_${enrollment.student_id?.slice(-4) || 'Unknown'}`;
+          }
+          
+          // ============ FETCH STUDENT DATA FROM DATABASE ============
+          let studentPoints = 0;
+          let studentXP = 0;
+          let studentTotalScores = 0;
+          let studentCompletedMissions = [];
+          let studentMissionsCompleted = 0;
+          let studentGamesCompleted = 0;
+          let studentGameProgress = {
+            equation: { completed: false, highScore: 0, attempts: 0 },
+            battle: { completed: false, highScore: 0, attempts: 0 },
+            spaceShooter: { completed: false, highScore: 0, attempts: 0 }
+          };
+          
+          // 1. Get POINTS from student_points table
+          if (studentUUID) {
+            const { data: pointsData } = await supabase
+              .from('student_points')
+              .select('points')
+              .eq('student_id', studentUUID)
+              .eq('class_id', classItem.id)
+              .maybeSingle();
+            if (pointsData) studentPoints = pointsData.points || 0;
+            console.log(`📊 Points for ${studentName}:`, studentPoints);
+          }
+          
+          // 2. Get XP from user_xp table using user_id
+          if (studentUserId) {
+            const { data: xpData } = await supabase
+              .from('user_xp')
+              .select('xp')
+              .eq('user_id', studentUserId)
+              .maybeSingle();
+            if (xpData) studentXP = xpData.xp || 0;
+            console.log(`⭐ XP for ${studentName}:`, studentXP);
+          }
+          
+          // If no XP found, try to get from localStorage as fallback
+          if (studentXP === 0 && studentEmail) {
+            const savedXP = localStorage.getItem(`userXP_${studentEmail}`);
+            if (savedXP && !isNaN(parseInt(savedXP))) {
+              studentXP = parseInt(savedXP);
+              console.log(`📦 XP from localStorage for ${studentName}:`, studentXP);
+            }
+          }
+          
+          // 3. Get SCORES from game_scores table
+          if (studentUUID) {
+            const { data: gameScores } = await supabase
+              .from('game_scores')
+              .select('game_type, score, completed')
+              .eq('student_id', studentUUID);
+            if (gameScores && gameScores.length > 0) {
+              gameScores.forEach(score => {
+                studentTotalScores += score.score || 0;
+                if (score.completed) studentGamesCompleted++;
+                
+                // Build game progress object
+                if (score.game_type === 'equation') {
+                  studentGameProgress.equation.completed = score.completed || false;
+                  studentGameProgress.equation.highScore = Math.max(studentGameProgress.equation.highScore, score.score || 0);
+                  studentGameProgress.equation.attempts++;
+                } else if (score.game_type === 'battle') {
+                  studentGameProgress.battle.completed = score.completed || false;
+                  studentGameProgress.battle.highScore = Math.max(studentGameProgress.battle.highScore, score.score || 0);
+                  studentGameProgress.battle.attempts++;
+                } else if (score.game_type === 'spaceShooter') {
+                  studentGameProgress.spaceShooter.completed = score.completed || false;
+                  studentGameProgress.spaceShooter.highScore = Math.max(studentGameProgress.spaceShooter.highScore, score.score || 0);
+                  studentGameProgress.spaceShooter.attempts++;
+                }
+              });
+              console.log(`🎯 Scores for ${studentName}:`, studentTotalScores);
+            }
+          }
+          
+          // If no scores found, try localStorage
+          if (studentTotalScores === 0 && studentEmail) {
+            const savedScores = localStorage.getItem(`userTotalScores_${studentEmail}`);
+            if (savedScores && !isNaN(parseInt(savedScores))) {
+              studentTotalScores = parseInt(savedScores);
+              console.log(`📦 Scores from localStorage for ${studentName}:`, studentTotalScores);
+            }
+          }
+          
+          // 4. Get MISSIONS from student_missions table
+          if (studentUUID) {
+            const { data: missionsData } = await supabase
+              .from('student_missions')
+              .select('mission_id, completed')
+              .eq('student_id', studentUUID);
+            if (missionsData && missionsData.length > 0) {
+              studentMissionsCompleted = missionsData.filter(m => m.completed === true).length;
+              studentCompletedMissions = missionsData.filter(m => m.completed === true).map(m => m.mission_id);
+              console.log(`📋 Missions for ${studentName}: ${studentMissionsCompleted}/4`);
+            }
+          }
+          
+          // If no missions found, try localStorage
+          if (studentMissionsCompleted === 0 && studentEmail) {
+            const savedMissions = localStorage.getItem(`completedMissions_${studentEmail}`);
+            if (savedMissions) {
+              const missions = JSON.parse(savedMissions);
+              studentMissionsCompleted = missions.length;
+              studentCompletedMissions = missions;
+              console.log(`📦 Missions from localStorage for ${studentName}:`, studentMissionsCompleted);
+            }
+          }
+          
           const missionCompletionRate = calculateStudentMissionProgress(studentCompletedMissions);
           const gameCompletionRate = calculateStudentGameProgress(studentGameProgress);
-          const overallStudentPoints = calculateOverallProgress(missionCompletionRate, gameCompletionRate);
+          const overallStudentPoints = studentPoints > 0 ? studentPoints : calculateOverallProgress(missionCompletionRate, gameCompletionRate);
+          
           allStudents.push({
-            id: enrollment.student_id, name: studentName, email: studentEmail, className: classItem.name, classId: classItem.id,
-            progress: enrollment.progress || 0, points: overallStudentPoints, xpPoints: studentXP, totalScores: studentTotalScores,
-            missionCompletionRate: missionCompletionRate, gameCompletionRate: gameCompletionRate, completedMissions: studentCompletedMissions.length,
-            totalMissions: 4, completedGames: Object.values(studentGameProgress).filter(g => g?.completed).length, totalGames: 3,
-            lastActivity: enrollment.last_activity || enrollment.joined_at, status: enrollment.status || 'active', overallProgress: overallStudentPoints
+            id: enrollment.student_id,
+            name: studentName,
+            email: studentEmail,
+            className: classItem.name,
+            classId: classItem.id,
+            progress: enrollment.progress || 0,
+            points: studentPoints,
+            xpPoints: studentXP,
+            totalScores: studentTotalScores,
+            missionCompletionRate: missionCompletionRate,
+            gameCompletionRate: gameCompletionRate,
+            completedMissions: studentMissionsCompleted,
+            totalMissions: 4,
+            completedGames: studentGamesCompleted,
+            totalGames: 3,
+            missionCount: `${studentMissionsCompleted}/4`,
+            gameCount: `${studentGamesCompleted}/3`,
+            lastActivity: enrollment.last_activity || enrollment.joined_at,
+            status: enrollment.status || 'active',
+            overallProgress: overallStudentPoints
           });
         }
       }
       allStudents.sort((a, b) => b.overallProgress - a.overallProgress);
       setStudentsList(allStudents);
+      console.log('📊 Final students list with data:', allStudents.map(s => ({ name: s.name, points: s.points, xp: s.xpPoints, scores: s.totalScores, missions: s.missionCount, games: s.gameCount })));
       await loadUserProgress();
-    } catch (error) { console.error('Error loading students data:', error); }
+    } catch (error) { 
+      console.error('Error loading students data:', error);
+    }
   };
 
   const loadTeacherAnalytics = async () => {
@@ -180,7 +349,9 @@ function Dashboard() {
       if (selectedClass === 'all') teacherClasses = await classService.getTeacherClasses(user.dbId);
       else { const singleClass = await classService.getClassById(selectedClass); teacherClasses = singleClass ? [singleClass] : []; }
       if (!teacherClasses || teacherClasses.length === 0) { setAnalytics(prev => ({ ...prev, activeClasses: 0, totalStudents: 0, averageProgress: 0, weeklyActivity: [0,0,0,0,0,0,0], dailyActivityLog: [] })); setLoading(false); return; }
+      
       let totalStudentsCount = 0, totalProgressSum = 0, totalClassesWithStudents = 0, allStudentsData = [], classesAnalytics = [], allActivityData = [];
+      
       for (const classItem of teacherClasses) {
         const students = await classService.getClassStudents(classItem.id);
         const studentsCount = students.length;
@@ -193,26 +364,118 @@ function Dashboard() {
         const classAverageProgress = studentsCount > 0 ? classProgressSum / studentsCount : 0;
         totalStudentsCount += studentsCount;
         if (studentsCount > 0) { totalProgressSum += classAverageProgress; totalClassesWithStudents++; }
-        students.forEach(student => { allStudentsData.push({ id: student.student_id, name: student.users?.name || 'Student', email: student.users?.email, progress: student.progress || 0, className: classItem.name, classId: classItem.id, lastActivity: student.last_activity }); });
+        students.forEach(student => { 
+          allStudentsData.push({ 
+            id: student.student_id, 
+            name: student.users?.name || 'Student', 
+            email: student.users?.email, 
+            progress: student.progress || 0, 
+            className: classItem.name, 
+            classId: classItem.id, 
+            lastActivity: student.last_activity 
+          }); 
+        });
         classesAnalytics.push({ id: classItem.id, name: classItem.name, code: classItem.code, studentsCount: studentsCount, averageProgress: Math.round(classAverageProgress) });
       }
       const averageProgress = totalClassesWithStudents > 0 ? Math.round(totalProgressSum / totalClassesWithStudents) : 0;
-      const topPerformers = allStudentsData.sort((a, b) => b.progress - a.progress).slice(0, 5).map((student, index) => {
-        let studentXP = 0, studentScores = 0, studentMissions = [], studentGames = {};
-        if (student.email) {
-          const savedXP = localStorage.getItem(`userXP_${student.email}`); if (savedXP && !isNaN(parseInt(savedXP))) studentXP = parseInt(savedXP);
-          const savedScores = localStorage.getItem(`userTotalScores_${student.email}`); if (savedScores && !isNaN(parseInt(savedScores))) studentScores = parseInt(savedScores);
-          const savedMissions = localStorage.getItem(`completedMissions_${student.email}`); if (savedMissions) studentMissions = JSON.parse(savedMissions);
-          const savedGames = localStorage.getItem(`gameProgress_${student.email}`); if (savedGames) studentGames = JSON.parse(savedGames);
+      
+      // Build top performers with real data
+      const topPerformers = await Promise.all(allStudentsData.slice(0, 10).map(async (student, index) => {
+        let studentPoints = 0, studentXP = 0, studentScores = 0, studentMissions = [], studentGames = {};
+        let studentUUID = student.id;
+        let studentUserId = null;
+        
+        // Get user_id from students table first
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('user_id')
+          .eq('id', studentUUID)
+          .maybeSingle();
+        if (studentData) studentUserId = studentData.user_id;
+        
+        if (studentUUID) {
+          // Get points
+          const { data: pointsData } = await supabase
+            .from('student_points')
+            .select('points')
+            .eq('student_id', studentUUID)
+            .maybeSingle();
+          if (pointsData) studentPoints = pointsData.points || 0;
+          
+          // Get XP from user_xp
+          if (studentUserId) {
+            const { data: xpData } = await supabase
+              .from('user_xp')
+              .select('xp')
+              .eq('user_id', studentUserId)
+              .maybeSingle();
+            if (xpData) studentXP = xpData.xp || 0;
+          }
+          
+          // Get missions
+          const { data: missionsData } = await supabase
+            .from('student_missions')
+            .select('mission_id, completed')
+            .eq('student_id', studentUUID);
+          if (missionsData) studentMissions = missionsData.filter(m => m.completed === true).map(m => m.mission_id);
+          
+          // Get game scores
+          const { data: gameScores } = await supabase
+            .from('game_scores')
+            .select('game_type, score, completed')
+            .eq('student_id', studentUUID);
+          if (gameScores) {
+            gameScores.forEach(score => {
+              studentScores += score.score || 0;
+            });
+            studentGames = {
+              equation: { completed: gameScores.some(g => g.game_type === 'equation' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'equation').map(g => g.score || 0), 0) },
+              battle: { completed: gameScores.some(g => g.game_type === 'battle' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'battle').map(g => g.score || 0), 0) },
+              spaceShooter: { completed: gameScores.some(g => g.game_type === 'spaceShooter' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'spaceShooter').map(g => g.score || 0), 0) }
+            };
+          }
         }
+        
+        // Fallback to localStorage
+        if (student.email && studentXP === 0) {
+          const savedXP = localStorage.getItem(`userXP_${student.email}`);
+          if (savedXP) studentXP = parseInt(savedXP);
+          const savedScores = localStorage.getItem(`userTotalScores_${student.email}`);
+          if (savedScores) studentScores = parseInt(savedScores);
+        }
+        
+        let studentName = student.name || 'Student';
+        if (studentName === 'Student' && student.email) {
+          studentName = student.email.split('@')[0];
+          studentName = studentName.charAt(0).toUpperCase() + studentName.slice(1);
+        }
+        
         const missionRate = calculateStudentMissionProgress(studentMissions);
         const gameRate = calculateStudentGameProgress(studentGames);
-        const overall = calculateOverallProgress(missionRate, gameRate);
-        return { rank: index + 1, name: student.name, progress: student.progress, className: student.className, points: overall, xpPoints: studentXP || Math.round((student.progress || 0) * 10), totalScores: studentScores, missionProgress: missionRate, gameProgress: gameRate, overallProgress: overall };
-      });
+        const overall = studentPoints > 0 ? studentPoints : calculateOverallProgress(missionRate, gameRate);
+        
+        return { 
+          rank: index + 1, 
+          name: studentName, 
+          progress: student.progress, 
+          className: student.className, 
+          points: studentPoints,
+          xpPoints: studentXP,
+          totalScores: studentScores,
+          missionProgress: missionRate, 
+          gameProgress: gameRate, 
+          overallProgress: overall,
+          missionCount: `${studentMissions.length}/4`,
+          gameCount: `${Object.values(studentGames).filter(g => g.completed).length}/3`
+        };
+      }));
+      
+      topPerformers.sort((a, b) => b.overallProgress - a.overallProgress);
+      topPerformers.forEach((performer, idx) => performer.rank = idx + 1);
+      
       const weeklyActivity = calculateWeeklyActivity(allActivityData, totalStudentsCount);
       const dailyActivityLog = generateDailyActivityLog(allActivityData, totalStudentsCount);
-      setAnalytics({ totalStudents: totalStudentsCount, activeClasses: teacherClasses.length, averageProgress: averageProgress, completionRate: 0, totalMissions: 0, completedMissions: 0, weeklyActivity: weeklyActivity, topPerformers: topPerformers, classesData: classesAnalytics, dailyActivityLog: dailyActivityLog });
+      setAnalytics({ totalStudents: totalStudentsCount, activeClasses: teacherClasses.length, averageProgress: averageProgress, completionRate: 0, totalMissions: 0, completedMissions: 0, weeklyActivity: weeklyActivity, topPerformers: topPerformers.slice(0, 5), classesData: classesAnalytics, dailyActivityLog: dailyActivityLog });
     } catch (error) { console.error('Error loading teacher analytics:', error); }
     finally { setLoading(false); }
   };
@@ -257,16 +520,9 @@ function Dashboard() {
     setAnnouncementError('');
     
     try {
-      if (!user) {
-        throw new Error('User not found. Please log in again.');
-      }
-      
+      if (!user) throw new Error('User not found. Please log in again.');
       const teacherId = user.dbId || user.id || user.sub || user.userId;
-      if (!teacherId) {
-        console.error('User object:', user);
-        throw new Error('Unable to get teacher ID');
-      }
-      
+      if (!teacherId) throw new Error('Unable to get teacher ID');
       const targetClass = classes.find(c => String(c.id) === String(selectedClassForAnnouncement));
       if (!targetClass) throw new Error('Class not found');
       
@@ -281,9 +537,6 @@ function Dashboard() {
         created_at: new Date().toISOString()
       };
       
-      console.log('Sending announcement:', { ...announcementData, teacher_id: '***' });
-      
-      // Try Supabase first (without id and class_name)
       const { error: insertError } = await supabase
         .from('announcements')
         .insert({
@@ -296,13 +549,9 @@ function Dashboard() {
         });
       
       if (insertError) {
-        console.log('Supabase error, using localStorage fallback:', insertError.message);
-        // Use localStorage fallback
         const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
         existing.push(announcementData);
         localStorage.setItem('announcements', JSON.stringify(existing));
-      } else {
-        console.log('Announcement saved to Supabase!');
       }
       
       setAnnouncementTitle('');
@@ -311,40 +560,8 @@ function Dashboard() {
       setShowAnnouncementModal(false);
       setAnnouncementSuccess(`✅ Announcement sent to "${targetClass.name}"!`);
       setTimeout(() => setAnnouncementSuccess(''), 3000);
-      
     } catch (error) {
       console.error('Error sending announcement:', error);
-      
-      // Even if there's an error, try to save to localStorage as fallback
-      try {
-        const targetClass = classes.find(c => String(c.id) === String(selectedClassForAnnouncement));
-        if (targetClass) {
-          const fallbackData = {
-            id: Date.now(),
-            class_id: targetClass.id,
-            class_name: targetClass.name,
-            teacher_id: user?.dbId || user?.id || 'unknown',
-            teacher_name: user?.name || 'Teacher',
-            title: announcementTitle.trim(),
-            message: announcementMessage.trim(),
-            created_at: new Date().toISOString(),
-            saved_as_fallback: true
-          };
-          const existing = JSON.parse(localStorage.getItem('announcements') || '[]');
-          existing.push(fallbackData);
-          localStorage.setItem('announcements', JSON.stringify(existing));
-          setAnnouncementSuccess(`✅ Announcement saved locally to "${targetClass.name}"!`);
-          setTimeout(() => setAnnouncementSuccess(''), 3000);
-          setAnnouncementTitle('');
-          setAnnouncementMessage('');
-          setSelectedClassForAnnouncement('');
-          setShowAnnouncementModal(false);
-          return;
-        }
-      } catch (fallbackError) {
-        console.error('Fallback also failed:', fallbackError);
-      }
-      
       setAnnouncementError(error.message || 'Failed to send announcement');
       setTimeout(() => setAnnouncementError(''), 4000);
     } finally {
@@ -373,12 +590,12 @@ function Dashboard() {
         <thead>
           <tr>
             <th style={styles.th}>Student</th>
-            <th style={styles.th}>Points</th>
-            <th style={styles.th}>XP</th>
-            <th style={styles.th}>Score</th>
-            <th style={styles.th}>Missions</th>
-            <th style={styles.th}>Games</th>
-            <th style={styles.th}>Overall</th>
+            <th style={styles.th}>Points 🏆</th>
+            <th style={styles.th}>XP ⭐</th>
+            <th style={styles.th}>Scores 🎯</th>
+            <th style={styles.th}>Missions 📋</th>
+            <th style={styles.th}>Games 🎮</th>
+            <th style={styles.th}>Overall %</th>
             <th style={styles.th}>Last Active</th>
             <th style={styles.th}>Status</th>
           </tr>
@@ -388,7 +605,7 @@ function Dashboard() {
             <tr key={student.id} style={styles.tr}>
               <td style={styles.td}>
                 <div style={styles.studentCell}>
-                  <div style={styles.studentAvatar}>{student.name.charAt(0)}</div>
+                  <div style={styles.studentAvatar}>{student.name?.charAt(0) || 'S'}</div>
                   <div>
                     <div style={styles.studentName}>{student.name}</div>
                     <div style={styles.studentEmail}>{student.email}</div>
@@ -396,17 +613,17 @@ function Dashboard() {
                 </div>
               </td>
               <td style={styles.td}>
-                <span style={student.points >= 80 ? styles.pointsHigh : (student.points >= 60 ? styles.pointsMedium : styles.pointsLow)}>{student.points}</span>
+                <span style={styles.pointsValue}>{student.points || 0}</span>
               </td>
               <td style={styles.td}>
-                <div style={styles.xpCell}><FiZap size={12} color="#f59e0b" />{student.xpPoints}</div>
+                <div style={styles.xpCell}><FiZap size={12} color="#f59e0b" />{student.xpPoints || 0}</div>
               </td>
               <td style={styles.td}>
-                <span style={student.totalScores >= 800 ? styles.scoreHigh : (student.totalScores >= 500 ? styles.scoreMedium : styles.scoreLow)}>{student.totalScores}</span>
+                <span style={student.totalScores >= 800 ? styles.scoreHigh : (student.totalScores >= 500 ? styles.scoreMedium : styles.scoreLow)}>{student.totalScores || 0}</span>
               </td>
               <td style={styles.td}>
                 <div>
-                  <span>{student.missionCompletionRate}%</span>
+                  <span>{student.missionCount || '0/4'}</span>
                   <div style={styles.progressBarSmall}>
                     <div style={{...styles.progressFillSmall, width: `${student.missionCompletionRate}%`, backgroundColor: '#10b981'}} />
                   </div>
@@ -414,7 +631,7 @@ function Dashboard() {
               </td>
               <td style={styles.td}>
                 <div>
-                  <span>{student.gameCompletionRate}%</span>
+                  <span>{student.gameCount || '0/3'}</span>
                   <div style={styles.progressBarSmall}>
                     <div style={{...styles.progressFillSmall, width: `${student.gameCompletionRate}%`, backgroundColor: '#8b5cf6'}} />
                   </div>
@@ -459,6 +676,9 @@ function Dashboard() {
   const classOverallProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + (s.overallProgress || 0), 0) / studentsList.length) : 0;
   const classMissionProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + s.missionCompletionRate, 0) / studentsList.length) : 0;
   const classGameProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + s.gameCompletionRate, 0) / studentsList.length) : 0;
+  const totalPointsAll = studentsList.reduce((sum, s) => sum + (s.points || 0), 0);
+  const totalXPAll = studentsList.reduce((sum, s) => sum + (s.xpPoints || 0), 0);
+  const totalScoresAll = studentsList.reduce((sum, s) => sum + (s.totalScores || 0), 0);
 
   return (
     <div style={styles.container}>
@@ -505,11 +725,27 @@ function Dashboard() {
           </div>
         </div>
       </Modal>
-      <Modal isOpen={isPerformanceModalOpen} onClose={() => setIsPerformanceModalOpen(false)} title="Performance">
+      <Modal isOpen={isPerformanceModalOpen} onClose={() => setIsPerformanceModalOpen(false)} title="Performance Distribution">
         <div style={styles.performanceSummary}>
-          <div><span style={styles.perfDotExcellent} />Excellent <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong></div>
-          <div><span style={styles.perfDotGood} />Good <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong></div>
-          <div><span style={styles.perfDotAverage} />Avg <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong></div>
+          <div><span style={styles.perfDotExcellent} />Excellent (80-100%) <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong> students</div>
+          <div><span style={styles.perfDotGood} />Good (60-79%) <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong> students</div>
+          <div><span style={styles.perfDotAverage} />Needs Improvement (0-59%) <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong> students</div>
+        </div>
+        <div style={styles.performanceStudentList}>
+          <h4 style={styles.performanceListTitle}>Student Details:</h4>
+          {studentsList.map(student => (
+            <div key={student.id} style={styles.performanceStudentItem}>
+              <span style={styles.performanceStudentName}>{student.name}</span>
+              <div style={styles.performanceStudentStats}>
+                <span>🏆{student.points || 0}</span>
+                <span>⭐{student.xpPoints || 0}</span>
+                <span>🎯{student.totalScores || 0}</span>
+                <span>📋{student.missionCount || '0/4'}</span>
+                <span>🎮{student.gameCount || '0/3'}</span>
+                <span style={{...styles.performanceStudentProgress, color: getPerformanceColor(student.overallProgress)}}>{student.overallProgress}%</span>
+              </div>
+            </div>
+          ))}
         </div>
       </Modal>
       <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance">
@@ -521,22 +757,40 @@ function Dashboard() {
                 <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
               </div>
               <span style={styles.distPercent}>{c.averageProgress}%</span>
+              <span style={styles.distCount}>{c.studentsCount} students</span>
             </div>
           ))}
         </div>
       </Modal>
-      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Progress Stats">
+      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Progress Statistics">
         <div style={styles.progressStats}>
-          <div><span>Class Progress</span><span>{classOverallProgress}%</span></div>
-          <div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div>
-          <div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div>
-          <div><span>Missions Avg</span><span>{classMissionProgress}%</span></div>
-          <div><span>Games Avg</span><span>{classGameProgress}%</span></div>
+          <div><span>Class Average Progress</span><span>{classOverallProgress}%</span></div>
+          <div><span>Total Points (🏆)</span><span>{totalPointsAll}</span></div>
+          <div><span>Total XP (⭐)</span><span>{totalXPAll}</span></div>
+          <div><span>Total Scores (🎯)</span><span>{totalScoresAll}</span></div>
+          <div><span>Average Missions Completed</span><span>{classMissionProgress}%</span></div>
+          <div><span>Average Games Completed</span><span>{classGameProgress}%</span></div>
+        </div>
+        <div style={styles.progressStatsStudentList}>
+          <h4 style={styles.performanceListTitle}>Student Breakdown:</h4>
+          {studentsList.map(student => (
+            <div key={student.id} style={styles.progressStatsStudentItem}>
+              <span style={styles.progressStatsStudentName}>{student.name}</span>
+              <div style={styles.progressStatsStudentDetails}>
+                <span>🏆 {student.points || 0}</span>
+                <span>⭐ {student.xpPoints || 0}</span>
+                <span>🎯 {student.totalScores || 0}</span>
+                <span>📋 {student.missionCount || '0/4'}</span>
+                <span>🎮 {student.gameCount || '0/3'}</span>
+                <span>📊 {student.overallProgress}%</span>
+              </div>
+            </div>
+          ))}
         </div>
       </Modal>
       <Modal isOpen={isTopPerformersModalOpen} onClose={() => setIsTopPerformersModalOpen(false)} title="Top Performers">
         <div>
-          {analytics.topPerformers.slice(0,5).map((s) => (
+          {analytics.topPerformers.map((s) => (
             <div key={s.rank} style={styles.topPerformerItem}>
               <div style={styles.topPerformerRank}>{s.rank}</div>
               <div>
@@ -544,8 +798,12 @@ function Dashboard() {
                 <div style={styles.topPerformerClass}>{s.className}</div>
               </div>
               <div>
-                <div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div>
-                <div style={styles.topPerformerXP}>⭐{s.xpPoints}</div>
+                <div style={styles.topPerformerStats}>
+                  <span>🏆{s.points || 0}</span>
+                  <span>⭐{s.xpPoints || 0}</span>
+                  <span>🎯{s.totalScores || 0}</span>
+                </div>
+                <div style={styles.topPerformerProgress}>{s.overallProgress}%</div>
               </div>
             </div>
           ))}
@@ -614,8 +872,9 @@ function Dashboard() {
           <h1 style={styles.welcomeTitle}>Welcome, {user?.name?.split(' ')[0] || 'Teacher'}!</h1>
           <p style={styles.welcomeDate}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', weekday: 'long' })}</p>
           <div style={styles.userStatsBadges}>
-            <span style={styles.xpBadge}>⭐ {currentUserXP} XP</span>
-            <span style={styles.scoreBadge}>🎯 {totalScores} Score</span>
+            <span style={styles.pointsBadge}>🏆 {totalPointsAll} Total Points</span>
+            <span style={styles.xpBadge}>⭐ {totalXPAll} Total XP</span>
+            <span style={styles.scoreBadge}>🎯 {totalScoresAll} Total Scores</span>
           </div>
         </div>
         <div style={styles.dropdownContainer}>
@@ -644,6 +903,27 @@ function Dashboard() {
           <div>
             <div style={styles.statValue}>{analytics.activeClasses}</div>
             <div style={styles.statLabel}>Classes</div>
+          </div>
+        </div>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}><FiAward size={20} /></div>
+          <div>
+            <div style={styles.statValue}>{totalPointsAll}</div>
+            <div style={styles.statLabel}>Total Points</div>
+          </div>
+        </div>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}><FiZap size={20} /></div>
+          <div>
+            <div style={styles.statValue}>{totalXPAll}</div>
+            <div style={styles.statLabel}>Total XP</div>
+          </div>
+        </div>
+        <div style={styles.statCard}>
+          <div style={styles.statIcon}><FiTarget size={20} /></div>
+          <div>
+            <div style={styles.statValue}>{totalScoresAll}</div>
+            <div style={styles.statLabel}>Total Scores</div>
           </div>
         </div>
       </div>
@@ -721,7 +1001,7 @@ function Dashboard() {
 
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}><FiBarChart size={14} /> Performance</h3>
+              <h3 style={styles.sectionTitle}><FiBarChart size={14} /> Performance Distribution</h3>
               {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
             </div>
             {!isMobile && (
@@ -747,6 +1027,7 @@ function Dashboard() {
                   <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
                 </div>
                 <span style={styles.distPercent}>{c.averageProgress}%</span>
+                <span style={styles.distCount}>{c.studentsCount} students</span>
               </div>
             ))}
           </div>
@@ -759,10 +1040,11 @@ function Dashboard() {
             {!isMobile && (
               <div style={styles.progressStats}>
                 <div><span>Class Progress</span><span>{classOverallProgress}%</span></div>
-                <div><span>Total Scores</span><span>{studentsList.reduce((s, a) => s + a.totalScores, 0)}</span></div>
-                <div><span>Total XP</span><span>{studentsList.reduce((s, a) => s + a.xpPoints, 0)}</span></div>
-                <div><span>Missions</span><span>{classMissionProgress}%</span></div>
-                <div><span>Games</span><span>{classGameProgress}%</span></div>
+                <div><span>Total Points</span><span>{totalPointsAll}</span></div>
+                <div><span>Total XP</span><span>{totalXPAll}</span></div>
+                <div><span>Total Scores</span><span>{totalScoresAll}</span></div>
+                <div><span>Missions Avg</span><span>{classMissionProgress}%</span></div>
+                <div><span>Games Avg</span><span>{classGameProgress}%</span></div>
               </div>
             )}
           </div>
@@ -780,8 +1062,12 @@ function Dashboard() {
                   <div style={styles.topPerformerClass}>{s.className}</div>
                 </div>
                 <div>
-                  <div style={styles.topPerformerProgress}>{s.points || s.progress} pts</div>
-                  <div style={styles.topPerformerXP}>⭐{s.xpPoints}</div>
+                  <div style={styles.topPerformerStats}>
+                    <span>🏆{s.points || 0}</span>
+                    <span>⭐{s.xpPoints || 0}</span>
+                    <span>🎯{s.totalScores || 0}</span>
+                  </div>
+                  <div style={styles.topPerformerProgress}>{s.overallProgress}%</div>
                 </div>
               </div>
             ))}
@@ -816,6 +1102,7 @@ const styles = {
   welcomeTitle: { fontSize: '18px', fontWeight: '700', color: '#1f2937', marginBottom: '2px' },
   welcomeDate: { fontSize: '11px', color: '#6b7280' },
   userStatsBadges: { display: 'flex', gap: '8px', marginTop: '6px', flexWrap: 'wrap' },
+  pointsBadge: { backgroundColor: '#dbeafe', color: '#1d4ed8', padding: '2px 8px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' },
   xpBadge: { backgroundColor: '#fef3c7', color: '#f59e0b', padding: '2px 8px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' },
   scoreBadge: { backgroundColor: '#d1fae5', color: '#059669', padding: '2px 8px', borderRadius: '16px', fontSize: '10px', fontWeight: 'bold' },
   dropdownContainer: { minWidth: '180px', width: '100%' },
@@ -836,11 +1123,11 @@ const styles = {
   },
   optionText: { color: '#1f2937', fontSize: '13px', fontWeight: '500', padding: '8px' },
   selectIcon: { position: 'relative', float: 'right', marginTop: '-30px', marginRight: '12px', color: '#6b7280', pointerEvents: 'none', fontSize: '16px' },
-  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' },
+  statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px', marginBottom: '16px' },
   statCard: { backgroundColor: 'white', borderRadius: '14px', padding: '12px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' },
   statIcon: { width: '36px', height: '36px', backgroundColor: '#f3f4f6', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  statValue: { fontSize: '22px', fontWeight: '700', color: '#1f2937', lineHeight: 1.2 },
-  statLabel: { fontSize: '10px', color: '#6b7280' },
+  statValue: { fontSize: '20px', fontWeight: '700', color: '#1f2937', lineHeight: 1.2 },
+  statLabel: { fontSize: '9px', color: '#6b7280' },
   studentsSection: { marginBottom: '16px' },
   studentsCard: { backgroundColor: 'white', borderRadius: '16px', padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' },
   studentsCardIcon: { width: '60px', height: '60px', backgroundColor: '#e0e7ff', borderRadius: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' },
@@ -864,21 +1151,32 @@ const styles = {
   barValue: { fontSize: '8px', fontWeight: '600', color: '#1f2937' },
   classProgressContainer: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   performanceSummary: { display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' },
+  performanceStudentList: { marginTop: '16px', maxHeight: '300px', overflowY: 'auto' },
+  performanceListTitle: { fontSize: '12px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' },
+  performanceStudentItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap', gap: '8px' },
+  performanceStudentName: { fontSize: '11px', color: '#4b5563', fontWeight: '500' },
+  performanceStudentStats: { display: 'flex', gap: '8px', fontSize: '10px', flexWrap: 'wrap' },
+  performanceStudentProgress: { fontSize: '10px', fontWeight: '600' },
+  progressStatsStudentList: { marginTop: '16px', maxHeight: '300px', overflowY: 'auto' },
+  progressStatsStudentItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap', gap: '8px' },
+  progressStatsStudentName: { fontSize: '11px', fontWeight: '500', color: '#1f2937' },
+  progressStatsStudentDetails: { display: 'flex', gap: '8px', fontSize: '9px', color: '#6b7280', flexWrap: 'wrap' },
   perfDotExcellent: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '4px' },
   perfDotGood: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '4px' },
   perfDotAverage: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '4px' },
-  distItem: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' },
+  distItem: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' },
   distLabel: { width: '70px', fontSize: '11px', color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  distBar: { flex: 1, height: '5px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' },
+  distBar: { flex: 1, height: '5px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden', minWidth: '100px' },
   distFill: { height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' },
-  distPercent: { width: '35px', fontSize: '11px', fontWeight: '600', color: '#1f2937', textAlign: 'right' },
+  distPercent: { width: '35px', fontSize: '10px', fontWeight: '600', color: '#1f2937', textAlign: 'right' },
+  distCount: { fontSize: '9px', color: '#6b7280' },
   progressStats: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  topPerformerItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid #f3f4f6' },
-  topPerformerRank: { width: '24px', height: '24px', backgroundColor: '#e0e7ff', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#4338ca' },
-  topPerformerName: { fontSize: '12px', fontWeight: '500', color: '#1f2937' },
-  topPerformerClass: { fontSize: '9px', color: '#9ca3af' },
-  topPerformerProgress: { fontSize: '12px', fontWeight: '700', color: '#10b981' },
-  topPerformerXP: { fontSize: '8px', color: '#f59e0b' },
+  topPerformerItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' },
+  topPerformerRank: { width: '24px', height: '24px', backgroundColor: '#e0e7ff', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#4338ca', flexShrink: 0 },
+  topPerformerName: { fontSize: '11px', fontWeight: '500', color: '#1f2937' },
+  topPerformerClass: { fontSize: '8px', color: '#9ca3af' },
+  topPerformerStats: { display: 'flex', gap: '6px', fontSize: '9px', color: '#6b7280', flexWrap: 'wrap' },
+  topPerformerProgress: { fontSize: '11px', fontWeight: '700', color: '#10b981' },
   quickActions: { display: 'flex', flexDirection: 'column', gap: '8px' },
   actionButton: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', minHeight: '40px', width: '100%' },
   progressBarSmall: { height: '3px', backgroundColor: '#e5e7eb', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' },
@@ -886,12 +1184,10 @@ const styles = {
   progressCell: { display: 'flex', alignItems: 'center', gap: '6px', minWidth: '70px' },
   progressBar: { flex: 1, height: '4px', backgroundColor: '#e5e7eb', borderRadius: '2px', overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: '2px', transition: 'width 0.3s ease' },
+  pointsValue: { padding: '2px 6px', backgroundColor: '#dbeafe', color: '#1d4ed8', borderRadius: '6px', fontSize: '10px', fontWeight: '600' },
   dateTimeCell: { display: 'flex', alignItems: 'center', gap: '4px', fontSize: '9px', color: '#6b7280' },
   statusActive: { display: 'inline-block', padding: '2px 6px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '6px', fontSize: '9px', fontWeight: '500' },
   statusInactive: { display: 'inline-block', padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '6px', fontSize: '9px', fontWeight: '500' },
-  pointsHigh: { padding: '2px 6px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '6px', fontSize: '10px', fontWeight: '600' },
-  pointsMedium: { padding: '2px 6px', backgroundColor: '#fed7aa', color: '#92400e', borderRadius: '6px', fontSize: '10px', fontWeight: '600' },
-  pointsLow: { padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '6px', fontSize: '10px', fontWeight: '600' },
   scoreHigh: { padding: '2px 6px', backgroundColor: '#d1fae5', color: '#065f46', borderRadius: '6px', fontSize: '9px', fontWeight: '600' },
   scoreMedium: { padding: '2px 6px', backgroundColor: '#fed7aa', color: '#92400e', borderRadius: '6px', fontSize: '9px', fontWeight: '600' },
   scoreLow: { padding: '2px 6px', backgroundColor: '#fee2e2', color: '#991b1b', borderRadius: '6px', fontSize: '9px', fontWeight: '600' },
@@ -901,7 +1197,7 @@ const styles = {
   studentName: { fontSize: '11px', fontWeight: '500', color: '#1f2937' },
   studentEmail: { fontSize: '8px', color: '#9ca3af' },
   tableWrapper: { overflowX: 'auto' },
-  studentTable: { width: '100%', borderCollapse: 'collapse', fontSize: '10px', minWidth: '700px' },
+  studentTable: { width: '100%', borderCollapse: 'collapse', fontSize: '10px', minWidth: '800px' },
   th: { textAlign: 'left', padding: '8px 6px', fontSize: '9px', fontWeight: '600', color: '#6b7280', borderBottom: '1px solid #e5e7eb' },
   tr: { borderBottom: '1px solid #f3f4f6' },
   td: { padding: '8px 6px', fontSize: '10px', color: '#4b5563' },
@@ -940,7 +1236,9 @@ styleSheet.textContent = `
   }
   
   @media (max-width: 480px) { 
-    button { min-height: 40px; }
+    button { minHeight: 40px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    .performance-student-stats { flex-wrap: wrap; }
   }
   
   select option { 
