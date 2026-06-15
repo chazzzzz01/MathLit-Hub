@@ -709,33 +709,215 @@ export const classService = {
     }
   },
 
+  // ========== FIXED: DELETE CLASS - PERMANENT DELETION ==========
   async deleteClass(classId, teacherAuthUserId) {
     try {
-      if (!classId) throw new Error('Class ID is required');
-      if (!teacherAuthUserId) throw new Error('Teacher authorization required');
+      console.log('🗑️ Starting class deletion process for:', classId);
       
-      const teacher = await this.getTeacherByUserId(teacherAuthUserId);
-      if (!teacher) throw new Error('Teacher not found');
+      if (!classId) {
+        throw new Error('Class ID is required');
+      }
       
+      // Get teacher information - try multiple methods
+      let teacher = null;
+      let teacherUserId = teacherAuthUserId;
+      
+      // Method 1: Use provided teacherAuthUserId
+      if (teacherAuthUserId) {
+        teacher = await this.getTeacherByUserId(teacherAuthUserId);
+        if (teacher) {
+          console.log('✅ Teacher found via provided userId:', teacher.id);
+        }
+      }
+      
+      // Method 2: Try to get current authenticated user
+      if (!teacher) {
+        const currentUser = await this.getCurrentUser();
+        if (currentUser) {
+          console.log('Found current user:', currentUser.id);
+          teacher = await this.getTeacherByUserId(currentUser.id);
+          if (teacher) {
+            console.log('✅ Teacher found via current user:', teacher.id);
+            teacherUserId = currentUser.id;
+          }
+        }
+      }
+      
+      // Method 3: Check localStorage for cached teacher info
+      if (!teacher) {
+        const storedTeacherId = localStorage.getItem('teacher_id');
+        const storedUserId = localStorage.getItem('user_id');
+        
+        if (storedTeacherId) {
+          teacher = await this.getTeacherById(storedTeacherId);
+          if (teacher) {
+            console.log('✅ Teacher found via stored teacher_id:', teacher.id);
+            teacherUserId = teacher.user_id;
+          }
+        }
+        
+        if (!teacher && storedUserId) {
+          teacher = await this.getTeacherByUserId(storedUserId);
+          if (teacher) {
+            console.log('✅ Teacher found via stored user_id:', teacher.id);
+            teacherUserId = storedUserId;
+          }
+        }
+      }
+      
+      if (!teacher) {
+        console.error('No teacher found after all methods');
+        throw new Error('Teacher authorization required. Please ensure you are logged in as a teacher.');
+      }
+      
+      console.log('Final teacher record:', { id: teacher.id, user_id: teacher.user_id, name: teacher.name });
+      
+      // Get the class to verify ownership and get name
       const { data: classData, error: classError } = await supabase
         .from('classes')
-        .select('teacher_id')
+        .select('teacher_id, name, code')
         .eq('id', classId)
         .maybeSingle();
       
-      if (classError) throw new Error('Class not found');
+      if (classError || !classData) {
+        throw new Error('Class not found');
+      }
+      
+      console.log('Class data:', { id: classId, name: classData.name, teacher_id: classData.teacher_id });
+      console.log('Our teacher ID:', teacher.id);
+      
+      // Verify the teacher owns this class
       if (classData.teacher_id !== teacher.id) {
         throw new Error('You do not have permission to delete this class');
       }
       
-      await supabase.from('class_students').delete().eq('class_id', classId);
-      await supabase.from('classes').delete().eq('id', classId);
+      // Step 1: Delete all student enrollments
+      console.log('📋 Deleting student enrollments for class:', classId);
+      const { error: enrollError } = await supabase
+        .from('class_students')
+        .delete()
+        .eq('class_id', classId);
       
-      return { success: true, message: 'Class deleted successfully' };
+      if (enrollError) {
+        console.error('Error deleting enrollments:', enrollError);
+        // Continue anyway - try to delete the class
+      } else {
+        console.log('✅ Student enrollments deleted');
+      }
+      
+      // Step 2: Delete team assignments
+      console.log('👥 Deleting team assignments for class:', classId);
+      const { error: teamError } = await supabase
+        .from('team_assignments')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (teamError) {
+        console.error('Error deleting team assignments:', teamError);
+      } else {
+        console.log('✅ Team assignments deleted');
+      }
+      
+      // Step 3: Delete announcements
+      console.log('📢 Deleting announcements for class:', classId);
+      const { error: announceError } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (announceError) {
+        console.error('Error deleting announcements:', announceError);
+      } else {
+        console.log('✅ Announcements deleted');
+      }
+      
+      // Step 4: Delete missions
+      console.log('🎯 Deleting missions for class:', classId);
+      const { error: missionError } = await supabase
+        .from('missions')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (missionError) {
+        console.error('Error deleting missions:', missionError);
+      } else {
+        console.log('✅ Missions deleted');
+      }
+      
+      // Step 5: Delete student points records
+      console.log('⭐ Deleting student points for class:', classId);
+      const { error: pointsError } = await supabase
+        .from('student_points')
+        .delete()
+        .eq('class_id', classId);
+      
+      if (pointsError) {
+        console.error('Error deleting student points:', pointsError);
+      } else {
+        console.log('✅ Student points deleted');
+      }
+      
+      // Step 6: Finally delete the class
+      console.log('🗑️ Deleting class:', classId);
+      const { error: deleteError } = await supabase
+        .from('classes')
+        .delete()
+        .eq('id', classId);
+      
+      if (deleteError) {
+        throw new Error(`Failed to delete class: ${deleteError.message}`);
+      }
+      
+      console.log('✅ Class deleted permanently:', classData.name);
+      
+      // Step 7: Clear all localStorage cache related to this class
+      try {
+        // Clear teacher classes cache
+        if (teacherUserId) {
+          const cacheKey = `teacher_classes_${teacherUserId}`;
+          localStorage.removeItem(cacheKey);
+          console.log('Cleared teacher classes cache');
+        }
+        
+        // Clear any active class info if this was the active class
+        if (localStorage.getItem('activeClassId') === classId) {
+          localStorage.removeItem('hasActiveClass');
+          localStorage.removeItem('activeClassId');
+          localStorage.removeItem('activeClassName');
+          console.log('Cleared active class info');
+        }
+        
+        // Clear any class-specific data
+        const keysToRemove = [
+          `class_${classId}_students`,
+          `class_${classId}_announcements`,
+          `class_${classId}_missions`,
+          `class_${classId}_teams`
+        ];
+        
+        keysToRemove.forEach(key => {
+          if (localStorage.getItem(key)) {
+            localStorage.removeItem(key);
+            console.log(`Cleared cache: ${key}`);
+          }
+        });
+        
+        // Set flag to force refresh on next load
+        localStorage.setItem('needsClassRefresh', 'true');
+        
+      } catch (cacheError) {
+        console.error('Error clearing cache:', cacheError);
+      }
+      
+      return { 
+        success: true, 
+        message: `Class "${classData.name}" deleted permanently`,
+        className: classData.name 
+      };
       
     } catch (error) {
       console.error('Error in deleteClass:', error);
-      return { success: false, message: error.message };
+      throw error;
     }
   },
 
@@ -955,7 +1137,6 @@ export const classService = {
     }
   },
 
-  // FIXED: Remove student from team
   async removeStudentFromTeam(classId, studentId) {
     try {
       if (!classId || !studentId) {

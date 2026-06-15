@@ -1,4 +1,4 @@
-// src/menu/Dashboard.jsx - FIXED WITH PROPER XP AND SCORES
+// src/menu/Dashboard.jsx - FIXED WITH PROPER XP, SCORES, AND TOP PERFORMERS SHOWING STUDENT NAMES
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { 
@@ -37,6 +37,8 @@ function Dashboard() {
     averageProgress: 0,
     completionRate: 0,
     weeklyActivity: [0, 0, 0, 0, 0, 0, 0],
+    monthlyActivity: [],
+    yearlyActivity: [],
     topPerformers: [],
     classesData: [],
     dailyActivityLog: []
@@ -44,12 +46,14 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const mountedRef = useRef(true);
 
+  const [activityView, setActivityView] = useState('weekly');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   const [isStudentsModalOpen, setIsStudentsModalOpen] = useState(false);
   const [isWeeklyActivityModalOpen, setIsWeeklyActivityModalOpen] = useState(false);
   const [isClassProgressModalOpen, setIsClassProgressModalOpen] = useState(false);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
   const [isClassPerformanceModalOpen, setIsClassPerformanceModalOpen] = useState(false);
-  const [isProgressStatsModalOpen, setIsProgressStatsModalOpen] = useState(false);
   const [isTopPerformersModalOpen, setIsTopPerformersModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -95,7 +99,13 @@ function Dashboard() {
     return games.length > 0 ? Math.round(totalProgress / games.length) : 0;
   };
 
-  const calculateOverallProgress = (missionPercent, gamePercent) => Math.round((missionPercent * 0.5) + (gamePercent * 0.5));
+  const calculateOverallProgressFromPointsAndXP = (points, xp) => {
+    const maxPoints = 1000;
+    const maxXP = 2000;
+    const pointsPercent = Math.min(100, Math.round((points / maxPoints) * 100));
+    const xpPercent = Math.min(100, Math.round((xp / maxXP) * 100));
+    return Math.round((pointsPercent * 0.4) + (xpPercent * 0.6));
+  };
 
   const calculateTotalScores = useCallback((gameProgressData) => {
     if (!gameProgressData) return 0;
@@ -103,7 +113,7 @@ function Dashboard() {
   }, []);
 
   useEffect(() => { loadTeacherClasses(); }, [user]);
-  useEffect(() => { if (classes.length > 0 || selectedClass !== 'all') { loadTeacherAnalytics(); loadStudentsData(); } }, [selectedClass, classes]);
+  useEffect(() => { if (classes.length > 0 || selectedClass !== 'all') { loadTeacherAnalytics(); loadStudentsData(); } }, [selectedClass, classes, activityView, selectedYear]);
 
   const loadUserProgress = useCallback(async () => {
     if (!user?.email) return;
@@ -152,14 +162,12 @@ function Dashboard() {
           let studentUserId = null;
           let studentUUID = enrollment.student_id;
           
-          // Get student name from users table first
           if (studentUser) {
             studentName = studentUser.name || studentUser.email?.split('@')[0] || 'Student';
             studentEmail = studentUser.email || '';
             studentUserId = studentUser.id;
           }
           
-          // If no name found, try to get from students table
           if (studentName === 'Student' || !studentName) {
             const { data: studentData } = await supabase
               .from('students')
@@ -173,7 +181,6 @@ function Dashboard() {
             }
           }
           
-          // If still no name, try to get from users via user_id
           if ((studentName === 'Student' || !studentName) && studentUserId) {
             const { data: userData } = await supabase
               .from('users')
@@ -184,7 +191,6 @@ function Dashboard() {
             if (userData && userData.email && !studentEmail) studentEmail = userData.email;
           }
           
-          // Clean up the name
           if (studentName && studentName !== 'Student') {
             studentName = studentName.split(' ').map(word => 
               word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
@@ -196,7 +202,6 @@ function Dashboard() {
             studentName = `Student_${enrollment.student_id?.slice(-4) || 'Unknown'}`;
           }
           
-          // ============ FETCH STUDENT DATA FROM DATABASE ============
           let studentPoints = 0;
           let studentXP = 0;
           let studentTotalScores = 0;
@@ -209,7 +214,6 @@ function Dashboard() {
             spaceShooter: { completed: false, highScore: 0, attempts: 0 }
           };
           
-          // 1. Get POINTS from student_points table
           if (studentUUID) {
             const { data: pointsData } = await supabase
               .from('student_points')
@@ -218,10 +222,8 @@ function Dashboard() {
               .eq('class_id', classItem.id)
               .maybeSingle();
             if (pointsData) studentPoints = pointsData.points || 0;
-            console.log(`📊 Points for ${studentName}:`, studentPoints);
           }
           
-          // 2. Get XP from user_xp table using user_id
           if (studentUserId) {
             const { data: xpData } = await supabase
               .from('user_xp')
@@ -229,19 +231,13 @@ function Dashboard() {
               .eq('user_id', studentUserId)
               .maybeSingle();
             if (xpData) studentXP = xpData.xp || 0;
-            console.log(`⭐ XP for ${studentName}:`, studentXP);
           }
           
-          // If no XP found, try to get from localStorage as fallback
           if (studentXP === 0 && studentEmail) {
             const savedXP = localStorage.getItem(`userXP_${studentEmail}`);
-            if (savedXP && !isNaN(parseInt(savedXP))) {
-              studentXP = parseInt(savedXP);
-              console.log(`📦 XP from localStorage for ${studentName}:`, studentXP);
-            }
+            if (savedXP && !isNaN(parseInt(savedXP))) studentXP = parseInt(savedXP);
           }
           
-          // 3. Get SCORES from game_scores table
           if (studentUUID) {
             const { data: gameScores } = await supabase
               .from('game_scores')
@@ -251,8 +247,6 @@ function Dashboard() {
               gameScores.forEach(score => {
                 studentTotalScores += score.score || 0;
                 if (score.completed) studentGamesCompleted++;
-                
-                // Build game progress object
                 if (score.game_type === 'equation') {
                   studentGameProgress.equation.completed = score.completed || false;
                   studentGameProgress.equation.highScore = Math.max(studentGameProgress.equation.highScore, score.score || 0);
@@ -267,20 +261,14 @@ function Dashboard() {
                   studentGameProgress.spaceShooter.attempts++;
                 }
               });
-              console.log(`🎯 Scores for ${studentName}:`, studentTotalScores);
             }
           }
           
-          // If no scores found, try localStorage
           if (studentTotalScores === 0 && studentEmail) {
             const savedScores = localStorage.getItem(`userTotalScores_${studentEmail}`);
-            if (savedScores && !isNaN(parseInt(savedScores))) {
-              studentTotalScores = parseInt(savedScores);
-              console.log(`📦 Scores from localStorage for ${studentName}:`, studentTotalScores);
-            }
+            if (savedScores && !isNaN(parseInt(savedScores))) studentTotalScores = parseInt(savedScores);
           }
           
-          // 4. Get MISSIONS from student_missions table
           if (studentUUID) {
             const { data: missionsData } = await supabase
               .from('student_missions')
@@ -289,24 +277,21 @@ function Dashboard() {
             if (missionsData && missionsData.length > 0) {
               studentMissionsCompleted = missionsData.filter(m => m.completed === true).length;
               studentCompletedMissions = missionsData.filter(m => m.completed === true).map(m => m.mission_id);
-              console.log(`📋 Missions for ${studentName}: ${studentMissionsCompleted}/4`);
             }
           }
           
-          // If no missions found, try localStorage
           if (studentMissionsCompleted === 0 && studentEmail) {
             const savedMissions = localStorage.getItem(`completedMissions_${studentEmail}`);
             if (savedMissions) {
               const missions = JSON.parse(savedMissions);
               studentMissionsCompleted = missions.length;
               studentCompletedMissions = missions;
-              console.log(`📦 Missions from localStorage for ${studentName}:`, studentMissionsCompleted);
             }
           }
           
           const missionCompletionRate = calculateStudentMissionProgress(studentCompletedMissions);
           const gameCompletionRate = calculateStudentGameProgress(studentGameProgress);
-          const overallStudentPoints = studentPoints > 0 ? studentPoints : calculateOverallProgress(missionCompletionRate, gameCompletionRate);
+          const overallFromPointsAndXP = calculateOverallProgressFromPointsAndXP(studentPoints, studentXP);
           
           allStudents.push({
             id: enrollment.student_id,
@@ -328,17 +313,142 @@ function Dashboard() {
             gameCount: `${studentGamesCompleted}/3`,
             lastActivity: enrollment.last_activity || enrollment.joined_at,
             status: enrollment.status || 'active',
-            overallProgress: overallStudentPoints
+            overallProgress: overallFromPointsAndXP
           });
         }
       }
       allStudents.sort((a, b) => b.overallProgress - a.overallProgress);
       setStudentsList(allStudents);
-      console.log('📊 Final students list with data:', allStudents.map(s => ({ name: s.name, points: s.points, xp: s.xpPoints, scores: s.totalScores, missions: s.missionCount, games: s.gameCount })));
       await loadUserProgress();
     } catch (error) { 
       console.error('Error loading students data:', error);
     }
+  };
+
+  const collectAllActivityData = async (teacherClasses) => {
+    let allActivities = [];
+    for (const classItem of teacherClasses) {
+      const students = await classService.getClassStudents(classItem.id);
+      for (const student of students) {
+        const { data: gameSessions } = await supabase
+          .from('game_scores')
+          .select('game_type, score, completed, created_at')
+          .eq('student_id', student.student_id);
+        
+        if (gameSessions && gameSessions.length > 0) {
+          gameSessions.forEach(session => {
+            if (session.created_at) {
+              allActivities.push({
+                date: new Date(session.created_at),
+                studentId: student.student_id,
+                studentName: student.users?.name || 'Student',
+                classId: classItem.id,
+                className: classItem.name,
+                gameType: session.game_type,
+                score: session.score || 0,
+                completed: session.completed || false
+              });
+            }
+          });
+        }
+        
+        const lastActivityDate = student.last_activity || student.joined_at;
+        if (lastActivityDate) {
+          allActivities.push({
+            date: new Date(lastActivityDate),
+            studentId: student.student_id,
+            studentName: student.users?.name || 'Student',
+            classId: classItem.id,
+            className: classItem.name,
+            gameType: 'login',
+            score: 0,
+            completed: true
+          });
+        }
+      }
+    }
+    return allActivities;
+  };
+
+  const calculateAccurateWeeklyActivity = (activityData, totalStudents) => {
+    const now = new Date();
+    const currentDay = now.getDay();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
+    startOfWeek.setHours(0, 0, 0, 0);
+    
+    const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
+    const uniqueStudentsPerDay = [{}, {}, {}, {}, {}, {}, {}];
+    
+    activityData.forEach(activity => {
+      const activityDate = new Date(activity.date);
+      if (activityDate >= startOfWeek) {
+        let dayIndex = activityDate.getDay() - 1;
+        if (activityDate.getDay() === 0) dayIndex = 6;
+        if (dayIndex >= 0 && dayIndex < 7) {
+          if (!uniqueStudentsPerDay[dayIndex][activity.studentId]) {
+            uniqueStudentsPerDay[dayIndex][activity.studentId] = true;
+            weeklyActivity[dayIndex]++;
+          }
+        }
+      }
+    });
+    
+    if (totalStudents > 0) {
+      return weeklyActivity.map(count => Math.min(100, Math.round((count / totalStudents) * 100)));
+    }
+    return [0, 0, 0, 0, 0, 0, 0];
+  };
+
+  const calculateMonthlyActivity = (activityData, totalStudents, year) => {
+    const monthlyData = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    for (let month = 0; month < 12; month++) {
+      const uniqueStudents = new Set();
+      
+      activityData.forEach(activity => {
+        const activityDate = new Date(activity.date);
+        if (activityDate.getMonth() === month && activityDate.getFullYear() === year) {
+          uniqueStudents.add(activity.studentId);
+        }
+      });
+      
+      const percentage = totalStudents > 0 ? Math.min(100, Math.round((uniqueStudents.size / totalStudents) * 100)) : 0;
+      monthlyData.push({
+        month: month,
+        monthName: monthNames[month],
+        activityCount: uniqueStudents.size,
+        percentage: percentage
+      });
+    }
+    
+    return monthlyData;
+  };
+
+  const calculateYearlyActivity = (activityData, totalStudents, year) => {
+    const yearlyData = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    for (let month = 0; month < 12; month++) {
+      const uniqueStudents = new Set();
+      
+      activityData.forEach(activity => {
+        const activityDate = new Date(activity.date);
+        if (activityDate.getMonth() === month && activityDate.getFullYear() === year) {
+          uniqueStudents.add(activity.studentId);
+        }
+      });
+      
+      const percentage = totalStudents > 0 ? Math.min(100, Math.round((uniqueStudents.size / totalStudents) * 100)) : 0;
+      yearlyData.push({
+        month: month,
+        monthName: monthNames[month],
+        activityCount: uniqueStudents.size,
+        percentage: percentage
+      });
+    }
+    return yearlyData;
   };
 
   const loadTeacherAnalytics = async () => {
@@ -348,22 +458,120 @@ function Dashboard() {
       let teacherClasses = [];
       if (selectedClass === 'all') teacherClasses = await classService.getTeacherClasses(user.dbId);
       else { const singleClass = await classService.getClassById(selectedClass); teacherClasses = singleClass ? [singleClass] : []; }
-      if (!teacherClasses || teacherClasses.length === 0) { setAnalytics(prev => ({ ...prev, activeClasses: 0, totalStudents: 0, averageProgress: 0, weeklyActivity: [0,0,0,0,0,0,0], dailyActivityLog: [] })); setLoading(false); return; }
+      if (!teacherClasses || teacherClasses.length === 0) { 
+        setAnalytics(prev => ({ ...prev, activeClasses: 0, totalStudents: 0, averageProgress: 0, weeklyActivity: [0,0,0,0,0,0,0], monthlyActivity: [], yearlyActivity: [] })); 
+        setLoading(false); 
+        return; 
+      }
       
-      let totalStudentsCount = 0, totalProgressSum = 0, totalClassesWithStudents = 0, allStudentsData = [], classesAnalytics = [], allActivityData = [];
+      let totalStudentsCount = 0, allStudentsData = [], classesAnalytics = [];
+      
+      const allActivityData = await collectAllActivityData(teacherClasses);
       
       for (const classItem of teacherClasses) {
         const students = await classService.getClassStudents(classItem.id);
         const studentsCount = students.length;
-        for (const student of students) {
-          const lastActivityDate = student.last_activity || student.joined_at;
-          if (lastActivityDate) allActivityData.push({ date: new Date(lastActivityDate), studentId: student.student_id, studentName: student.users?.name, classId: classItem.id, className: classItem.name, progress: student.progress || 0 });
-        }
-        let classProgressSum = 0;
-        students.forEach(student => { classProgressSum += student.progress || 0; });
-        const classAverageProgress = studentsCount > 0 ? classProgressSum / studentsCount : 0;
         totalStudentsCount += studentsCount;
-        if (studentsCount > 0) { totalProgressSum += classAverageProgress; totalClassesWithStudents++; }
+        
+        let classOverallProgressSum = 0;
+        let classTotalPoints = 0;
+        let classTotalXP = 0;
+        let classTotalScores = 0;
+        let classMissionSum = 0;
+        let classGameSum = 0;
+        
+        for (const enrollment of students) {
+          const studentData = studentsList.find(s => s.id === enrollment.student_id);
+          if (studentData) {
+            classOverallProgressSum += studentData.overallProgress;
+            classTotalPoints += studentData.points;
+            classTotalXP += studentData.xpPoints;
+            classTotalScores += studentData.totalScores;
+            classMissionSum += studentData.missionCompletionRate;
+            classGameSum += studentData.gameCompletionRate;
+          } else {
+            let studentPoints = 0, studentXP = 0, studentScores = 0;
+            let studentMissionsCompleted = 0, studentGamesCompleted = 0;
+            let studentGameProgress = { equation: { completed: false, highScore: 0, attempts: 0 }, battle: { completed: false, highScore: 0, attempts: 0 }, spaceShooter: { completed: false, highScore: 0, attempts: 0 } };
+            
+            const { data: pointsData } = await supabase
+              .from('student_points')
+              .select('points')
+              .eq('student_id', enrollment.student_id)
+              .eq('class_id', classItem.id)
+              .maybeSingle();
+            if (pointsData) studentPoints = pointsData.points || 0;
+            
+            let studentUserId = null;
+            const { data: studentUserData } = await supabase
+              .from('students')
+              .select('user_id')
+              .eq('id', enrollment.student_id)
+              .maybeSingle();
+            if (studentUserData) studentUserId = studentUserData.user_id;
+            
+            if (studentUserId) {
+              const { data: xpData } = await supabase
+                .from('user_xp')
+                .select('xp')
+                .eq('user_id', studentUserId)
+                .maybeSingle();
+              if (xpData) studentXP = xpData.xp || 0;
+            }
+            
+            const { data: gameScores } = await supabase
+              .from('game_scores')
+              .select('game_type, score, completed')
+              .eq('student_id', enrollment.student_id);
+            if (gameScores) {
+              gameScores.forEach(score => {
+                studentScores += score.score || 0;
+                if (score.completed) studentGamesCompleted++;
+              });
+            }
+            
+            const { data: missionsData } = await supabase
+              .from('student_missions')
+              .select('mission_id, completed')
+              .eq('student_id', enrollment.student_id);
+            if (missionsData) studentMissionsCompleted = missionsData.filter(m => m.completed === true).length;
+            
+            const missionRate = calculateStudentMissionProgress(studentMissionsCompleted);
+            const gameRate = calculateStudentGameProgress(studentGameProgress);
+            const overallFromPointsAndXP = calculateOverallProgressFromPointsAndXP(studentPoints, studentXP);
+            
+            classOverallProgressSum += overallFromPointsAndXP;
+            classTotalPoints += studentPoints;
+            classTotalXP += studentXP;
+            classTotalScores += studentScores;
+            classMissionSum += missionRate;
+            classGameSum += gameRate;
+          }
+        }
+        
+        const classAvgOverall = studentsCount > 0 ? Math.round(classOverallProgressSum / studentsCount) : 0;
+        const classAvgPoints = studentsCount > 0 ? Math.round(classTotalPoints / studentsCount) : 0;
+        const classAvgXP = studentsCount > 0 ? Math.round(classTotalXP / studentsCount) : 0;
+        const classAvgScores = studentsCount > 0 ? Math.round(classTotalScores / studentsCount) : 0;
+        const classAvgMissions = studentsCount > 0 ? Math.round(classMissionSum / studentsCount) : 0;
+        const classAvgGames = studentsCount > 0 ? Math.round(classGameSum / studentsCount) : 0;
+        
+        classesAnalytics.push({ 
+          id: classItem.id, 
+          name: classItem.name, 
+          code: classItem.code, 
+          studentsCount: studentsCount,
+          averageProgress: classAvgOverall,
+          averagePoints: classAvgPoints,
+          averageXP: classAvgXP,
+          averageScores: classAvgScores,
+          averageMissions: classAvgMissions,
+          averageGames: classAvgGames,
+          totalPoints: classTotalPoints,
+          totalXP: classTotalXP,
+          totalScores: classTotalScores
+        });
+        
         students.forEach(student => { 
           allStudentsData.push({ 
             id: student.student_id, 
@@ -375,130 +583,207 @@ function Dashboard() {
             lastActivity: student.last_activity 
           }); 
         });
-        classesAnalytics.push({ id: classItem.id, name: classItem.name, code: classItem.code, studentsCount: studentsCount, averageProgress: Math.round(classAverageProgress) });
       }
-      const averageProgress = totalClassesWithStudents > 0 ? Math.round(totalProgressSum / totalClassesWithStudents) : 0;
       
-      // Build top performers with real data
-      const topPerformers = await Promise.all(allStudentsData.slice(0, 10).map(async (student, index) => {
-        let studentPoints = 0, studentXP = 0, studentScores = 0, studentMissions = [], studentGames = {};
-        let studentUUID = student.id;
-        let studentUserId = null;
-        
-        // Get user_id from students table first
-        const { data: studentData } = await supabase
-          .from('students')
-          .select('user_id')
-          .eq('id', studentUUID)
-          .maybeSingle();
-        if (studentData) studentUserId = studentData.user_id;
-        
-        if (studentUUID) {
-          // Get points
-          const { data: pointsData } = await supabase
-            .from('student_points')
-            .select('points')
-            .eq('student_id', studentUUID)
-            .maybeSingle();
-          if (pointsData) studentPoints = pointsData.points || 0;
-          
-          // Get XP from user_xp
-          if (studentUserId) {
-            const { data: xpData } = await supabase
-              .from('user_xp')
-              .select('xp')
-              .eq('user_id', studentUserId)
-              .maybeSingle();
-            if (xpData) studentXP = xpData.xp || 0;
-          }
-          
-          // Get missions
-          const { data: missionsData } = await supabase
-            .from('student_missions')
-            .select('mission_id, completed')
-            .eq('student_id', studentUUID);
-          if (missionsData) studentMissions = missionsData.filter(m => m.completed === true).map(m => m.mission_id);
-          
-          // Get game scores
-          const { data: gameScores } = await supabase
-            .from('game_scores')
-            .select('game_type, score, completed')
-            .eq('student_id', studentUUID);
-          if (gameScores) {
-            gameScores.forEach(score => {
-              studentScores += score.score || 0;
-            });
-            studentGames = {
-              equation: { completed: gameScores.some(g => g.game_type === 'equation' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'equation').map(g => g.score || 0), 0) },
-              battle: { completed: gameScores.some(g => g.game_type === 'battle' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'battle').map(g => g.score || 0), 0) },
-              spaceShooter: { completed: gameScores.some(g => g.game_type === 'spaceShooter' && g.completed), highScore: Math.max(...gameScores.filter(g => g.game_type === 'spaceShooter').map(g => g.score || 0), 0) }
-            };
-          }
-        }
-        
-        // Fallback to localStorage
-        if (student.email && studentXP === 0) {
-          const savedXP = localStorage.getItem(`userXP_${student.email}`);
-          if (savedXP) studentXP = parseInt(savedXP);
-          const savedScores = localStorage.getItem(`userTotalScores_${student.email}`);
-          if (savedScores) studentScores = parseInt(savedScores);
-        }
-        
-        let studentName = student.name || 'Student';
-        if (studentName === 'Student' && student.email) {
-          studentName = student.email.split('@')[0];
-          studentName = studentName.charAt(0).toUpperCase() + studentName.slice(1);
-        }
-        
-        const missionRate = calculateStudentMissionProgress(studentMissions);
-        const gameRate = calculateStudentGameProgress(studentGames);
-        const overall = studentPoints > 0 ? studentPoints : calculateOverallProgress(missionRate, gameRate);
-        
-        return { 
-          rank: index + 1, 
-          name: studentName, 
-          progress: student.progress, 
-          className: student.className, 
-          points: studentPoints,
-          xpPoints: studentXP,
-          totalScores: studentScores,
-          missionProgress: missionRate, 
-          gameProgress: gameRate, 
-          overallProgress: overall,
-          missionCount: `${studentMissions.length}/4`,
-          gameCount: `${Object.values(studentGames).filter(g => g.completed).length}/3`
-        };
-      }));
+      const weeklyActivity = calculateAccurateWeeklyActivity(allActivityData, totalStudentsCount);
+      const monthlyActivity = calculateMonthlyActivity(allActivityData, totalStudentsCount, selectedYear);
+      const yearlyActivity = calculateYearlyActivity(allActivityData, totalStudentsCount, selectedYear);
       
-      topPerformers.sort((a, b) => b.overallProgress - a.overallProgress);
-      topPerformers.forEach((performer, idx) => performer.rank = idx + 1);
+      // Build top performers with proper student names from studentsList
+      const topPerformers = studentsList
+        .filter(student => student && student.name && student.name !== 'Student')
+        .map((student, index) => ({
+          rank: index + 1,
+          name: student.name,
+          className: student.className,
+          points: student.points || 0,
+          xpPoints: student.xpPoints || 0,
+          totalScores: student.totalScores || 0,
+          missionProgress: student.missionCompletionRate || 0,
+          gameProgress: student.gameCompletionRate || 0,
+          overallProgress: student.overallProgress || 0,
+          missionCount: student.missionCount || '0/4',
+          gameCount: student.gameCount || '0/3'
+        }))
+        .sort((a, b) => b.overallProgress - a.overallProgress)
+        .slice(0, 10);
       
-      const weeklyActivity = calculateWeeklyActivity(allActivityData, totalStudentsCount);
-      const dailyActivityLog = generateDailyActivityLog(allActivityData, totalStudentsCount);
-      setAnalytics({ totalStudents: totalStudentsCount, activeClasses: teacherClasses.length, averageProgress: averageProgress, completionRate: 0, totalMissions: 0, completedMissions: 0, weeklyActivity: weeklyActivity, topPerformers: topPerformers.slice(0, 5), classesData: classesAnalytics, dailyActivityLog: dailyActivityLog });
+      setAnalytics({ 
+        totalStudents: totalStudentsCount, 
+        activeClasses: teacherClasses.length, 
+        averageProgress: classesAnalytics.length > 0 ? Math.round(classesAnalytics.reduce((sum, c) => sum + c.averageProgress, 0) / classesAnalytics.length) : 0,
+        completionRate: 0, 
+        totalMissions: 0, 
+        completedMissions: 0, 
+        weeklyActivity: weeklyActivity,
+        monthlyActivity: monthlyActivity,
+        yearlyActivity: yearlyActivity,
+        topPerformers: topPerformers.slice(0, 5), 
+        classesData: classesAnalytics,
+        dailyActivityLog: allActivityData 
+      });
     } catch (error) { console.error('Error loading teacher analytics:', error); }
     finally { setLoading(false); }
   };
 
-  const calculateWeeklyActivity = (activityData, totalStudents) => {
-    const now = new Date(); const currentDay = now.getDay(); const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - currentDay + (currentDay === 0 ? -6 : 1)); startOfWeek.setHours(0, 0, 0, 0);
-    const weeklyActivity = [0, 0, 0, 0, 0, 0, 0];
-    activityData.forEach(activity => { const activityDate = new Date(activity.date); if (activityDate >= startOfWeek) { let dayIndex = activityDate.getDay() - 1; if (activityDate.getDay() === 0) dayIndex = 6; if (dayIndex >= 0 && dayIndex < 7) weeklyActivity[dayIndex]++; } });
-    if (totalStudents > 0) return weeklyActivity.map(count => Math.min(100, Math.round((count / totalStudents) * 100)));
-    return [65, 72, 80, 78, 85, 90, 88];
+  const renderActivityChart = () => {
+    if (activityView === 'weekly') {
+      return (
+        <div style={styles.barChart}>
+          {analytics.weeklyActivity.map((v, i) => (
+            <div key={i} style={styles.barContainer}>
+              <div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
+              <div style={styles.barWrapper}>
+                <div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
+              </div>
+              <div style={styles.barValue}>{v}%</div>
+            </div>
+          ))}
+        </div>
+      );
+    } else if (activityView === 'monthly') {
+      const monthlyData = analytics.monthlyActivity || [];
+      return (
+        <div style={styles.monthlyChart}>
+          <div style={styles.monthlyHeader}>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => {
+                setSelectedYear(parseInt(e.target.value));
+                loadTeacherAnalytics();
+              }}
+              style={styles.yearSelect}
+            >
+              {[2023, 2024, 2025, 2026].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.monthlyBars}>
+            {monthlyData.map((month, i) => (
+              <div key={i} style={styles.monthlyBarContainer}>
+                <div style={styles.monthlyBarWrapper}>
+                  <div style={{...styles.monthlyBar, height: `${Math.max(5, month.percentage)}%`, backgroundColor: '#6366f1'}} />
+                </div>
+                <div style={styles.monthlyBarLabel}>{month.monthName}</div>
+                <div style={styles.monthlyBarValue}>{month.percentage}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    } else {
+      const yearlyData = analytics.yearlyActivity || [];
+      return (
+        <div style={styles.yearlyChart}>
+          <div style={styles.yearlyHeader}>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => {
+                setSelectedYear(parseInt(e.target.value));
+                loadTeacherAnalytics();
+              }}
+              style={styles.yearSelectLarge}
+            >
+              {[2023, 2024, 2025, 2026].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.yearlyBars}>
+            {yearlyData.map((month, i) => (
+              <div key={i} style={styles.yearlyBarContainer}>
+                <div style={styles.yearlyBarWrapper}>
+                  <div style={{...styles.yearlyBar, height: `${Math.max(5, month.percentage)}%`, backgroundColor: '#8b5cf6'}} />
+                </div>
+                <div style={styles.yearlyBarLabel}>{month.monthName}</div>
+                <div style={styles.yearlyBarValue}>{month.percentage}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
   };
 
-  const generateDailyActivityLog = (activityData, totalStudents) => {
-    const logs = []; const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date(now); date.setDate(now.getDate() - i); date.setHours(0, 0, 0, 0);
-      const activitiesOnDay = activityData.filter(activity => new Date(activity.date).toDateString() === date.toDateString());
-      const uniqueStudents = new Set(activitiesOnDay.map(a => a.studentId)).size;
-      const activityPercentage = totalStudents > 0 ? Math.round((uniqueStudents / totalStudents) * 100) : 0;
-      logs.push({ date, dayName: date.toLocaleDateString('en-US', { weekday: 'short' }), formattedDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), uniqueStudents, activityPercentage });
+  const renderModalActivityContent = () => {
+    if (activityView === 'weekly') {
+      return (
+        <div style={styles.barChartLarge}>
+          {analytics.weeklyActivity.map((v, i) => (
+            <div key={i} style={styles.barContainerLarge}>
+              <div style={styles.barLabelLarge}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
+              <div style={styles.barWrapperLarge}>
+                <div style={{...styles.barLarge, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
+              </div>
+              <div style={styles.barValueLarge}>{v}%</div>
+            </div>
+          ))}
+        </div>
+      );
+    } else if (activityView === 'monthly') {
+      const monthlyData = analytics.monthlyActivity || [];
+      return (
+        <div style={styles.modalMonthlyChart}>
+          <div style={styles.monthlyHeader}>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => {
+                setSelectedYear(parseInt(e.target.value));
+                loadTeacherAnalytics();
+              }}
+              style={styles.yearSelectLarge}
+            >
+              {[2023, 2024, 2025, 2026].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.monthlyBarsLarge}>
+            {monthlyData.map((month, i) => (
+              <div key={i} style={styles.monthlyBarContainerLarge}>
+                <div style={styles.monthlyBarWrapperLarge}>
+                  <div style={{...styles.monthlyBarLarge, height: `${Math.max(5, month.percentage)}%`, backgroundColor: '#6366f1'}} />
+                </div>
+                <div style={styles.monthlyBarLabelLarge}>{month.monthName}</div>
+                <div style={styles.monthlyBarValueLarge}>{month.percentage}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    } else {
+      const yearlyData = analytics.yearlyActivity || [];
+      return (
+        <div style={styles.modalYearlyChart}>
+          <div style={styles.yearlyHeader}>
+            <select 
+              value={selectedYear} 
+              onChange={(e) => {
+                setSelectedYear(parseInt(e.target.value));
+                loadTeacherAnalytics();
+              }}
+              style={styles.yearSelectLarge}
+            >
+              {[2023, 2024, 2025, 2026].map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+          <div style={styles.yearlyBarsLarge}>
+            {yearlyData.map((month, i) => (
+              <div key={i} style={styles.yearlyBarContainerLarge}>
+                <div style={styles.yearlyBarWrapperLarge}>
+                  <div style={{...styles.yearlyBarLarge, height: `${Math.max(5, month.percentage)}%`, backgroundColor: '#8b5cf6'}} />
+                </div>
+                <div style={styles.yearlyBarLabelLarge}>{month.monthName}</div>
+                <div style={styles.yearlyBarValueLarge}>{month.percentage}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
     }
-    return logs;
   };
 
   const getPerformanceColor = (progress) => progress >= 80 ? '#10b981' : progress >= 60 ? '#f59e0b' : '#ef4444';
@@ -672,7 +957,6 @@ function Dashboard() {
     ); 
   }
 
-  const currentUserXP = getUserXP && typeof getUserXP === 'function' ? getUserXP() : gameXP;
   const classOverallProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + (s.overallProgress || 0), 0) / studentsList.length) : 0;
   const classMissionProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + s.missionCompletionRate, 0) / studentsList.length) : 0;
   const classGameProgress = studentsList.length > 0 ? Math.round(studentsList.reduce((sum, s) => sum + s.gameCompletionRate, 0) / studentsList.length) : 0;
@@ -685,18 +969,30 @@ function Dashboard() {
       <Modal isOpen={isStudentsModalOpen} onClose={() => setIsStudentsModalOpen(false)} title={`Students (${studentsList.length})`}>
         <FullStudentsTable />
       </Modal>
-      <Modal isOpen={isWeeklyActivityModalOpen} onClose={() => setIsWeeklyActivityModalOpen(false)} title="Weekly Activity">
-        <div style={styles.barChart}>
-          {analytics.weeklyActivity.map((v, i) => (
-            <div key={i} style={styles.barContainer}>
-              <div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
-              <div style={styles.barWrapper}>
-                <div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
-              </div>
-              <div style={styles.barValue}>{v}%</div>
-            </div>
-          ))}
+      <Modal isOpen={isWeeklyActivityModalOpen} onClose={() => setIsWeeklyActivityModalOpen(false)} title={`Activity - ${activityView.charAt(0).toUpperCase() + activityView.slice(1)} View`}>
+        <div style={styles.modalActivityHeader}>
+          <div style={styles.viewToggleGroup}>
+            <button 
+              onClick={() => setActivityView('weekly')} 
+              style={{...styles.viewToggle, ...(activityView === 'weekly' ? styles.viewToggleActive : {})}}
+            >
+              Weekly
+            </button>
+            <button 
+              onClick={() => setActivityView('monthly')} 
+              style={{...styles.viewToggle, ...(activityView === 'monthly' ? styles.viewToggleActive : {})}}
+            >
+              Monthly
+            </button>
+            <button 
+              onClick={() => setActivityView('yearly')} 
+              style={{...styles.viewToggle, ...(activityView === 'yearly' ? styles.viewToggleActive : {})}}
+            >
+              Yearly
+            </button>
+          </div>
         </div>
+        {renderModalActivityContent()}
       </Modal>
       <Modal isOpen={isClassProgressModalOpen} onClose={() => setIsClassProgressModalOpen(false)} title="Class Progress">
         <div style={styles.classProgressContainer}>
@@ -729,7 +1025,8 @@ function Dashboard() {
         <div style={styles.performanceSummary}>
           <div><span style={styles.perfDotExcellent} />Excellent (80-100%) <strong>{studentsList.filter(s => s.overallProgress >= 80).length}</strong> students</div>
           <div><span style={styles.perfDotGood} />Good (60-79%) <strong>{studentsList.filter(s => s.overallProgress >= 60 && s.overallProgress < 80).length}</strong> students</div>
-          <div><span style={styles.perfDotAverage} />Needs Improvement (0-59%) <strong>{studentsList.filter(s => s.overallProgress < 60).length}</strong> students</div>
+          <div><span style={styles.perfDotAverage} />Average (40-59%) <strong>{studentsList.filter(s => s.overallProgress >= 40 && s.overallProgress < 60).length}</strong> students</div>
+          <div><span style={styles.perfDotNeeds} />Needs Imp. (0-39%) <strong>{studentsList.filter(s => s.overallProgress < 40).length}</strong> students</div>
         </div>
         <div style={styles.performanceStudentList}>
           <h4 style={styles.performanceListTitle}>Student Details:</h4>
@@ -748,41 +1045,50 @@ function Dashboard() {
           ))}
         </div>
       </Modal>
-      <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance">
+      <Modal isOpen={isClassPerformanceModalOpen} onClose={() => setIsClassPerformanceModalOpen(false)} title="Class Performance - Overall Progress">
         <div>
           {analytics.classesData.map((c, i) => (
-            <div key={i} style={styles.distItem}>
-              <span style={styles.distLabel}>{c.name}</span>
-              <div style={styles.distBar}>
-                <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+            <div key={i} style={styles.classPerformanceCard}>
+              <div style={styles.classPerformanceHeader}>
+                <span style={styles.classPerformanceName}>{c.name}</span>
+                <span style={styles.classPerformanceCount}>{c.studentsCount} students</span>
               </div>
-              <span style={styles.distPercent}>{c.averageProgress}%</span>
-              <span style={styles.distCount}>{c.studentsCount} students</span>
-            </div>
-          ))}
-        </div>
-      </Modal>
-      <Modal isOpen={isProgressStatsModalOpen} onClose={() => setIsProgressStatsModalOpen(false)} title="Progress Statistics">
-        <div style={styles.progressStats}>
-          <div><span>Class Average Progress</span><span>{classOverallProgress}%</span></div>
-          <div><span>Total Points (🏆)</span><span>{totalPointsAll}</span></div>
-          <div><span>Total XP (⭐)</span><span>{totalXPAll}</span></div>
-          <div><span>Total Scores (🎯)</span><span>{totalScoresAll}</span></div>
-          <div><span>Average Missions Completed</span><span>{classMissionProgress}%</span></div>
-          <div><span>Average Games Completed</span><span>{classGameProgress}%</span></div>
-        </div>
-        <div style={styles.progressStatsStudentList}>
-          <h4 style={styles.performanceListTitle}>Student Breakdown:</h4>
-          {studentsList.map(student => (
-            <div key={student.id} style={styles.progressStatsStudentItem}>
-              <span style={styles.progressStatsStudentName}>{student.name}</span>
-              <div style={styles.progressStatsStudentDetails}>
-                <span>🏆 {student.points || 0}</span>
-                <span>⭐ {student.xpPoints || 0}</span>
-                <span>🎯 {student.totalScores || 0}</span>
-                <span>📋 {student.missionCount || '0/4'}</span>
-                <span>🎮 {student.gameCount || '0/3'}</span>
-                <span>📊 {student.overallProgress}%</span>
+              <div style={styles.classPerformanceStats}>
+                <div style={styles.classPerformanceStat}>
+                  <span style={styles.classPerformanceStatLabel}>Overall Progress</span>
+                  <span style={{...styles.classPerformanceStatValue, color: getPerformanceColor(c.averageProgress)}}>{c.averageProgress}%</span>
+                </div>
+                <div style={styles.classPerformanceStatRow}>
+                  <div style={styles.classPerformanceStatSmall}>
+                    <span>🏆 Points</span>
+                    <strong>{c.averagePoints}</strong>
+                  </div>
+                  <div style={styles.classPerformanceStatSmall}>
+                    <span>⭐ XP</span>
+                    <strong>{c.averageXP}</strong>
+                  </div>
+                  <div style={styles.classPerformanceStatSmall}>
+                    <span>🎯 Scores</span>
+                    <strong>{c.averageScores}</strong>
+                  </div>
+                </div>
+                <div style={styles.classPerformanceStatRow}>
+                  <div style={styles.classPerformanceStatSmall}>
+                    <span>📋 Missions</span>
+                    <strong>{c.averageMissions}%</strong>
+                  </div>
+                  <div style={styles.classPerformanceStatSmall}>
+                    <span>🎮 Games</span>
+                    <strong>{c.averageGames}%</strong>
+                  </div>
+                </div>
+              </div>
+              <div style={styles.classProgressBarContainer}>
+                <div style={styles.classProgressBarLabel}>Class Progress</div>
+                <div style={styles.classProgressBarWrapper}>
+                  <div style={{...styles.classProgressFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+                </div>
+                <div style={styles.classProgressPercent}>{c.averageProgress}%</div>
               </div>
             </div>
           ))}
@@ -793,15 +1099,15 @@ function Dashboard() {
           {analytics.topPerformers.map((s) => (
             <div key={s.rank} style={styles.topPerformerItem}>
               <div style={styles.topPerformerRank}>{s.rank}</div>
-              <div>
+              <div style={styles.topPerformerInfo}>
                 <div style={styles.topPerformerName}>{s.name}</div>
                 <div style={styles.topPerformerClass}>{s.className}</div>
               </div>
-              <div>
+              <div style={styles.topPerformerDetails}>
                 <div style={styles.topPerformerStats}>
-                  <span>🏆{s.points || 0}</span>
-                  <span>⭐{s.xpPoints || 0}</span>
-                  <span>🎯{s.totalScores || 0}</span>
+                  <span>🏆 {s.points}</span>
+                  <span>⭐ {s.xpPoints}</span>
+                  <span>🎯 {s.totalScores}</span>
                 </div>
                 <div style={styles.topPerformerProgress}>{s.overallProgress}%</div>
               </div>
@@ -945,22 +1251,30 @@ function Dashboard() {
         <div style={styles.leftColumn}>
           <div style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}><FiActivity size={14} /> Weekly Activity</h3>
+              <h3 style={styles.sectionTitle}><FiActivity size={14} /> Activity Overview</h3>
+              <div style={styles.viewToggleGroupSmall}>
+                <button 
+                  onClick={() => { setActivityView('weekly'); loadTeacherAnalytics(); }} 
+                  style={{...styles.viewToggleSmall, ...(activityView === 'weekly' ? styles.viewToggleSmallActive : {})}}
+                >
+                  Week
+                </button>
+                <button 
+                  onClick={() => { setActivityView('monthly'); loadTeacherAnalytics(); }} 
+                  style={{...styles.viewToggleSmall, ...(activityView === 'monthly' ? styles.viewToggleSmallActive : {})}}
+                >
+                  Month
+                </button>
+                <button 
+                  onClick={() => { setActivityView('yearly'); loadTeacherAnalytics(); }} 
+                  style={{...styles.viewToggleSmall, ...(activityView === 'yearly' ? styles.viewToggleSmallActive : {})}}
+                >
+                  Year
+                </button>
+              </div>
               {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsWeeklyActivityModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
             </div>
-            {!isMobile && (
-              <div style={styles.barChart}>
-                {analytics.weeklyActivity.map((v, i) => (
-                  <div key={i} style={styles.barContainer}>
-                    <div style={styles.barLabel}>{['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</div>
-                    <div style={styles.barWrapper}>
-                      <div style={{...styles.bar, height: `${Math.max(5, v)}%`, backgroundColor: i >= 5 ? '#f59e0b' : '#6366f1'}} />
-                    </div>
-                    <div style={styles.barValue}>{v}%</div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {!isMobile && renderActivityChart()}
           </div>
 
           <div style={styles.sectionCard}>
@@ -1021,32 +1335,24 @@ function Dashboard() {
               {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsClassPerformanceModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
             </div>
             {!isMobile && analytics.classesData.slice(0,4).map((c, i) => (
-              <div key={i} style={styles.distItem}>
-                <span style={styles.distLabel}>{c.name}</span>
-                <div style={styles.distBar}>
-                  <div style={{...styles.distFill, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+              <div key={i} style={styles.classPerformanceCompact}>
+                <div style={styles.classPerformanceCompactHeader}>
+                  <span style={styles.classPerformanceCompactName}>{c.name}</span>
+                  <span style={styles.classPerformanceCompactCount}>{c.studentsCount} std</span>
                 </div>
-                <span style={styles.distPercent}>{c.averageProgress}%</span>
-                <span style={styles.distCount}>{c.studentsCount} students</span>
+                <div style={styles.classPerformanceCompactProgress}>
+                  <div style={styles.classProgressBarWrapperCompact}>
+                    <div style={{...styles.classProgressFillCompact, width: `${c.averageProgress}%`, backgroundColor: getPerformanceColor(c.averageProgress)}} />
+                  </div>
+                  <span style={styles.classPerformanceCompactPercent}>{c.averageProgress}%</span>
+                </div>
+                <div style={styles.classPerformanceCompactStats}>
+                  <span>🏆 {c.averagePoints}</span>
+                  <span>⭐ {c.averageXP}</span>
+                  <span>🎯 {c.averageScores}</span>
+                </div>
               </div>
             ))}
-          </div>
-
-          <div style={styles.sectionCard}>
-            <div style={styles.sectionHeader}>
-              <h3 style={styles.sectionTitle}><FiPieChart size={14} /> Progress Stats</h3>
-              {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsProgressStatsModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
-            </div>
-            {!isMobile && (
-              <div style={styles.progressStats}>
-                <div><span>Class Progress</span><span>{classOverallProgress}%</span></div>
-                <div><span>Total Points</span><span>{totalPointsAll}</span></div>
-                <div><span>Total XP</span><span>{totalXPAll}</span></div>
-                <div><span>Total Scores</span><span>{totalScoresAll}</span></div>
-                <div><span>Missions Avg</span><span>{classMissionProgress}%</span></div>
-                <div><span>Games Avg</span><span>{classGameProgress}%</span></div>
-              </div>
-            )}
           </div>
 
           <div style={styles.sectionCard}>
@@ -1055,20 +1361,13 @@ function Dashboard() {
               {isMobile && <button style={{...styles.viewButton, color: '#3b82f6'}} onClick={() => setIsTopPerformersModalOpen(true)}><FiMaximize2 size={12} /> View</button>}
             </div>
             {!isMobile && analytics.topPerformers.slice(0,3).map((s) => (
-              <div key={s.rank} style={styles.topPerformerItem}>
-                <div style={styles.topPerformerRank}>{s.rank}</div>
-                <div>
-                  <div style={styles.topPerformerName}>{s.name}</div>
-                  <div style={styles.topPerformerClass}>{s.className}</div>
+              <div key={s.rank} style={styles.topPerformerItemCompact}>
+                <div style={styles.topPerformerRankCompact}>{s.rank}</div>
+                <div style={styles.topPerformerInfoCompact}>
+                  <div style={styles.topPerformerNameCompact}>{s.name}</div>
+                  <div style={styles.topPerformerClassCompact}>{s.className}</div>
                 </div>
-                <div>
-                  <div style={styles.topPerformerStats}>
-                    <span>🏆{s.points || 0}</span>
-                    <span>⭐{s.xpPoints || 0}</span>
-                    <span>🎯{s.totalScores || 0}</span>
-                  </div>
-                  <div style={styles.topPerformerProgress}>{s.overallProgress}%</div>
-                </div>
+                <div style={styles.topPerformerProgressCompact}>{s.overallProgress}%</div>
               </div>
             ))}
           </div>
@@ -1143,12 +1442,109 @@ const styles = {
   sectionTitle: { fontSize: '13px', fontWeight: '600', color: '#1f2937', display: 'flex', alignItems: 'center', gap: '6px', margin: 0 },
   sectionBadge: { fontSize: '10px', padding: '2px 6px', backgroundColor: '#f3f4f6', borderRadius: '16px', color: '#6b7280' },
   viewButton: { display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 10px', backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '8px', fontSize: '10px', fontWeight: '500', cursor: 'pointer', minHeight: '32px' },
+  
+  viewToggleGroup: { display: 'flex', gap: '8px', backgroundColor: '#f3f4f6', padding: '4px', borderRadius: '12px' },
+  viewToggle: { padding: '6px 16px', fontSize: '12px', fontWeight: '500', border: 'none', borderRadius: '8px', cursor: 'pointer', backgroundColor: 'transparent', color: '#6b7280', transition: 'all 0.2s' },
+  viewToggleActive: { backgroundColor: '#6366f1', color: 'white' },
+  viewToggleGroupSmall: { display: 'flex', gap: '4px', backgroundColor: '#f3f4f6', padding: '2px', borderRadius: '8px' },
+  viewToggleSmall: { padding: '4px 10px', fontSize: '10px', fontWeight: '500', border: 'none', borderRadius: '6px', cursor: 'pointer', backgroundColor: 'transparent', color: '#6b7280' },
+  viewToggleSmallActive: { backgroundColor: '#6366f1', color: 'white' },
+  
+  // Top Performers Compact Styles
+  topPerformerItemCompact: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f3f4f6' },
+  topPerformerRankCompact: { width: '28px', height: '28px', backgroundColor: '#e0e7ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '700', color: '#4338ca', flexShrink: 0 },
+  topPerformerInfoCompact: { flex: 1 },
+  topPerformerNameCompact: { fontSize: '13px', fontWeight: '600', color: '#1f2937' },
+  topPerformerClassCompact: { fontSize: '9px', color: '#9ca3af' },
+  topPerformerProgressCompact: { fontSize: '14px', fontWeight: '700', color: '#10b981' },
+  
+  // Top Performers Modal Styles
+  topPerformerItem: { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 0', borderBottom: '1px solid #f3f4f6' },
+  topPerformerRank: { width: '32px', height: '32px', backgroundColor: '#e0e7ff', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '700', color: '#4338ca', flexShrink: 0 },
+  topPerformerInfo: { flex: 1 },
+  topPerformerName: { fontSize: '14px', fontWeight: '600', color: '#1f2937' },
+  topPerformerClass: { fontSize: '10px', color: '#9ca3af' },
+  topPerformerDetails: { textAlign: 'right' },
+  topPerformerStats: { display: 'flex', gap: '8px', fontSize: '10px', color: '#6b7280', marginBottom: '4px' },
+  topPerformerProgress: { fontSize: '14px', fontWeight: '700', color: '#10b981' },
+  
+  classPerformanceCompact: { padding: '8px 0', borderBottom: '1px solid #f3f4f6' },
+  classPerformanceCompactHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' },
+  classPerformanceCompactName: { fontSize: '12px', fontWeight: '600', color: '#1f2937' },
+  classPerformanceCompactCount: { fontSize: '9px', color: '#6b7280' },
+  classPerformanceCompactProgress: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' },
+  classProgressBarWrapperCompact: { flex: 1, height: '4px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' },
+  classProgressFillCompact: { height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' },
+  classPerformanceCompactPercent: { fontSize: '10px', fontWeight: '600', color: '#1f2937', minWidth: '35px' },
+  classPerformanceCompactStats: { display: 'flex', gap: '10px', fontSize: '9px', color: '#6b7280' },
+  
+  classPerformanceCard: { backgroundColor: '#f9fafb', borderRadius: '12px', padding: '12px', marginBottom: '12px' },
+  classPerformanceHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' },
+  classPerformanceName: { fontSize: '14px', fontWeight: '700', color: '#1f2937' },
+  classPerformanceCount: { fontSize: '11px', color: '#6b7280' },
+  classPerformanceStats: { marginBottom: '10px' },
+  classPerformanceStat: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', padding: '6px 0', borderBottom: '1px solid #e5e7eb' },
+  classPerformanceStatLabel: { fontSize: '11px', color: '#4b5563' },
+  classPerformanceStatValue: { fontSize: '16px', fontWeight: '700' },
+  classPerformanceStatRow: { display: 'flex', gap: '12px', marginBottom: '8px' },
+  classPerformanceStatSmall: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px', backgroundColor: 'white', borderRadius: '8px' },
+  classProgressBarContainer: { display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid #e5e7eb' },
+  classProgressBarLabel: { fontSize: '10px', color: '#6b7280', minWidth: '60px' },
+  classProgressBarWrapper: { flex: 1, height: '6px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden' },
+  classProgressFill: { height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' },
+  classProgressPercent: { fontSize: '11px', fontWeight: '600', color: '#1f2937', minWidth: '40px', textAlign: 'right' },
+  
   barChart: { display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '120px', minWidth: '240px' },
   barContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 },
   barLabel: { fontSize: '8px', fontWeight: '600', color: '#6b7280' },
   barWrapper: { width: '100%', height: '70px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   bar: { width: '20px', borderRadius: '3px', transition: 'height 0.3s ease', minHeight: '5px' },
   barValue: { fontSize: '8px', fontWeight: '600', color: '#1f2937' },
+  
+  monthlyChart: { width: '100%' },
+  monthlyHeader: { display: 'flex', gap: '8px', marginBottom: '12px', justifyContent: 'flex-end' },
+  yearSelect: { padding: '4px 8px', fontSize: '11px', border: '1px solid #e5e7eb', borderRadius: '6px', backgroundColor: 'white' },
+  yearSelectLarge: { padding: '6px 12px', fontSize: '12px', border: '1px solid #e5e7eb', borderRadius: '8px', backgroundColor: 'white' },
+  monthlyBars: { display: 'flex', gap: '4px', alignItems: 'flex-end', height: '100px' },
+  monthlyBarContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 },
+  monthlyBarWrapper: { width: '100%', height: '60px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  monthlyBar: { width: '24px', borderRadius: '3px', transition: 'height 0.3s ease', minHeight: '5px' },
+  monthlyBarLabel: { fontSize: '8px', fontWeight: '600', color: '#6b7280' },
+  monthlyBarValue: { fontSize: '7px', color: '#6366f1', fontWeight: '500' },
+  
+  yearlyChart: { width: '100%' },
+  yearlyHeader: { display: 'flex', gap: '8px', marginBottom: '12px', justifyContent: 'flex-end' },
+  yearlyBars: { display: 'flex', gap: '4px', alignItems: 'flex-end', height: '120px' },
+  yearlyBarContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', flex: 1 },
+  yearlyBarWrapper: { width: '100%', height: '80px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  yearlyBar: { width: '24px', borderRadius: '3px', transition: 'height 0.3s ease', minHeight: '5px' },
+  yearlyBarLabel: { fontSize: '8px', fontWeight: '600', color: '#6b7280' },
+  yearlyBarValue: { fontSize: '7px', color: '#8b5cf6', fontWeight: '500' },
+  
+  barChartLarge: { display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', height: '200px', minWidth: '400px' },
+  barContainerLarge: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 },
+  barLabelLarge: { fontSize: '10px', fontWeight: '600', color: '#6b7280' },
+  barWrapperLarge: { width: '100%', height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  barLarge: { width: '30px', borderRadius: '4px', transition: 'height 0.3s ease', minHeight: '5px' },
+  barValueLarge: { fontSize: '10px', fontWeight: '600', color: '#1f2937' },
+  
+  modalMonthlyChart: { width: '100%' },
+  monthlyBarsLarge: { display: 'flex', gap: '8px', alignItems: 'flex-end', height: '200px' },
+  monthlyBarContainerLarge: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 },
+  monthlyBarWrapperLarge: { width: '100%', height: '120px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  monthlyBarLarge: { width: '36px', borderRadius: '4px', transition: 'height 0.3s ease', minHeight: '5px' },
+  monthlyBarLabelLarge: { fontSize: '10px', fontWeight: '600', color: '#6b7280' },
+  monthlyBarValueLarge: { fontSize: '9px', color: '#6366f1', fontWeight: '500' },
+  
+  modalYearlyChart: { width: '100%' },
+  yearlyBarsLarge: { display: 'flex', gap: '12px', alignItems: 'flex-end', height: '200px' },
+  yearlyBarContainerLarge: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flex: 1 },
+  yearlyBarWrapperLarge: { width: '100%', height: '130px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  yearlyBarLarge: { width: '40px', borderRadius: '4px', transition: 'height 0.3s ease', minHeight: '5px' },
+  yearlyBarLabelLarge: { fontSize: '10px', fontWeight: '600', color: '#6b7280' },
+  yearlyBarValueLarge: { fontSize: '9px', color: '#8b5cf6', fontWeight: '600' },
+  
+  modalActivityHeader: { marginBottom: '16px' },
   classProgressContainer: { display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' },
   performanceSummary: { display: 'flex', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' },
   performanceStudentList: { marginTop: '16px', maxHeight: '300px', overflowY: 'auto' },
@@ -1157,26 +1553,10 @@ const styles = {
   performanceStudentName: { fontSize: '11px', color: '#4b5563', fontWeight: '500' },
   performanceStudentStats: { display: 'flex', gap: '8px', fontSize: '10px', flexWrap: 'wrap' },
   performanceStudentProgress: { fontSize: '10px', fontWeight: '600' },
-  progressStatsStudentList: { marginTop: '16px', maxHeight: '300px', overflowY: 'auto' },
-  progressStatsStudentItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap', gap: '8px' },
-  progressStatsStudentName: { fontSize: '11px', fontWeight: '500', color: '#1f2937' },
-  progressStatsStudentDetails: { display: 'flex', gap: '8px', fontSize: '9px', color: '#6b7280', flexWrap: 'wrap' },
   perfDotExcellent: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '4px' },
   perfDotGood: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '4px' },
-  perfDotAverage: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '4px' },
-  distItem: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' },
-  distLabel: { width: '70px', fontSize: '11px', color: '#4b5563', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  distBar: { flex: 1, height: '5px', backgroundColor: '#e5e7eb', borderRadius: '3px', overflow: 'hidden', minWidth: '100px' },
-  distFill: { height: '100%', borderRadius: '3px', transition: 'width 0.3s ease' },
-  distPercent: { width: '35px', fontSize: '10px', fontWeight: '600', color: '#1f2937', textAlign: 'right' },
-  distCount: { fontSize: '9px', color: '#6b7280' },
-  progressStats: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  topPerformerItem: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid #f3f4f6', flexWrap: 'wrap' },
-  topPerformerRank: { width: '24px', height: '24px', backgroundColor: '#e0e7ff', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '700', color: '#4338ca', flexShrink: 0 },
-  topPerformerName: { fontSize: '11px', fontWeight: '500', color: '#1f2937' },
-  topPerformerClass: { fontSize: '8px', color: '#9ca3af' },
-  topPerformerStats: { display: 'flex', gap: '6px', fontSize: '9px', color: '#6b7280', flexWrap: 'wrap' },
-  topPerformerProgress: { fontSize: '11px', fontWeight: '700', color: '#10b981' },
+  perfDotAverage: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#6366f1', marginRight: '4px' },
+  perfDotNeeds: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', marginRight: '4px' },
   quickActions: { display: 'flex', flexDirection: 'column', gap: '8px' },
   actionButton: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '8px', backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '10px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', minHeight: '40px', width: '100%' },
   progressBarSmall: { height: '3px', backgroundColor: '#e5e7eb', borderRadius: '2px', overflow: 'hidden', marginTop: '2px' },
