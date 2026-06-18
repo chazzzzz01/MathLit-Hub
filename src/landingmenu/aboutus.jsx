@@ -73,18 +73,11 @@ const AboutUs = () => {
               <div style={styles.objectiveIcon}>📐</div>
               <h3 style={styles.objectiveTitle}>Solve Problems</h3>
               <p style={styles.objectiveText}>
-                Solve problems involving slope, intercepts, and linear equations accurately using appropriate mathematical procedures and formulas.
+                Solve problems involving slope, intercepts, and linear equations accurately through interactive and web-based learning activities provided in the MathLit Hub.
               </p>
             </div>
 
-            <div style={styles.objectiveCard}>
-              <div style={styles.objectiveNumber}>03</div>
-              <div style={styles.objectiveIcon}>💡</div>
-              <h3 style={styles.objectiveTitle}>Develop Skills</h3>
-              <p style={styles.objectiveText}>
-                Develop mathematical literacy, critical thinking, and problem-solving skills through interactive and web-based learning activities provided in the MathLit Hub.
-              </p>
-            </div>
+      
           </div>
         </div>
       </section>
