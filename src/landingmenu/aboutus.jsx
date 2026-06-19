@@ -54,6 +54,20 @@ const AboutUs = () => {
         </div>
       </section>
 
+      {/* Learning Competency Section */}
+      <section style={styles.learningCompetencySection}>
+        <div style={styles.sectionContent}>
+          <div style={styles.competencyCard}>
+            <div style={styles.competencyBadge}>📌 Learning Competency</div>
+            <h2 style={styles.competencyTitle}>M8AL-Ig-1</h2>
+            <p style={styles.competencyText}>
+              Find the equation of a line using two points, slope and a point, slope-intercept form, and the x- and y-intercepts.
+            </p>
+           
+          </div>
+        </div>
+      </section>
+
       {/* Learning Objectives Section */}
       <section style={styles.learningObjectivesSection}>
         <div style={styles.sectionContent}>
@@ -76,8 +90,6 @@ const AboutUs = () => {
                 Solve problems involving slope, intercepts, and linear equations accurately through interactive and web-based learning activities provided in the MathLit Hub.
               </p>
             </div>
-
-      
           </div>
         </div>
       </section>
@@ -283,6 +295,25 @@ const AboutUs = () => {
           transform: translateY(-8px);
           box-shadow: 0 20px 30px -10px rgba(37, 99, 235, 0.3);
         }
+
+        .competency-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .competency-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 20px 30px -10px rgba(37, 99, 235, 0.25);
+        }
+
+        .tag {
+          transition: all 0.3s ease;
+        }
+
+        .tag:hover {
+          transform: scale(1.05);
+          background-color: #2563eb;
+          color: white;
+        }
       `}</style>
     </div>
   );
@@ -359,6 +390,11 @@ const styles = {
     padding: 'clamp(60px, 10vh, 80px) 20px',
     backgroundColor: '#F9FAFB'
   },
+  learningCompetencySection: {
+    padding: 'clamp(60px, 10vh, 80px) 20px',
+    backgroundColor: '#F0F7FF',
+    backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.05) 0%, transparent 50%)'
+  },
   learningObjectivesSection: {
     padding: 'clamp(60px, 10vh, 80px) 20px',
     background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #EFF6FF 100%)',
@@ -393,6 +429,62 @@ const styles = {
     maxWidth: '800px',
     margin: '0 auto',
     textAlign: 'justify'
+  },
+  // Learning Competency Styles
+  competencyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: '24px',
+    padding: 'clamp(32px, 5vw, 48px)',
+    boxShadow: '0 10px 30px -5px rgba(37, 99, 235, 0.15)',
+    border: '2px solid rgba(37, 99, 235, 0.15)',
+    maxWidth: '900px',
+    margin: '0 auto',
+    textAlign: 'center',
+    position: 'relative',
+    overflow: 'hidden'
+  },
+  competencyBadge: {
+    display: 'inline-block',
+    backgroundColor: '#2563EB',
+    color: '#FFFFFF',
+    padding: '6px 20px',
+    borderRadius: '20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginBottom: '16px',
+    letterSpacing: '0.5px',
+    textTransform: 'uppercase'
+  },
+  competencyTitle: {
+    fontSize: 'clamp(24px, 5vw, 32px)',
+    color: '#111827',
+    fontWeight: '700',
+    marginBottom: '16px',
+    fontFamily: 'monospace'
+  },
+  competencyText: {
+    fontSize: 'clamp(18px, 4vw, 22px)',
+    color: '#1F2937',
+    lineHeight: '1.7',
+    marginBottom: '24px',
+    fontWeight: '500'
+  },
+  competencyTags: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '12px',
+    justifyContent: 'center'
+  },
+  tag: {
+    backgroundColor: '#EFF6FF',
+    color: '#2563EB',
+    padding: '8px 20px',
+    borderRadius: '20px',
+    fontSize: '14px',
+    fontWeight: '600',
+    border: '1px solid rgba(37, 99, 235, 0.2)',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease'
   },
   // Learning Objectives Styles
   objectivesGrid: {
